@@ -1,0 +1,43 @@
+from distutils.core import setup
+
+from setuptools import find_packages
+
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
+
+setup(
+    name="Streamlined",
+    version="0.1.0",
+    author="Zhengyi Peng",
+    author_email="pengzhengyipengzhengyi@gmail.com",
+    description="Make ML or generic pipeline more streamlined",
+    keywords="workflow pipeline",
+    install_requires=[
+        "bandit",
+        "black",
+        "Faker",
+        "isort",
+        "mypy",
+        "pre-commit",
+        "pylint",
+        "pytest",
+        "pytest-cov",
+        "ray[default]",
+        "types-requests",
+    ],
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    packages=find_packages(include=["streamlined", "streamlined.*"]),
+    project_urls={
+        "Bug Tracker": "https://github.com/pengzhengyi/Streamlined/issues",
+        "Documentation": "https://github.com/pengzhengyi/Streamlined/wiki",
+    },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires=">=3.8",
+    url="https://github.com/pengzhengyi/Streamlined",
+)
