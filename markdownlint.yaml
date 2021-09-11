@@ -1,0 +1,12 @@
+line-length:
+  line_length: 99
+  stern: true
+  tables: false
+  code_block_line_length: 99
+
+no-inline-html:
+  allowed_elements:
+    - br
+    - mark
+
+first-line-heading: false
