@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="Streamlined",
-    version="0.1.0",
+    version="0.1.1",
     author="Zhengyi Peng",
     author_email="pengzhengyipengzhengyi@gmail.com",
     description="Make ML or generic pipeline more streamlined",
