@@ -6,20 +6,14 @@ name: Python package
 on:
   push:
     branches:
-      # Push events on main branch
       - main
-      # Push events to branches matching dev
-      - 'dev'
-      # Push events to branches matching refs/heads/releases/10
-      - 'releases/**'
+      - dev
+      - release
   pull_request:
     branches:
-      # Push events on main branch
       - main
-      # Push events to branches matching dev
-      - 'dev'
-      # Push events to branches matching refs/heads/releases/10
-      - 'releases/**'
+      - dev
+      - release
 
 jobs:
   build:
@@ -39,7 +33,6 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Test with pytest
       run: |
