@@ -1,0 +1,11 @@
+bandit
+black
+Faker
+isort
+mypy
+pre-commit
+pylint
+pytest
+pytest-cov
+ray[default]
+types-requests
