@@ -3,7 +3,7 @@ name: Publish Streamlined to PyPI
 on:
   push:
     branches:
-      - release
+      - main
 
 jobs:
   build-and-publish:
