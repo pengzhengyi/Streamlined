@@ -1,4 +1,4 @@
-name: Publish Streamlined to PyPI
+name: Publish
 
 on:
   push:
@@ -22,8 +22,17 @@ jobs:
     - name: Build a binary wheel
       run: >-
         python setup.py bdist_wheel
+        python setup.py sdist
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        body_path: CHANGELOG.txt
+        files: |
+          dist/streamlined-*.tar.gz
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@release/v1
+      if: startsWith(github.ref, 'refs/tags/')
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
