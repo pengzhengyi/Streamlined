@@ -75,7 +75,7 @@ COPY . .
 
 RUN	. ~/.bashrc && \
 	pip install --extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt && \
-	pip install -e /app/Streamlined/ && \
+	pip install -e . && \
 	pre-commit && \
 	pre-commit autoupdate; exit 0
 
