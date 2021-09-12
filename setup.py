@@ -7,22 +7,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 
 setup(
-    name="Streamlined",
-    version="0.1.1",
+    name="streamlined",
+    version="0.1.2",
     author="Zhengyi Peng",
     author_email="pengzhengyipengzhengyi@gmail.com",
     description="Make ML or generic pipeline more streamlined",
     keywords="workflow pipeline",
     install_requires=[
-        "bandit",
-        "black",
-        "Faker",
-        "isort",
-        "mypy",
-        "pre-commit",
-        "pylint",
-        "pytest",
-        "pytest-cov",
         "ray[default]",
         "types-requests",
     ],
