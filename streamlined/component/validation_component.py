@@ -52,7 +52,7 @@ class ValidationStageComponent(Component):
     A component represents a validation stage where a predicate will be executed in current scope.
     """
 
-    VALIATION_RESULT_KEYNAME: ClassVar[str] = VALIDATION_RESULT
+    VALIDATION_RESULT_KEYNAME: ClassVar[str] = VALIDATION_RESULT
     ACTION_KEYNAME: ClassVar[str] = ACTION
 
     def __init__(self, action: TValidatorAction, log: Any = None, **kwargs: Any):
@@ -68,20 +68,20 @@ class ValidationStageComponent(Component):
             return cls(action=config)
 
     @staticmethod
-    def __get_default_log_config_for_validation_sucess() -> TLogDictConfig:
-        return {"value": lambda _runstep_: f"validation suceeds for {_runstep_.name}"}
+    def __get_default_log_config_for_validation_success() -> TLogDictConfig:
+        return {"value": lambda _runstep_: f"validation succeeds for {_runstep_.name}"}
 
     @staticmethod
     def __get_default_log_config_for_validation_failure() -> TLogDictConfig:
         return {"value": lambda _runstep_: f"validation failed for {_runstep_.name}"}
 
     def __set_log_with_configs(self, success_config, failure_config) -> None:
-        self._sucess_logging_component = LoggingComponent.of(success_config)
+        self._success_logging_component = LoggingComponent.of(success_config)
         self._failure_logging_component = LoggingComponent.of(failure_config)
 
     def __set_log(self, log: Any) -> None:
         if log is None:
-            validation_success_log_config = self.__get_default_log_config_for_validation_sucess()
+            validation_success_log_config = self.__get_default_log_config_for_validation_success()
             validation_failure_log_config = self.__get_default_log_config_for_validation_failure()
         elif isinstance(log, dict):
             if True in log:
@@ -103,13 +103,13 @@ class ValidationStageComponent(Component):
 
     def _execute_for_action(self, manager: Manager, scope: Scope) -> bool:
         result: bool = self._action_runner.execute(manager)
-        scope.set_magic_value(self.VALIATION_RESULT_KEYNAME, result)
+        scope.set_magic_value(self.VALIDATION_RESULT_KEYNAME, result)
         scope.set_magic_value(self.ACTION_KEYNAME, result)
         return result
 
     def _execute_for_log(self, manager: Manager, validation_result: bool) -> None:
         if validation_result:
-            self._sucess_logging_component.execute(manager)
+            self._success_logging_component.execute(manager)
         else:
             self._failure_logging_component.execute(manager)
 
