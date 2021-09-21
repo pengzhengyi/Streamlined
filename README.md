@@ -75,6 +75,11 @@ pipeline.run()
 
 ## Components
 
+### Notations
+
++ bolded **field name** implies a required field
++ bolded exposed magic value implies an argument value that is available to current scope and all enclosing scopes.
+
 ### Argument
 
 Argument component is used to define a in-scope argument that can be utilized in execution component through dependency injection.
@@ -187,13 +192,21 @@ If logger is not specified, it will use [`logging.getLogger()`](https://docs.pyt
 
 #### Syntax
 
-```Python
-LOG: {
-    VALUE: ...,
-    LEVEL: ...,
-    LOGGER: ...
-}
-```
++ Full Syntax
+    
+    ```Python
+    LOG: {
+        VALUE: ...,
+        LEVEL: ...,
+        LOGGER: ...
+    }
+    ```
+
++ Only specify log message
+
+    ```Python
+    LOG: ...
+    ```
 
 | Field Name | Field Value |
 | --- | --- |
@@ -203,9 +216,268 @@ LOG: {
 
 ### Pipeline
 
+A pipeline component is the topmost-level of configuration. For example, arguments defined at this scope can be referenced in all other scopes. Pipeline is composed by a list of runstages and the return value of the pipeline component is the return values of runstages.
+
+Also `_pipeline_` will be exposed as a magic property to reference current pipeline. To explicitly bind an argument at global level, `bindone(name, value)` can be used.
+
+#### Skip
+
+Skip is a special field present in pipeline configuration (it is also present in runstage component and runstep component) which controls conditionally execution of enclosing component.  
+
+It can be configured in any of the following ways:
+
+- Boolean Flag: `"skip": True` or `"skip": False`
+- An execution component that evaluates to boolean flag
+    `"skip": lambda: True`
+- A dictionary where value determines whether enclosing component should be skipped and action specifies an action to execute in replacement if enclosing component is skipped.
+
+    ```Python
+    "skip": {
+        "value": True,
+        "action": lambda: print('skipped')
+    }
+    ```
+
+- Not specifying any, it will default to `"skip": False`
+
+#### Syntax
+
+```Python
+{
+    NAME: ...,
+    TAG: ...,
+    ARGUMENTS: ...,
+    RUNSTAGES: ...,
+    CLEANUP: ...,
+    VALIDATOR: ...,
+    SKIP: ...
+}
+```
+
+| Field Name | Field Value | Expose Magic Value |
+| --- | --- | --- |
+| **name** | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>str</i></td><td><code>"x"</code></td></tr><tr><td><a href="#Execution"><i>Execution</i></a></td><td><code>lambda: "x"</code></td></tr></tbody></table>| `_name_` |
+| tags | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>List[str]</i></td><td><code>["preparation", "important"]</code></td></tr></tbody></table>| `_tags_` |
+| arguments | See [Argument Component](#Argument)|
+| runstages | See [Runstage Component](#Runstage)|
+| validator | See [Validator Component](#Validator)|
+| skip | See [Skip field](#Skip)|
+
 ### Runstage
 
+Runstage is the intermediate level between pipeline and runstep -- pipeline is composed of a list of runstages while a runstage is composed of a list of runsteps. In other words, runstage represent a grouping of runsteps.
+
+Arguments defined in runstage will be available through dependency injection to all enclosed runsteps.
+
+Runstage exposes a magic property `_runsteps_` which represent enclosed runsteps. It can be used to explicitly bind an argument at runsteps level. For example, if first runstage exposes an argument through `lambda _runsteps_: _runsteps_.bindone('x', 1)` can be used, later runstages can reference `x` through dependency injection.
+
+Runstage also has a special `action` field. When this field is not specified, the default action is to run in order the enclosed runsteps (equivalent of calling `_runsteps_.run()`) and collect all return values as a list. If `action` is specified, then this action is responsible for running runsteps explicitly if necessary.
+
+#### Syntax
+
+```Python
+RUNSTAGES: [
+    {
+        NAME: ...,
+        TAG: ...,
+        ARGUMENTS: ...,
+        RUNSTEPS: ...,
+        ACTION: ...,
+        LOG: ...,
+        CLEANUP: ...,
+        VALIDATOR: ...,
+        SKIP: ...
+    },
+    ...
+]
+```
+
+| Field Name | Field Value | Expose Magic Value |
+| --- | --- | --- |
+| **name** | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>str</i></td><td><code>"x"</code></td></tr><tr><td><a href="#Execution"><i>Execution</i></a></td><td><code>lambda: "x"</code></td></tr></tbody></table>| `_name_` |
+| tags | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>List[str]</i></td><td><code>["preparation", "important"]</code></td></tr></tbody></table>| `_tags_` |
+| arguments | See [Argument Component](#Argument)|
+| runsteps | See [Runstep Component](#Runstep)| **`_runsteps_`** |
+| **action** | See [Execution Component](#Execution)|
+| log | See [Log Component](#Log)|
+| cleanup | See [Cleanup Component](#Cleanup)|
+| validator | See [Validator Component](#Validator)|
+| skip | See [Skip field](#Skip)|
 
 ### Runstep
 
+Runstep is the lowest running unit of pipeline. It should ideally represent a trivial task like running a shell script. This task should be defined as the `action` field.
+
+#### Syntax
+
+```Python
+RUNSTAGES: [
+    {
+        NAME: ...,
+        TAG: ...,
+        ARGUMENTS: ...,
+        ACTION: ...,
+        LOG: ...,
+        CLEANUP: ...,
+        VALIDATOR: ...,
+        SKIP: ...
+    },
+    ...
+]
+```
+
+| Field Name | Field Value | Expose Magic Value |
+| --- | --- | --- |
+| **name** | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>str</i></td><td><code>"x"</code></td></tr><tr><td><a href="#Execution"><i>Execution</i></a></td><td><code>lambda: "x"</code></td></tr></tbody></table>| `_name_` |
+| tags | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>List[str]</i></td><td><code>["preparation", "important"]</code></td></tr></tbody></table>| `_tags_` |
+| arguments | See [Argument Component](#Argument)|
+| action | See [Execution Component](#Execution)|
+| log | See [Log Component](#Log)|
+| cleanup | See [Cleanup Component](#Cleanup)|
+| validator | See [Validator Component](#Validator)|
+| skip | See [Skip field](#Skip)|
+
 ### Validator
+
+Validator component enables validation before or after execution of enclosing component's action. If validation failed, the execution of pipeline will immediately fail because of thrown validation exception.
+
+A common use case is to validate a file not exists before action execution and exists after execution when the enclosing component's action involves creating a new file.
+
+A validator component is composed by before validation stage and (or) after validation stage. Each validation stage is then composed by a predicate that evaluates to a boolean and a log field which is a dictionary from True or False to a logging component configuration.
+
+#### Syntax
+
++ Full Syntax
+
+    ```Python
+    VALIDATOR: {
+        VALIDATION_BEFORE_STAGE: {
+            ACTION: ...,
+            LOG: {
+                True: ...,
+                False: ...
+            },
+        },
+        VALIDATION_AFTER_STAGE: {
+            ACTION: ...,
+            LOG: {
+                True: ...,
+                False: ...
+            },
+        },
+    }
+    ```
+
++ Specify only before validation stage
+
+    ```Python
+    VALIDATOR: {
+        VALIDATION_BEFORE_STAGE: {
+            ACTION: ...,
+            LOG: {
+                True: ...,
+                False: ...
+            },
+        }
+    }
+    ```
+
++ Specify only after validation stage
+
+    ```Python
+    VALIDATOR: {
+        VALIDATION_AFTER_STAGE: {
+            ACTION: ...,
+            LOG: {
+                True: ...,
+                False: ...
+            },
+        }
+    }
+    ```
+
+    This can be further simplified to
+
+    ```Python
+    VALIDATOR: {
+        ACTION: ...,
+        LOG: {
+            True: ...,
+            False: ...
+        }
+    }
+    ```
+
+| Field Name | Field Value |
+| --- | --- | 
+| before | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>Callable[..., bool]</i></td><td><code>lambda: True</code></td></tr><tr><td>Dict</a></td><td><code>{"action": lambda: True, LOG: {True: "pass", False: "fail"}}</code></td></tr></tbody></table>|
+| after | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>Callable[..., bool]</i></td><td><code>lambda: True</code></td></tr><tr><td>Dict</a></td><td><code>{"action": lambda: True, LOG: {True: "pass", False: "fail"}}</code></td></tr></tbody></table>|
+
+There are several variants to validation stage configuration:
+
++ Full syntax
+
+    ```Python
+    {
+        ACTION: ...,
+        LOG: {
+            True: ...,
+            False: ...
+        }
+    }
+    ```
+
++ Use default log message
+
+
+    ```Python
+    {
+        ACTION: ...
+    }
+    ```
+
+| Field Name | Field Value |
+| --- | --- |
+| **True** | See [Argument Component](#Logging) |
+| **False** | See [Argument Component](#Logging) |
+
+## Utilities
+
+This section will cover some utilities exposed by `streamlined` library. All these utilities are put under `streamlined.utils` package.
+
+### Argument Parser
+
+Argument parser is a utility built on top of [argparse](https://docs.python.org/3/library/argparse.html) to parse command line arguments iteratively.
+
+See `utils/argument_parser.py` folder for more details.
+
+<!-- TODO: add description for argument parser utility -->
+
+### Typed Configuration Parser
+
++ `streamlined.utils.ConfigurationParser` is a derived class of [configparser.ConfigParser](https://docs.python.org/3/library/configparser.html#configparser.ConfigParser) that provides the additional functionalities:
+
+    + **CLASSMETHOD** add a section -- `append_section`
+    + **CLASSMETHOD** remove a section -- `remove_section`
+    + get an configuration option and cast to specified type -- `get_with_type`
++ `streamlined.utils.ConfigurationLoader` allows loading a configuration file into a [dataclass](https://docs.python.org/3/library/dataclasses.html).
+It can be seen as a trait to be derived by desired dataclass:
+
+    ```Python
+    from dataclasses import dataclass
+    from streamlined.utils import ConfigurationLoader
+
+
+    @dataclass
+    class FooConfig(ConfigurationLoader):
+        bar: str
+    ```
+
+    After extending `ConfigurationLoader`,`FooConfig` can invoke `from_config_file(<config_filepath>, <section>)` to create an instance of
+    FooConfig with all values loaded according to their annotation types.
+
+    *ConfigurationLoader is able to handle `ClassVar` and `InitVar` as expected.*
+
+### Concurrency
+
+<!-- TODO: add description for concurrency-->
