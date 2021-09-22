@@ -1,5 +1,9 @@
 # Streamlined
 
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/streamlined.svg)](https://pypi.python.org/pypi/streamlined/)
+[![PyPI version fury.io](https://badge.fury.io/py/streamlined.svg)](https://pypi.python.org/pypi/streamlined/)
+[![PyPI download month](https://img.shields.io/pypi/dm/streamlined.svg)](https://pypi.python.org/pypi/streamlined/)
+
 **Making running scripts more streamlined!**
 
 Streamlined allows you to declare a pipeline using a declarative syntax.
