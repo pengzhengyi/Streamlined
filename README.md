@@ -10,7 +10,7 @@ Streamlined allows you to declare a pipeline using a declarative syntax.
 
 ## Install
 
-Steamlined can be installed by running:
+Streamlined can be installed by running:
 
 ```bash
 pip install streamlined
