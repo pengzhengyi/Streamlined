@@ -25,7 +25,6 @@ jobs:
           python setup.py sdist
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: ${{ startsWith('refs/tags/v', github.ref) }}
         with:
           body_path: CHANGELOG.txt
           files: |
