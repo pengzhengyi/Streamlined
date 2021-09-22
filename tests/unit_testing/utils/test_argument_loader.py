@@ -22,9 +22,7 @@ class DatabaseConfig(ArgumentLoader):
     username: str = field(
         metadata={"name": ["-u", "--username"], "help": "supply username", "default": "admin"}
     )
-    password: str = field(
-        metadata={"name": ["-p"], "help": "supply value for j", "dest": "password"}
-    )
+    password: str = field(metadata={"name": ["-p"], "help": "supply password", "dest": "password"})
     database: InitVar[str] = field(
         metadata={"help": "supply value for database", "choices": ["mysql", "sqlite", "mongodb"]}
     )
