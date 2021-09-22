@@ -445,15 +445,38 @@ There are several variants to validation stage configuration:
 
 This section will cover some utilities exposed by `streamlined` library. All these utilities are put under `streamlined.utils` package.
 
-### Argument Parser
+### Argument Parser/Loader
 
-Argument parser is a utility built on top of [argparse](https://docs.python.org/3/library/argparse.html) to parse command line arguments iteratively.
++ `streamlined.utils.ArgumentParser` is a utility built on top of [argparse](https://docs.python.org/3/library/argparse.html) to parse command line arguments iteratively. See `utils/argument_parser.py` folder for more details.
++ `streamlined.utils.ArgumentLoader` allows specifying definition for argument parser inside the [dataclass](https://docs.python.org/3/library/dataclasses.html) definition -- through the `metadata` property of dataclass field. 
 
-See `utils/argument_parser.py` folder for more details.
+    It supports
+    
+    + creating an argument parser based on defined dataclass fields
+    + creating an instance from arguments using a provided argument parser
+    + create an instance from arguments directly (the argument parser is created based off configuration in defined dataclass fields)
 
-<!-- TODO: add description for argument parser utility -->
+    ```Python
+    @dataclass
+    class DatabaseConfig(ArgumentLoader):
+        username: str = field(
+            metadata={"name": ["-u", "--username"], "help": "supply username", "default": "admin"}
+        )
+        password: str = field(
+            metadata={"name": ["-p"], "help": "supply password", "dest": "password"}
+        )
+        database: InitVar[str] = field(
+            metadata={"help": "supply value for database", "choices": ["mysql", "sqlite", "mongodb"]}
+        )
 
-### Typed Configuration Parser
+        def __post_init__(self, database):
+            pass
+    ```
+
+    After invoking `DatabaseConfig.from_arguments(<args>)`, an instance of
+    DatabaseConfig will be created with all values loaded based on parsed arguments.
+
+### Configuration Parser/Loader
 
 + `streamlined.utils.ConfigurationParser` is a derived class of [configparser.ConfigParser](https://docs.python.org/3/library/configparser.html#configparser.ConfigParser) that provides the additional functionalities:
 
