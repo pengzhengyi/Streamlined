@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.5]
+
+### Added
+
+- support parsing only known arguments with `from_known_arguments` and `parse_known_args`. This feature is similar with [parse_known_args](https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser.parse_known_args) and will support multi-stage argument parsing.
+
 ## [1.1.4]
 
 ### Added
