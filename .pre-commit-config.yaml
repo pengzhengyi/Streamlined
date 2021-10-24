@@ -38,7 +38,7 @@ repos:
 
   # Autoformats python code to a single standard
   - repo: https://github.com/psf/black
-    rev: 21.8b0
+    rev: 21.9b0
     hooks:
       - id: black
         stages: [commit]
@@ -53,7 +53,7 @@ repos:
 
   # Markdown linter, see markdownlint.yaml for configuration
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.28.1
+    rev: v0.29.0
     hooks:
       - id: markdownlint
         stages: [commit]
@@ -71,7 +71,7 @@ repos:
   # Push hooks (runs on push because developers may commit incomplete changes)
   # Python files linter, see .pylintrc for configuration
   - repo: https://github.com/PyCQA/pylint
-    rev: v2.10.2
+    rev: v2.11.1
     hooks:
       - id: pylint
         stages: [push]

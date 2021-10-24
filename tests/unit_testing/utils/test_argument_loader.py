@@ -17,14 +17,21 @@ def test_simple_config():
     assert config.foo == "FOO"
 
 
+def test_parse_known_arguments():
+    config, remaining_args = SimpleConfig.from_known_arguments(["FOO", "--bar", "BAR"])
+
+    assert config.foo == "FOO"
+    assert remaining_args == ["--bar", "BAR"]
+
+
 @dataclass
 class DatabaseConfig(ArgumentLoader):
-    username: str = field(
-        metadata={"name": ["-u", "--username"], "help": "supply username", "default": "admin"}
-    )
     password: str = field(metadata={"name": ["-p"], "help": "supply password", "dest": "password"})
     database: InitVar[str] = field(
         metadata={"help": "supply value for database", "choices": ["mysql", "sqlite", "mongodb"]}
+    )
+    username: str = field(
+        default="admin", metadata={"name": ["-u", "--username"], "help": "supply username"}
     )
 
     def __post_init__(self, database):

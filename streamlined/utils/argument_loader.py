@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import _MISSING_TYPE, Field, InitVar
-from typing import Any, ClassVar, Dict, List, Optional, Union, get_origin
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union, get_origin
 
 from .argument_parser import ArgumentParser
 from .configuration_loader import ConfigurationLoader
@@ -91,6 +91,18 @@ class ArgumentLoader(ConfigurationLoader):
         return cls(**vars(namespace))
 
     @classmethod
+    def parse_known_args(
+        cls, argument_parser: ArgumentParser, args: Optional[List[str]] = None
+    ) -> Tuple[ArgumentLoader, List[str]]:
+        """
+        Call `parse_known_args` on the specified `argument_parser` with provided `args`.
+        Use the parsed arguments to create an instance of this class.
+        Return both the instance and remaining argument strings.
+        """
+        namespace, remaining_args = argument_parser.parse_known_args(args=args)
+        return cls(**vars(namespace)), remaining_args
+
+    @classmethod
     def create_argument_parser(cls, add_help: bool = True, **kwargs: Any) -> ArgumentParser:
         """
         Create an argument parser based on the fields defined in this dataclass.
@@ -136,3 +148,14 @@ class ArgumentLoader(ConfigurationLoader):
         """
         argument_parser = cls.create_argument_parser(**kwargs)
         return cls.parse_args(argument_parser, args=args)
+
+    @classmethod
+    def from_known_arguments(
+        cls, args: Optional[List[str]] = None, **kwargs: Any
+    ) -> Tuple[ArgumentLoader, List[str]]:
+        """
+        Create an argument parser based on the defined fields in this dataclass
+        and use this argument parser to parse known args to initialize this dataclass.
+        """
+        argument_parser = cls.create_argument_parser(**kwargs)
+        return cls.parse_known_args(argument_parser, args=args)
