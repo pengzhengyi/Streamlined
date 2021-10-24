@@ -8,12 +8,15 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="streamlined",
-    version="0.1.4",
+    version="0.1.5",
     author="Zhengyi Peng",
     author_email="pengzhengyipengzhengyi@gmail.com",
     description="Make ML or generic pipeline more streamlined",
     keywords="workflow pipeline",
-    install_requires=["ray[default]", "types-requests",],
+    install_requires=[
+        "ray[default]",
+        "types-requests",
+    ],
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(include=["streamlined", "streamlined.*"]),
