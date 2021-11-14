@@ -15,6 +15,7 @@ setup(
     keywords="workflow pipeline",
     install_requires=[
         "ray[default]",
+        "treelib",
         "types-requests",
     ],
     long_description=long_description,
