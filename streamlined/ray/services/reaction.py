@@ -93,29 +93,32 @@ def after(
     return decorator
 
 
-class Handler(Service):
+React = Union[before, after, raises]
+
+
+class Reaction(Service):
     """
-    Handler is an abstract class that should be subclassed to use.
+    Reaction is an abstract class that should be subclassed to use.
 
-    `handle` or `when` should be overridden with desired behavior.
+    `react` or `when` should be overridden with desired behavior.
 
-    `register` can be called to produce a decorator that binds this handler to a function.
+    `bind` can be called to produce a decorator that binds this handler to a function.
     """
 
     def when(self, *args: Any, **kwargs: Any) -> bool:
         """
-        Determines whether `handle` method should be called.
+        Determines whether `react` method should be called.
         """
         return True
 
-    def handle(self, *args: Any, **kwargs: Any) -> None:
+    def react(self, *args: Any, **kwargs: Any) -> None:
         """
         Perform an action at specific timings of registered function.
         """
         pass
 
-    def register(self, at: Union[before, after, raises]):
-        return at(do=self.handle, when=self.when)
+    def bind(self, at: Union[before, after, raises]):
+        return at(do=self.react, when=self.when)
 
 
 if __name__ == "__main__":
