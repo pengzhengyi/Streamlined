@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, Type, TypeVar, Union
+
+from .service import Service
 
 T = TypeVar("T")
 Predicate = Callable[..., bool]
@@ -35,10 +37,40 @@ def before(do: Optional[ACTION] = VOID, when: Optional[Predicate] = TAUTOLOGY):
     return decorator
 
 
+def raises(
+    do: Optional[ACTION] = VOID,
+    when: Optional[Predicate] = TAUTOLOGY,
+    expected_exception: Type[BaseException] = Exception,
+    exception_param_name: str = "_exception_",
+):
+    """
+    Add a hook to catch expected exception.
+    """
+
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> T:
+            try:
+                return func(*args, **kwargs)
+            except expected_exception as exception:
+                if when(*args, **{exception_param_name: exception}, **kwargs):
+                    if isinstance(
+                        result := do(*args, **{exception_param_name: exception}, **kwargs),
+                        BaseException,
+                    ):
+                        raise result from exception
+                    else:
+                        return result
+
+        return wrapper
+
+    return decorator
+
+
 def after(
     do: Optional[ACTION] = VOID,
     when: Optional[Predicate] = TAUTOLOGY,
-    result_param_name: str = "result",
+    result_param_name: str = "_result_",
 ):
     """
     Add a hook after decorated function's execution.
@@ -59,6 +91,31 @@ def after(
         return wrapper
 
     return decorator
+
+
+class Handler(Service):
+    """
+    Handler is an abstract class that should be subclassed to use.
+
+    `handle` or `when` should be overridden with desired behavior.
+
+    `register` can be called to produce a decorator that binds this handler to a function.
+    """
+
+    def when(self, *args: Any, **kwargs: Any) -> bool:
+        """
+        Determines whether `handle` method should be called.
+        """
+        return True
+
+    def handle(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Perform an action at specific timings of registered function.
+        """
+        pass
+
+    def register(self, at: Union[before, after, raises]):
+        return at(do=self.handle, when=self.when)
 
 
 if __name__ == "__main__":
