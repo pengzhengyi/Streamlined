@@ -6,5 +6,6 @@ These services should be plug and use, decoupled from anything else.
 
 from .dependency_injection import DependencyInjection
 from .dependency_tracking import DependencyTracking
+from .event import after, before
 from .scoping import Scoping, to_magic_naming
 from .service import Service
