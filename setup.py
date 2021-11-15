@@ -17,6 +17,7 @@ setup(
         "ray[default]",
         "treelib",
         "types-requests",
+        "networkx[default]",
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",

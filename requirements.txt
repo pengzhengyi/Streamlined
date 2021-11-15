@@ -3,6 +3,7 @@ black
 Faker
 isort
 mypy
+networkx[default]
 pre-commit
 pylint
 pytest
