@@ -18,6 +18,7 @@ setup(
         "treelib",
         "types-requests",
         "networkx[default]",
+        "decorator",
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",

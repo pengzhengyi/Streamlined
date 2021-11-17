@@ -1,5 +1,6 @@
 bandit
 black
+decorator
 Faker
 isort
 mypy

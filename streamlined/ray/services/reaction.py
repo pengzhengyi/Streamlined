@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
 
+from decorator import decorator
+
+from ..common import TAUTOLOGY, VOID
 from .service import Service
 
 T = TypeVar("T")
@@ -11,89 +13,72 @@ Predicate = Callable[..., bool]
 ACTION = Callable[..., None]
 
 
-def TAUTOLOGY(*args: Any, **kwargs: Any) -> bool:
-    return True
-
-
-def VOID(*args: Any, **kwargs: Any) -> None:
-    pass
-
-
-def before(do: Optional[ACTION] = VOID, when: Optional[Predicate] = TAUTOLOGY):
+@decorator
+def before(
+    func,
+    do: Optional[ACTION] = VOID,
+    when: Optional[Predicate] = TAUTOLOGY,
+    *args: Any,
+    **kwargs: Any,
+):
     """
     Add a hook before decorated function's execution.
     """
+    if when(*args, **kwargs):
+        do(*args, **kwargs)
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> T:
-            if when(*args, **kwargs):
-                do(*args, **kwargs)
-
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
+    return func(*args, **kwargs)
 
 
+@decorator
 def raises(
+    func,
     do: Optional[ACTION] = VOID,
     when: Optional[Predicate] = TAUTOLOGY,
     expected_exception: Type[BaseException] = Exception,
     exception_param_name: str = "_exception_",
+    *args: Any,
+    **kwargs: Any,
 ):
     """
     Add a hook to catch expected exception.
     """
-
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> T:
-            try:
-                return func(*args, **kwargs)
-            except expected_exception as exception:
-                if when(*args, **{exception_param_name: exception}, **kwargs):
-                    if isinstance(
-                        result := do(*args, **{exception_param_name: exception}, **kwargs),
-                        BaseException,
-                    ):
-                        raise result from exception
-                    else:
-                        return result
-
-        return wrapper
-
-    return decorator
+    try:
+        return func(*args, **kwargs)
+    except expected_exception as exception:
+        if when(*args, **{exception_param_name: exception}, **kwargs):
+            if isinstance(
+                result := do(*args, **{exception_param_name: exception}, **kwargs),
+                BaseException,
+            ):
+                raise result from exception
+            else:
+                return result
 
 
+@decorator
 def after(
+    func,
     do: Optional[ACTION] = VOID,
     when: Optional[Predicate] = TAUTOLOGY,
     result_param_name: str = "_result_",
+    *args: Any,
+    **kwargs: Any,
 ):
     """
     Add a hook after decorated function's execution.
 
     Result of decorated function is available through designated `result_param_name`.
     """
+    result = func(*args, **kwargs)
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> T:
-            result = func(*args, **kwargs)
+    if when(*args, **{result_param_name: result}, **kwargs):
+        do(*args, **{result_param_name: result}, **kwargs)
 
-            if when(*args, **{result_param_name: result}, **kwargs):
-                do(*args, **{result_param_name: result}, **kwargs)
-
-            return result
-
-        return wrapper
-
-    return decorator
+    return result
 
 
-React = Union[before, after, raises]
+ReactAt = Union[before, after, raises]
 
 
 class Reaction(Service):
@@ -117,7 +102,7 @@ class Reaction(Service):
         """
         pass
 
-    def bind(self, at: Union[before, after, raises]):
+    def bind(self, at: ReactAt):
         return at(do=self.react, when=self.when)
 
 
