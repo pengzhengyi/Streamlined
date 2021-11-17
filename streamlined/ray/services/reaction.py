@@ -102,8 +102,8 @@ class Reaction(Service):
         """
         pass
 
-    def bind(self, at: ReactAt):
-        return at(do=self.react, when=self.when)
+    def bind(self, at: ReactAt, **kwargs: Any):
+        return at(do=self.react, when=self.when, **kwargs)
 
 
 if __name__ == "__main__":
