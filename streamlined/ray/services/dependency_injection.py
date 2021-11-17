@@ -42,11 +42,9 @@ class DependencyInjection(Service):
                 yield providers[requirement]
 
     @classmethod
-    def inject_callable(
-        cls, _callable: Callable[..., Any], providers: Mapping[Any, Any]
+    def inject_signature(
+        cls, signature: inspect.Signature, providers: Mapping[Any, Any]
     ) -> inspect.BoundArguments:
-        signature = inspect.signature(_callable)
-
         args: List[Any] = []
         kwargs: Mapping[Any, Any] = dict()
 
@@ -70,6 +68,13 @@ class DependencyInjection(Service):
                 kwargs.update(providers.get(name, dict()))
 
         return signature.bind(*args, **kwargs)
+
+    @classmethod
+    def inject_callable(
+        cls, _callable: Callable[..., Any], providers: Mapping[Any, Any]
+    ) -> inspect.BoundArguments:
+        signature = inspect.signature(_callable)
+        return cls.inject_signature(signature, providers)
 
 
 if __name__ == "__main__":
