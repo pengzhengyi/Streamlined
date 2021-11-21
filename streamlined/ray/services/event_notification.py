@@ -32,9 +32,12 @@ class EventNotification(Service):
         for listener in self.listeners:
             self.notify(listener, *args, **kwargs)
 
-    def __iadd__(self, other: Callable) -> EventNotification:
+    def __add__(self, other: Callable) -> EventNotification:
         self.listeners.append(other)
         return self
+
+    def __iadd__(self, other: Callable) -> EventNotification:
+        return self.__add__(other)
 
     def notify(self, listener: Callable, *args: Any, **kwargs: Any) -> None:
         listener(*args, **kwargs)

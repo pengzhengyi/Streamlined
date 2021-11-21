@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional
-
-import networkx as nx
+from typing import Any, Callable, ClassVar, Dict, Iterable, Mapping, Optional
 
 from .service import Service
 
@@ -23,13 +21,9 @@ class DependencyTracking(Service):
     >>> teardown.acknowledge(running)
     >>> teardown.are_requirements_satisfied
     True
-
-    >>> G = DependencyTracking.build_dependency_graph([setup, running, teardown], add_source=False, add_sink=False)
-    >>> G.number_of_nodes()
-    3
-    >>> G.number_of_edges()
-    2
     """
+
+    REQUIREMENTS_FACTORY: ClassVar[Callable[[], Mapping]] = dict
 
     _requirements: Dict[DependencyTracking, bool]
 
@@ -55,7 +49,7 @@ class DependencyTracking(Service):
         self.__init_requirements(prerequisites)
 
     def __init_requirements(self, prerequisites: Optional[Iterable[DependencyTracking]]) -> None:
-        self._requirements = dict()
+        self._requirements = self.REQUIREMENTS_FACTORY()
 
         if prerequisites:
             for prerequisite in prerequisites:
@@ -72,37 +66,6 @@ class DependencyTracking(Service):
     def notify(self, dependent: DependencyTracking) -> None:
         """Notify a dependency that this instance as a prerequisite is satisfied."""
         dependent.acknowledge(self)
-
-    @classmethod
-    def build_dependency_graph(
-        cls,
-        dependency_nodes: Iterable[DependencyTracking],
-        add_source: bool = True,
-        add_sink: bool = True,
-    ) -> nx.DiGraph:
-        """
-        Dependency Graph is a directed acyclic graph with edges from prerequisite to dependent.
-
-        When `add_source` is True, there will be a empty dependency node that is prerequisite for every dependency nodes.
-        When `add_sink` is True, there will be a empty dependency node that has every dependency nodes as prerequisite.
-        """
-        graph = nx.DiGraph()
-
-        if add_source:
-            source = cls.empty()
-        if add_sink:
-            sink = cls.empty()
-
-        for dependency_node in dependency_nodes:
-            if add_source:
-                graph.add_edge(source, dependency_node)
-            if add_sink:
-                graph.add_edge(dependency_node, sink)
-
-            for prerequisite in dependency_node.prerequisites:
-                graph.add_edge(prerequisite, dependency_node)
-
-        return graph
 
 
 if __name__ == "__main__":
