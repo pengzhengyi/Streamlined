@@ -3,7 +3,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from streamlined.ray.services import Reaction, after, before, raises
+from streamlined.ray.services import (
+    Reaction,
+    after,
+    before,
+    bind_named_reaction,
+    raises,
+)
 
 
 def test_raises_return_default_value_at_expected_exception():
@@ -45,3 +51,33 @@ def test_reaction():
 
     assert add(10, 20) == 30
     mock.assert_called_with(10, 20)
+
+
+def test_reaction_for_class_method():
+    class MockReaction(Reaction):
+        def __init__(self):
+            self.mock = Mock()
+
+        def when(self, *args, **kwargs):
+            return True
+
+        def react(self, *args, **kwargs):
+            self.mock(*args, **kwargs)
+
+    class Calculator:
+        def __init__(self):
+            self.record_add = MockReaction()
+
+        @bind_named_reaction(at=before, name="record_add")
+        def add(self, x, y):
+            return x + y
+
+        def sub(self, x, y):
+            return x - y
+
+    calculator = Calculator()
+    assert 3 == calculator.add(1, 2)
+    calculator.record_add.mock.assert_called_once_with(calculator, 1, 2)
+
+    assert 8 == calculator.sub(10, 2)
+    assert calculator.record_add.mock.call_count == 1

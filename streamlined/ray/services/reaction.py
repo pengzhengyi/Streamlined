@@ -106,6 +106,60 @@ class Reaction(Service):
         return at(do=self.react, when=self.when, **kwargs)
 
 
+class _NoReaction_(Reaction):
+    """
+    A special subclass of Reaction that performs nothing.
+    """
+
+    def when(self, *args, **kwargs):
+        return False
+
+
+NO_REACTION = _NoReaction_()
+
+
+@decorator
+def bind_reaction(
+    func,
+    at: ReactAt = after,
+    reaction: Union[Reaction, Callable[..., Reaction]] = NO_REACTION,
+    *args: Any,
+    **kwargs: Any,
+):
+    """
+    Different from `Reaction.bind`, `bind_reaction` offers a possibility of
+    dynamically resolve reaction -- besides passing a instance of `Reaction`,
+    `reaction` can accept a callable that finds the reaction with the
+    provided arguments.
+    """
+    if callable(reaction):
+        reaction = reaction(*args, **kwargs)
+
+    return reaction.bind(at, **kwargs)(func)(*args, **kwargs)
+
+
+@decorator
+def bind_named_reaction(
+    func,
+    at: ReactAt = after,
+    name: str = "_MISSING_",
+    finder: Callable[..., Reaction] = lambda name, instance, *args, **kwargs: getattr(
+        instance, name
+    ),
+    *args: Any,
+    **kwargs: Any,
+):
+    """
+    An extension of `bind_reaction` that supports finding a Reaction dynamically with a name string.
+
+    The default finder will look at the attribute with specified name in
+    first method argument, which is suitable for decorating class methods
+    where first method argument is the class instance.
+    """
+    reaction: Reaction = finder(name, *args, **kwargs)
+    return reaction.bind(at, **kwargs)(func)(*args, **kwargs)
+
+
 if __name__ == "__main__":
     import doctest
 
