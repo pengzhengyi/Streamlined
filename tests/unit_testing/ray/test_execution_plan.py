@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from streamlined.ray.tasks.execution_plan import DependencyRequirements
+from streamlined.ray.execution.execution_plan import DependencyRequirements
 
 
 def test_dependency_requirements_on_new_requirement():

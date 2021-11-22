@@ -145,6 +145,9 @@ class ExecutionPlan:
     def __init_graph(self, graph: Optional[nx.DiGraph]) -> None:
         self.graph = graph if graph else nx.DiGraph()
 
+    def __iter__(self):
+        yield from self.execution_units
+
     def _track_requirement(self, prerequisite: ExecutionUnit, dependent: ExecutionUnit):
         self.graph.add_edge(prerequisite, dependent)
 
@@ -159,6 +162,7 @@ class ExecutionPlan:
         if not isinstance(execution_unit, ExecutionUnit):
             execution_unit = self.EXECUTION_UNIT_FACTORY(execution_unit)
         else:
+            assert callable(execution_unit)
             # track existing requirements
             for prerequisite in execution_unit.prerequisites:
                 self._track_requirement(prerequisite, execution_unit)

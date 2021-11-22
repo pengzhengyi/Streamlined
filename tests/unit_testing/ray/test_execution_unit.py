@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from streamlined.ray.tasks import ExecutionStatus, ExecutionUnit
+from streamlined.ray.execution import ExecutionStatus, ExecutionUnit
 
 
 def test_execution_status():
