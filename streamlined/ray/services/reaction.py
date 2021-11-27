@@ -138,14 +138,16 @@ def bind_reaction(
     return reaction.bind(at, **kwargs)(func)(*args, **kwargs)
 
 
+def DEFAULT_FINDER(name: str, instance: Any, *args: Any, **kwargs: Any) -> Reaction:
+    return getattr(instance, name)
+
+
 @decorator
 def bind_named_reaction(
     func,
     at: ReactAt = after,
     name: str = "_MISSING_",
-    finder: Callable[..., Reaction] = lambda name, instance, *args, **kwargs: getattr(
-        instance, name
-    ),
+    finder: Callable[..., Reaction] = DEFAULT_FINDER,
     *args: Any,
     **kwargs: Any,
 ):

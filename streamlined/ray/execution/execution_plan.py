@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any, Callable, ClassVar, Iterable, Optional, Type, Union
+from functools import partial
+from typing import Any, Callable, ClassVar, Iterable, Type
 
 import networkx as nx
 
@@ -111,6 +112,15 @@ class ExecutionPlan:
     """
     ExecutionPlan can be seen as a Directed Acyclic Graph of ExecutionUnit. More specifically, nodes are callables while edges are dependency relationships.
 
+    Events
+    --------
+    ExecutionPlan also exposes two events:
+
+    + `on_all_requirements_satisfied(execution_unit)` This event signals an execution unit is ready to execute
+    + `on_complete(result, execution_unit)` This event notifies an execution unit has completed its execution.
+
+    Usage
+    --------
     Initialize ExecutionPlan and add units
     >>> execution_plan = ExecutionPlan()
     >>> get_daily_profit = execution_plan.push(lambda: 1000)
@@ -134,22 +144,29 @@ class ExecutionPlan:
 
     EXECUTION_UNIT_FACTORY: ClassVar[Type[ExecutionUnit]] = ExecutionUnit
 
-    def __init__(self, *args: Any, graph: Optional[nx.DiGraph] = None, **kwargs: Any):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__()
-        self.__init_graph(graph)
-        self.__init_events()
+        self._init_events()
+        self._init_graph()
 
-    def __init_events(self):
+    def _init_events(self):
         self.on_all_requirements_satisfied = EventNotification()
+        self.on_complete = EventNotification()
 
-    def __init_graph(self, graph: Optional[nx.DiGraph]) -> None:
-        self.graph = graph if graph else nx.DiGraph()
+    def _init_graph(self) -> None:
+        self.graph = nx.DiGraph()
 
-    def __iter__(self):
-        yield from self.execution_units
-
-    def _track_requirement(self, prerequisite: ExecutionUnit, dependent: ExecutionUnit):
-        self.graph.add_edge(prerequisite, dependent)
+    def _init_events_for_execution_unit(self, execution_unit: ExecutionUnit) -> None:
+        # bind event listeners
+        execution_unit.on_new_requirement.register(
+            partial(self.__track_requirement, dependent=execution_unit)
+        )
+        execution_unit.on_all_requirements_satisfied.register(
+            partial(self.on_all_requirements_satisfied, execution_unit)
+        )
+        execution_unit.on_complete.register(
+            partial(self.on_complete, execution_unit=execution_unit)
+        )
 
     @property
     def execution_units(self) -> Iterable[ExecutionUnit]:
@@ -158,22 +175,26 @@ class ExecutionPlan:
         """
         return nx.topological_sort(self.graph)
 
-    def push(self, execution_unit: Union[Callable, ExecutionUnit]) -> ExecutionUnit:
-        if not isinstance(execution_unit, ExecutionUnit):
-            execution_unit = self.EXECUTION_UNIT_FACTORY(execution_unit)
-        else:
-            assert callable(execution_unit)
-            # track existing requirements
-            for prerequisite in execution_unit.prerequisites:
-                self._track_requirement(prerequisite, execution_unit)
+    def __iter__(self):
+        yield from self.execution_units
 
-        # bind event listeners
-        execution_unit.on_new_requirement + (
-            lambda prerequisite: self._track_requirement(prerequisite, execution_unit)
-        )
-        execution_unit.on_all_requirements_satisfied + (
-            lambda: self.on_all_requirements_satisfied(execution_unit=execution_unit)
-        )
+    def __add__(self, other: Any) -> ExecutionPlan:
+        if callable(other):
+            self.push(other)
+            return self
+        else:
+            raise TypeError("Expecting callable for right operand of add")
+
+    def __iadd__(self, other: Any) -> ExecutionPlan:
+        return self.__add__(other)
+
+    def __track_requirement(self, prerequisite: ExecutionUnit, dependent: ExecutionUnit):
+        self.graph.add_edge(prerequisite, dependent)
+
+    def push(self, _callable: Callable) -> ExecutionUnit:
+        execution_unit = self.EXECUTION_UNIT_FACTORY(_callable)
+
+        self._init_events_for_execution_unit(execution_unit)
 
         self.graph.add_node(execution_unit)
 
