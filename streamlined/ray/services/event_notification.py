@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import Any, Callable, List
 
 from .service import Service
@@ -59,6 +60,18 @@ class EventNotification(Service):
         Unregister an event listener.
         """
         self.listeners.remove(_callable)
+
+    @contextmanager
+    def registering(self, _callable: Callable):
+        """
+        Create a context manager that registers the event listener at entering and unregisters at exiting.
+        Register an event listener
+        """
+        try:
+            self.register(_callable)
+            yield self
+        finally:
+            self.unregister(_callable)
 
     def notify(self, listener: Callable, *args: Any, **kwargs: Any) -> None:
         listener(*args, **kwargs)
