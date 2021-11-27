@@ -1,6 +1,9 @@
+import asyncio
 from unittest.mock import Mock
 
-from streamlined.ray.execution import ExecutionStatus, ExecutionUnit
+import pytest
+
+from streamlined.ray.execution import AsyncExecutionUnit, ExecutionStatus, ExecutionUnit
 
 
 def test_execution_status():
@@ -18,7 +21,23 @@ def test_on_complete_callable():
     mock = Mock()
     execution_unit = ExecutionUnit(mock)
     on_complete_mock = Mock()
-    execution_unit.on_complete += on_complete_mock
+    execution_unit.on_complete.register(on_complete_mock)
 
     execution_unit()
     on_complete_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_execution_unit():
+    mock = Mock()
+    execution_unit = AsyncExecutionUnit.empty()
+
+    @AsyncExecutionUnit.bind(execution_unit=execution_unit)
+    async def sleep_and_run():
+        await asyncio.sleep(0.1)
+        mock()
+
+    await sleep_and_run()
+
+    mock.assert_called_once()
+    assert execution_unit.status == ExecutionStatus.Completed

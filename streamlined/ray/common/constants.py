@@ -7,3 +7,7 @@ def TAUTOLOGY(*args: Any, **kwargs: Any) -> bool:
 
 def VOID(*args: Any, **kwargs: Any) -> None:
     pass
+
+
+async def ASYNC_VOID(*args: Any, **kwargs: Any) -> None:
+    pass

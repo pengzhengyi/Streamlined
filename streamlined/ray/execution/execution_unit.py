@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from decorator import decorate
 
-from ..common import VOID
+from ..common import ASYNC_VOID, VOID
 from ..services import EventNotification
 
 
@@ -23,6 +23,8 @@ class ExecutionUnit:
 
     When ExecutionUnit is called, the wrapped function will be called and at its completion, registered listeners will be notified.
 
+    Initialization
+    --------
     ExecutionUnit can be instantiated in three ways:
 
     1. In this approach, the callable is transformed into an ExecutionUnit while the original callable is now `ExecutionUnit.callable`. Invoking the name of callable will actually invoke the ExecutionUnit.
@@ -99,6 +101,35 @@ class ExecutionUnit:
         """
         self.status = ExecutionStatus.Completed
         self.on_complete(result)
+
+
+class AsyncExecutionUnit(ExecutionUnit):
+    """
+    Similar as ExecutionUnit, but work specifically for coroutines.
+    """
+
+    @staticmethod
+    def bind(execution_unit: ExecutionUnit):
+        def _decorate(_callable: Callable):
+            execution_unit.callable = _callable
+
+            async def wrapper(_callable: Callable, *args: Any, **kwargs: Any):
+                return await execution_unit(*args, **kwargs)
+
+            return decorate(_callable, wrapper)
+
+        return _decorate
+
+    def __init__(self, _callable=ASYNC_VOID):
+        super().__init__(_callable=_callable)
+
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        self.status = ExecutionStatus.Started
+
+        result = await self.callable(*args, **kwargs)
+
+        self.set_complete(result, *args, **kwargs)
+        return result
 
 
 if __name__ == "__main__":
