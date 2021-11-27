@@ -1,7 +1,13 @@
+import asyncio
 from collections import deque
 from unittest.mock import Mock
 
-from streamlined.ray.execution import ExecutionSchedule
+import pytest
+
+from streamlined.ray.execution import (
+    DependencyTrackingAsyncExecutionUnit,
+    ExecutionSchedule,
+)
 
 
 def test_execution_schedule_synchronous_execution():
@@ -44,3 +50,45 @@ def test_execution_schedule_synchronous_execution():
     assert checkout_eu == next(tasks)
     assert len(queue) == 0
     checkout_eu()
+
+
+@pytest.mark.asyncio
+async def test_execution_schedule_asynchronous_execution():
+    prepare_mock = Mock()
+    prepare_eu = DependencyTrackingAsyncExecutionUnit.empty()
+
+    @DependencyTrackingAsyncExecutionUnit.bind(execution_unit=prepare_eu)
+    async def prepare():
+        await asyncio.sleep(0.1)
+        prepare_mock()
+
+    cook_mock = Mock()
+    cook_eu = DependencyTrackingAsyncExecutionUnit.empty()
+
+    @DependencyTrackingAsyncExecutionUnit.bind(execution_unit=cook_eu)
+    async def cook():
+        await asyncio.sleep(0.1)
+        cook_mock()
+
+    eat_mock = Mock()
+    eat_eu = DependencyTrackingAsyncExecutionUnit.empty()
+
+    @DependencyTrackingAsyncExecutionUnit.bind(execution_unit=eat_eu)
+    async def eat():
+        await asyncio.sleep(0.1)
+        eat_mock()
+
+    lunch_steps = ExecutionSchedule()
+    assert prepare_eu == lunch_steps.push(prepare_eu)
+    assert cook_eu == lunch_steps.push(cook_eu)
+    assert eat_eu == lunch_steps.push(eat_eu)
+
+    cook_eu.require(prepare_eu)
+    eat_eu.require(cook_eu)
+
+    async for task in lunch_steps:
+        await task()
+
+    prepare_mock.assert_called_once()
+    cook_mock.assert_called_once()
+    eat_mock.assert_called_once()

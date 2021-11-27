@@ -2,21 +2,20 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from functools import partial
-from typing import Any, Callable, ClassVar, Iterable, Type
+from typing import Any, Callable, ClassVar, Iterable, Type, Union
 
 import networkx as nx
 
-from ..common import VOID
-from ..services import DependencyTracking as _DependencyTracking
-from ..services import EventNotification, Reaction, after, before
-from .execution_unit import ExecutionUnit as _ExecutionUnit
+from ..common import ASYNC_VOID, VOID
+from ..services import DependencyTracking, EventNotification, Reaction, after, before
+from .execution_unit import AsyncExecutionUnit, ExecutionUnit
 
 
 class NotifyNewRequirement(Reaction):
     def when(
         self,
         dependency_requirements: DependencyRequirements,
-        prerequisite: _DependencyTracking,
+        prerequisite: DependencyTracking,
         is_satisfied: bool,
     ):
         return prerequisite not in dependency_requirements
@@ -24,7 +23,7 @@ class NotifyNewRequirement(Reaction):
     def react(
         self,
         dependency_requirements: DependencyRequirements,
-        prerequisite: _DependencyTracking,
+        prerequisite: DependencyTracking,
         is_satisfied: bool,
     ):
         dependency_requirements.on_new_requirement(prerequisite=prerequisite)
@@ -37,7 +36,7 @@ class NotifyAllRequirementsSatisfied(Reaction):
     def when(
         self,
         dependency_requirements: DependencyRequirements,
-        prerequisite: _DependencyTracking,
+        prerequisite: DependencyTracking,
         is_satisfied: bool,
         *args: Any,
         **kwargs: Any,
@@ -47,7 +46,7 @@ class NotifyAllRequirementsSatisfied(Reaction):
     def react(
         self,
         dependency_requirements: DependencyRequirements,
-        prerequisite: _DependencyTracking,
+        prerequisite: DependencyTracking,
         is_satisfied: bool,
         *args: Any,
         **kwargs: Any,
@@ -76,12 +75,12 @@ class DependencyRequirements(OrderedDict):
         self.on_new_requirement = EventNotification()
         self.on_all_requirements_satisfied = EventNotification()
 
-    def __getitem__(self, prerequisite: _DependencyTracking) -> bool:
+    def __getitem__(self, prerequisite: DependencyTracking) -> bool:
         return super().__getitem__(prerequisite)
 
     @NOTIFY_NEW_REQUIREMENT.bind(at=before)
     @NOTIFY_ALL_REQUIREMENTS_SATISFIED.bind(at=after)
-    def __setitem__(self, prerequisite: _DependencyTracking, is_satisfied: bool):
+    def __setitem__(self, prerequisite: DependencyTracking, is_satisfied: bool):
         super().__setitem__(prerequisite, is_satisfied)
 
     @property
@@ -89,7 +88,7 @@ class DependencyRequirements(OrderedDict):
         return all(self.values())
 
 
-class ExecutionUnit(_DependencyTracking, _ExecutionUnit):
+class DependencyTrackingExecutionUnit(DependencyTracking, ExecutionUnit):
     """
     Beyond plain `ExecutionUnit` and `DependencyTracking`, this provides EventNotification when all prerequisites are satisfied and when execution completed.
     """
@@ -106,6 +105,15 @@ class ExecutionUnit(_DependencyTracking, _ExecutionUnit):
     @property
     def on_all_requirements_satisfied(self) -> EventNotification:
         return self._requirements.on_all_requirements_satisfied
+
+
+class DependencyTrackingAsyncExecutionUnit(AsyncExecutionUnit, DependencyTrackingExecutionUnit):
+    """
+    Similar as ExecutionUnit, but work specifically for coroutines.
+    """
+
+    def __init__(self, _callable: Callable = ASYNC_VOID):
+        super().__init__(_callable=_callable)
 
 
 class ExecutionPlan:
@@ -142,7 +150,9 @@ class ExecutionPlan:
     True
     """
 
-    EXECUTION_UNIT_FACTORY: ClassVar[Type[ExecutionUnit]] = ExecutionUnit
+    EXECUTION_UNIT_FACTORY: ClassVar[
+        Type[DependencyTrackingExecutionUnit]
+    ] = DependencyTrackingExecutionUnit
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__()
@@ -156,7 +166,9 @@ class ExecutionPlan:
     def _init_graph(self) -> None:
         self.graph = nx.DiGraph()
 
-    def _init_events_for_execution_unit(self, execution_unit: ExecutionUnit) -> None:
+    def _init_events_for_execution_unit(
+        self, execution_unit: DependencyTrackingExecutionUnit
+    ) -> None:
         # bind event listeners
         execution_unit.on_new_requirement.register(
             partial(self.__track_requirement, dependent=execution_unit)
@@ -169,7 +181,7 @@ class ExecutionPlan:
         )
 
     @property
-    def execution_units(self) -> Iterable[ExecutionUnit]:
+    def execution_units(self) -> Iterable[DependencyTrackingExecutionUnit]:
         """
         Returns a generator of execution units in topologically sorted order.
         """
@@ -179,7 +191,7 @@ class ExecutionPlan:
         yield from self.execution_units
 
     def __add__(self, other: Any) -> ExecutionPlan:
-        if callable(other):
+        if callable(other) or isinstance(other, DependencyTrackingExecutionUnit):
             self.push(other)
             return self
         else:
@@ -188,12 +200,21 @@ class ExecutionPlan:
     def __iadd__(self, other: Any) -> ExecutionPlan:
         return self.__add__(other)
 
-    def __track_requirement(self, prerequisite: ExecutionUnit, dependent: ExecutionUnit):
+    def __track_requirement(
+        self,
+        prerequisite: DependencyTrackingExecutionUnit,
+        dependent: DependencyTrackingExecutionUnit,
+    ):
         self.graph.add_edge(prerequisite, dependent)
 
-    def push(self, _callable: Callable) -> ExecutionUnit:
-        execution_unit = self.EXECUTION_UNIT_FACTORY(_callable)
-
+    def push(
+        self, _callable: Union[Callable, DependencyTrackingExecutionUnit]
+    ) -> DependencyTrackingExecutionUnit:
+        execution_unit = (
+            _callable
+            if isinstance(_callable, DependencyTrackingExecutionUnit)
+            else self.EXECUTION_UNIT_FACTORY(_callable)
+        )
         self._init_events_for_execution_unit(execution_unit)
 
         self.graph.add_node(execution_unit)

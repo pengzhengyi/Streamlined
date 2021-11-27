@@ -6,8 +6,7 @@ from multiprocessing import Queue
 from typing import Any, AsyncIterable, Callable, ClassVar, Iterable, Optional
 
 from ..common import VOID
-from ..services import after
-from .execution_plan import ExecutionPlan, ExecutionUnit
+from .execution_plan import DependencyTrackingExecutionUnit, ExecutionPlan
 
 
 @contextmanager
@@ -32,17 +31,17 @@ class ExecutionSchedule(ExecutionPlan):
     _ATTRIBUTE_NAME_FOR_SINK: ClassVar[str] = "sink"
 
     @property
-    def _source(self) -> ExecutionUnit:
+    def _source(self) -> DependencyTrackingExecutionUnit:
         return self.graph.graph[self._ATTRIBUTE_NAME_FOR_SOURCE]
 
     @property
-    def _sink(self) -> ExecutionUnit:
+    def _sink(self) -> DependencyTrackingExecutionUnit:
         return self.graph.graph[self._ATTRIBUTE_NAME_FOR_SINK]
 
-    def __iter__(self) -> Iterable[ExecutionUnit]:
+    def __iter__(self) -> Iterable[DependencyTrackingExecutionUnit]:
         yield from self.walk()
 
-    async def __aiter__(self) -> AsyncIterable[ExecutionUnit]:
+    async def __aiter__(self) -> AsyncIterable[DependencyTrackingExecutionUnit]:
         async for execution_unit in self.walk_async():
             yield execution_unit
 
@@ -59,16 +58,20 @@ class ExecutionSchedule(ExecutionPlan):
         self.__init_terminal_node(self._ATTRIBUTE_NAME_FOR_SINK)
         self._sink.require(self._source)
 
-    def __add_requirement_for_source_sink(self, execution_unit: ExecutionUnit) -> None:
+    def __add_requirement_for_source_sink(
+        self, execution_unit: DependencyTrackingExecutionUnit
+    ) -> None:
         execution_unit.require(self._source)
         self._sink.require(execution_unit)
 
-    def __init_terminal_node(self, attribute_name: str) -> ExecutionUnit:
+    def __init_terminal_node(self, attribute_name: str) -> DependencyTrackingExecutionUnit:
         execution_unit = super().push(VOID)
         self.graph.graph[attribute_name] = execution_unit
         return execution_unit
 
-    def _notify_dependents(self, result: Any, execution_unit: ExecutionUnit) -> None:
+    def _notify_dependents(
+        self, result: Any, execution_unit: DependencyTrackingExecutionUnit
+    ) -> None:
         for dependent in self.graph.successors(execution_unit):
             execution_unit.notify(dependent)
 
@@ -80,9 +83,9 @@ class ExecutionSchedule(ExecutionPlan):
     def walk(
         self,
         queue: Optional[Queue] = None,
-        enqueue: Optional[Callable[[ExecutionUnit], None]] = None,
-        dequeue: Optional[Callable[..., ExecutionUnit]] = None,
-    ) -> Iterable[ExecutionUnit]:
+        enqueue: Optional[Callable[[DependencyTrackingExecutionUnit], None]] = None,
+        dequeue: Optional[Callable[..., DependencyTrackingExecutionUnit]] = None,
+    ) -> Iterable[DependencyTrackingExecutionUnit]:
         """
         Yield the execution units as they can be executed (all prerequisites satisfied).
 
@@ -107,9 +110,9 @@ class ExecutionSchedule(ExecutionPlan):
     async def walk_async(
         self,
         queue: Optional[Queue] = None,
-        enqueue: Optional[Callable[[ExecutionUnit], None]] = None,
-        dequeue: Optional[Callable[..., ExecutionUnit]] = None,
-    ) -> AsyncIterable[ExecutionUnit]:
+        enqueue: Optional[Callable[[DependencyTrackingExecutionUnit], None]] = None,
+        dequeue: Optional[Callable[..., DependencyTrackingExecutionUnit]] = None,
+    ) -> AsyncIterable[DependencyTrackingExecutionUnit]:
         """
         Yield the execution units asynchronously as they can be executed.
 
