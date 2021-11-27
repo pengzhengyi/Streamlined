@@ -33,11 +33,32 @@ class EventNotification(Service):
             self.notify(listener, *args, **kwargs)
 
     def __add__(self, other: Callable) -> EventNotification:
-        self.listeners.append(other)
+        self.register(other)
         return self
 
     def __iadd__(self, other: Callable) -> EventNotification:
         return self.__add__(other)
+
+    def __sub__(self, other: Callable) -> EventNotification:
+        self.unregister(other)
+        return self
+
+    def __isub__(self, other: Callable) -> EventNotification:
+        return self.__sub__(other)
+
+    def register(self, _callable: Callable) -> None:
+        """
+        Register an event listener.
+
+        This event listener will be called after all other registered event listeners (if any).
+        """
+        self.listeners.append(_callable)
+
+    def unregister(self, _callable: Callable) -> None:
+        """
+        Unregister an event listener.
+        """
+        self.listeners.remove(_callable)
 
     def notify(self, listener: Callable, *args: Any, **kwargs: Any) -> None:
         listener(*args, **kwargs)
