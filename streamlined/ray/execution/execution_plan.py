@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from functools import partial
-from typing import Any, Callable, ClassVar, Iterable, Type, Union
+from typing import Any, Callable, ClassVar, Dict, Iterable, Optional, Type, Union
 
 import networkx as nx
 
-from ..common import ASYNC_VOID, VOID
+from ..common import ASYNC_VOID, TAUTOLOGY, VOID
 from ..services import DependencyTracking, EventNotification, Reaction, after, before
 from .execution_unit import AsyncExecutionUnit, ExecutionUnit
 
@@ -67,9 +67,12 @@ class DependencyRequirements(OrderedDict):
     !  Since check for event notification happens when a prerequisite is marked as satisfied (set to True), it is possible to trigger `on_all_requirements_satisfied` more than once. Due to the same reason, `on_all_requirements_satisfied` is only triggered when there exists requirements.
     """
 
+    _conditions: Dict[DependencyTracking, Callable[[], bool]]
+
     def __init__(self):
         super().__init__()
         self.__init_events()
+        self._conditions = defaultdict(lambda: TAUTOLOGY)
 
     def __init_events(self):
         self.on_new_requirement = EventNotification()
@@ -81,11 +84,25 @@ class DependencyRequirements(OrderedDict):
     @NOTIFY_NEW_REQUIREMENT.bind(at=before)
     @NOTIFY_ALL_REQUIREMENTS_SATISFIED.bind(at=after)
     def __setitem__(self, prerequisite: DependencyTracking, is_satisfied: bool):
+        if is_satisfied:
+            is_satisfied = self._conditions[prerequisite]()
+
         super().__setitem__(prerequisite, is_satisfied)
 
     @property
     def are_requirements_satisfied(self) -> bool:
         return all(self.values())
+
+    def add_condition(
+        self, prerequisite: DependencyTracking, condition: Callable[..., bool]
+    ) -> None:
+        """
+        Adding a condition for a prerequisite.
+
+        When marking a prerequisite as satisfied, the condition is evaluated.
+        Only if it evaluates to True will the prerequisite be marked as  satisfied.
+        """
+        self._conditions[prerequisite] = condition
 
 
 class DependencyTrackingExecutionUnit(DependencyTracking, ExecutionUnit):
@@ -94,9 +111,19 @@ class DependencyTrackingExecutionUnit(DependencyTracking, ExecutionUnit):
     """
 
     REQUIREMENTS_FACTORY: ClassVar[Type[DependencyRequirements]] = DependencyRequirements
+    _requirements: DependencyRequirements
 
     def __init__(self, _callable: Callable = VOID):
         super().__init__(_callable=_callable)
+
+    def require(
+        self,
+        prerequisite: DependencyTrackingExecutionUnit,
+        condition: Optional[Callable[[], bool]] = None,
+    ):
+        if condition:
+            self._requirements.add_condition(prerequisite, condition)
+        return super().require(prerequisite)
 
     @property
     def on_new_requirement(self) -> EventNotification:
