@@ -3,7 +3,7 @@ from __future__ import annotations
 from asyncio import Queue as AsyncQueue
 from contextlib import contextmanager
 from multiprocessing import Queue
-from typing import Any, AsyncIterable, Callable, ClassVar, Iterable, Optional
+from typing import Any, AsyncIterable, Callable, ClassVar, Iterable, Optional, Union
 
 from ..common import VOID
 from .execution_plan import DependencyTrackingExecutionUnit, ExecutionPlan
@@ -56,12 +56,14 @@ class ExecutionSchedule(ExecutionPlan):
     def __init_source_sink(self) -> None:
         self.__init_terminal_node(self._ATTRIBUTE_NAME_FOR_SOURCE)
         self.__init_terminal_node(self._ATTRIBUTE_NAME_FOR_SINK)
-        self._sink.require(self._source)
+        self.__add_source_as_prerequisite(self._sink)
 
-    def __add_requirement_for_source_sink(
+    def __add_source_as_prerequisite(
         self, execution_unit: DependencyTrackingExecutionUnit
     ) -> None:
         execution_unit.require(self._source)
+
+    def __add_sink_as_dependent(self, execution_unit: DependencyTrackingExecutionUnit) -> None:
         self._sink.require(execution_unit)
 
     def __init_terminal_node(self, attribute_name: str) -> DependencyTrackingExecutionUnit:
@@ -75,9 +77,41 @@ class ExecutionSchedule(ExecutionPlan):
         for dependent in self.graph.successors(execution_unit):
             execution_unit.notify(dependent)
 
-    def push(self, _callable: Callable):
+    def push(
+        self,
+        _callable: Union[Callable, DependencyTrackingExecutionUnit],
+        has_prerequisites: Optional[bool] = None,
+        has_dependents: Optional[bool] = None,
+    ) -> DependencyTrackingExecutionUnit:
+        """
+        Add a callable into current execution schedule.
+
+        After calling `push`, the returned execution unit can record requirements by calling `require`.
+
+        :param _callable: Encapsulates the actual work.
+        :param has_prerequisites: Whether this callable will have other
+            callables as prerequisites. If False or not specified (default),
+            It will have `source` as prerequisite. Specifying True can
+            reduce graph complexity. Another usage of specifying True is
+            when an execution unit need to dynamically create new execution
+            units during enumeration (`walk`
+            or `walk_async`). Since `source` has already enumerated past, a
+            prerequisite on `source` will prevent the newly created execution
+            unit from being called.
+        :param has_dependents: Whether this callable will have other
+            callables as dependents. If False or not specified (default),
+            It will have `sink` as dependent. Specifying True can
+            reduce graph complexity.
+        :returns: An execution unit.
+        """
         execution_unit = super().push(_callable)
-        self.__add_requirement_for_source_sink(execution_unit)
+
+        if not has_prerequisites:
+            self.__add_source_as_prerequisite(execution_unit)
+
+        if not has_dependents:
+            self.__add_sink_as_dependent(execution_unit)
+
         return execution_unit
 
     def walk(
