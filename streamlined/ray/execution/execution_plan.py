@@ -6,7 +6,7 @@ from typing import Any, Callable, ClassVar, Dict, Iterable, Optional, Type, Unio
 
 import networkx as nx
 
-from ..common import ASYNC_VOID, TAUTOLOGY, VOID
+from ..common import ASYNC_VOID, TAUTOLOGY_FACTORY, VOID
 from ..services import DependencyTracking, EventNotification, Reaction, after, before
 from .execution_unit import AsyncExecutionUnit, ExecutionUnit
 
@@ -72,7 +72,7 @@ class DependencyRequirements(OrderedDict):
     def __init__(self):
         super().__init__()
         self.__init_events()
-        self._conditions = defaultdict(lambda: TAUTOLOGY)
+        self._conditions = defaultdict(TAUTOLOGY_FACTORY)
 
     def __init_events(self):
         self.on_new_requirement = EventNotification()

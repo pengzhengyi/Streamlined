@@ -1,24 +1,42 @@
 from __future__ import annotations
 
+from asyncio import Queue as AsyncQueue
 from concurrent.futures import Executor as AbstractExecutor
 from concurrent.futures import Future
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterable, Callable, Iterable, Mapping, Sequence, Union
+from contextlib import closing
+from functools import partial
+from multiprocessing import Queue
+from typing import (
+    Any,
+    AsyncIterable,
+    Callable,
+    ClassVar,
+    Iterable,
+    Mapping,
+    Optional,
+    Sequence,
+    Type,
+    Union,
+)
+
+import networkx as nx
+
+from ..common import VOID
+from .execution_plan import DependencyTrackingExecutionUnit, ExecutionPlan
 
 
-@dataclass(frozen=True)
 class Executable:
     """
     Capture function and arguments.
     """
 
-    fn: Callable
-    args: Sequence[Any] = field(default_factory=tuple)
-    kwargs: Mapping[str, Any] = field(default_factory=dict)
+    def __init__(self, fn: Callable, *args: Any, **kwargs: Any):
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
 
-    @classmethod
-    def of(cls, fn: Callable, *args: Any, **kwargs: Any):
-        return cls(fn, args, kwargs)
+    def __call__(self) -> Any:
+        return self.fn(*self.args, **self.kwargs)
 
 
 class Executor(AbstractExecutor):
@@ -27,7 +45,8 @@ class Executor(AbstractExecutor):
 
     The actual execution runs in provided `executor`.
 
-    References:
+    References
+    --------
     [concurrent.futures.Executor](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor).
     """
 
@@ -48,11 +67,11 @@ class Executor(AbstractExecutor):
         self.executed[future] = executable
 
     def submit(self, fn: Union[Callable, Executable], *args: Any, **kwargs: Any) -> Future:
-        executable = fn if isinstance(fn, Executable) else Executable.of(fn, *args, **kwargs)
+        executable = fn if isinstance(fn, Executable) else Executable(fn, *args, **kwargs)
 
         future = self.executor.submit(executable.fn, *executable.args, **executable.kwargs)
         self.executing[future] = executable
-        future.add_done_callback(lambda _future: self._on_complete(_future, executable))
+        future.add_done_callback(partial(self._on_complete, executable=executable))
         return future
 
     def map(self, executables: Iterable[Executable]) -> Iterable[Future]:

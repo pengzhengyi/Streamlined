@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 
@@ -11,3 +13,7 @@ def VOID(*args: Any, **kwargs: Any) -> None:
 
 async def ASYNC_VOID(*args: Any, **kwargs: Any) -> None:
     pass
+
+
+def TAUTOLOGY_FACTORY() -> TAUTOLOGY:
+    return TAUTOLOGY

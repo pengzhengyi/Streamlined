@@ -1,7 +1,12 @@
 import random
+from concurrent.futures import ProcessPoolExecutor
 from unittest.mock import Mock
 
-from .test_download import Download
+from faker import Faker
+
+from .test_download import Authentication, Download, DownloadManager, Enumeration
+
+fake = Faker()
 
 
 class MockDownload(Download):
@@ -49,3 +54,21 @@ def test_mock_download():
     download_task.download_mock.assert_called()
     download_task.validate_mock.assert_called()
     assert 1 == (success_callback.call_count + failure_callback.call_count)
+
+
+class MockEnumeration(Enumeration):
+    def __call__(self):
+        for i in random.choice(range(2, 5)):
+            url = fake.url()
+            yield Download(src=url, dest=fake.file_path())
+
+
+# def test_download_manger():
+#     authentication = Authentication(fake.user_name(), fake.password())
+#     breakpoint()
+#     download_manager = DownloadManager(authentication, MockEnumeration(), ProcessPoolExecutor())
+
+#     download_manager()
+
+#     assert download_manager.is_authenticated
+#     assert download_manager.can_enumerate

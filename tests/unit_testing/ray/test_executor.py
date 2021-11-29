@@ -10,9 +10,9 @@ def test_executor_with_simple_tasks():
     executor = Executor(executor=ProcessPoolExecutor())
 
     executables = [
-        Executable.of(add, 1, 9),
-        Executable.of(add, 2, 8),
-        Executable.of(add, 3, 7),
+        Executable(add, 1, 9),
+        Executable(add, 2, 8),
+        Executable(add, 3, 7),
     ]
     for future in executor.map(executables):
         assert future.result() == 10
