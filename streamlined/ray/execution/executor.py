@@ -1,28 +1,25 @@
 from __future__ import annotations
 
-from asyncio import Queue as AsyncQueue
 from concurrent.futures import Executor as AbstractExecutor
 from concurrent.futures import Future
-from contextlib import closing
+from contextlib import ExitStack
 from functools import partial
-from multiprocessing import Queue
 from typing import (
     Any,
     AsyncIterable,
     Callable,
-    ClassVar,
+    Dict,
     Iterable,
     Mapping,
     Optional,
-    Sequence,
-    Type,
     Union,
 )
 
-import networkx as nx
+import ray
+from ray.actor import ActorMethod
+from ray.remote_function import RemoteFunction
 
-from ..common import VOID
-from .execution_plan import DependencyTrackingExecutionUnit, ExecutionPlan
+from ..services import RayRemote, ray_remote
 
 
 class Executable:
@@ -84,6 +81,62 @@ class Executor(AbstractExecutor):
 
     def shutdown(self, wait: bool, *args: Any, **kwargs: Any) -> None:
         return super().shutdown(wait, *args, **kwargs)
+
+
+class RayExecutor(AbstractExecutor):
+    """
+    Execute a task in Ray.
+    """
+
+    def __init__(self, *args: Any, should_shutdown_ray: bool = False, **kwargs):
+        self._exit_stack = ExitStack()
+        self.__init_ray_context(*args, should_shutdown_ray=should_shutdown_ray, **kwargs)
+
+    def __init_ray_context(self, *args: Any, should_shutdown_ray: bool, **kwargs) -> None:
+        if ray.is_initialized():
+            self.ray_context = ray.get_runtime_context()
+        else:
+            self.ray_context = ray.init(*args, **kwargs)
+
+        if hasattr(self.ray_context, "__exit__"):
+            self._exit_stack.push(self.ray_context)
+        elif should_shutdown_ray:
+            self._exit_stack.callback(ray.shutdown)
+
+    @staticmethod
+    def _is_remote_function(fn: Any) -> bool:
+        return isinstance(fn, RemoteFunction)
+
+    @staticmethod
+    def _is_actor_method(fn: Any) -> bool:
+        return isinstance(fn, ActorMethod)
+
+    def _to_remote_function(
+        self,
+        fn: Callable,
+        ray_options: Optional[Dict[str, Any]] = None,
+    ) -> ray.ObjectRef:
+        if self._is_remote_function(fn) or self._is_actor_method(fn):
+            if ray_options:
+                fn = fn.options(**ray_options)
+            return fn.remote
+        else:
+            if ray_options:
+                return RayRemote(**ray_options)(fn)
+            else:
+                return ray_remote(fn)
+
+    def submit(self, fn: Callable, *args, ray_options: Optional[Dict[str, Any]] = None, **kwargs):
+        remote_func = self._to_remote_function(fn, ray_options)
+        return remote_func(*args, **kwargs)
+
+    def map(self, func, *iterables, ray_options: Optional[Dict[str, Any]] = None):
+        remote_func = self._to_remote_function(func, ray_options)
+        for args in zip(*iterables):
+            yield remote_func(*args)
+
+    def shutdown(self, wait):
+        return self._exit_stack.close()
 
 
 if __name__ == "__main__":

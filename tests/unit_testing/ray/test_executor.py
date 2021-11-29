@@ -3,7 +3,9 @@ from itertools import repeat
 from operator import add
 from unittest.mock import Mock
 
-from streamlined.ray.execution import Executable, Executor
+import ray
+
+from streamlined.ray.execution import Executable, Executor, RayExecutor
 
 
 def test_executor_with_simple_tasks():
@@ -19,3 +21,12 @@ def test_executor_with_simple_tasks():
 
     assert len(executor.executed) == 3
     assert len(executor.executing) == 0
+
+
+def test_ray_executor_with_simple_arithmetic():
+    def inc(a):
+        return a + 1
+
+    executor = RayExecutor()
+    for objectref, result in zip(executor.map(inc, range(5)), range(1, 6)):
+        assert ray.get(objectref) == result

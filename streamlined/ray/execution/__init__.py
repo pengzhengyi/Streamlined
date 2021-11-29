@@ -11,4 +11,4 @@ from .execution_plan import (
 )
 from .execution_schedule import ExecutionSchedule
 from .execution_unit import AsyncExecutionUnit, ExecutionStatus, ExecutionUnit
-from .executor import Executable, Executor
+from .executor import Executable, Executor, RayExecutor

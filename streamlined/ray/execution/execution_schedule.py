@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from asyncio import Queue as AsyncQueue
 from contextlib import contextmanager
-from multiprocessing import Queue
 from typing import Any, AsyncIterable, Callable, ClassVar, Iterable, Optional, Union
+
+from ray.util.queue import Queue
 
 from ..common import VOID
 from .execution_plan import DependencyTrackingExecutionUnit, ExecutionPlan
