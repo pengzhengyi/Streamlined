@@ -1,6 +1,6 @@
 import ray
 
-from streamlined.ray.services import RayRemote, ray_remote
+from streamlined.ray.common import AwaitCoroutine, RayAsyncActor, RayRemote
 
 
 def test_ray_remote_on_function():
@@ -10,7 +10,7 @@ def test_ray_remote_on_function():
 
     assert ray.get(add(1, 2)) == 3
 
-    @ray_remote
+    @RayRemote.transform
     def sub(a, b):
         return a - b
 
@@ -26,4 +26,20 @@ def test_ray_remote_on_callable():
             return self.prefix + string
 
     prefix = Prefix("Hello")
-    ray.get(ray_remote(prefix)("John")) == "Hello John"
+    ray.get(RayRemote.transform(prefix)("John")) == "Hello John"
+
+
+def test_await_coroutine():
+    @AwaitCoroutine.transform
+    async def add(a, b):
+        return a + b
+
+    assert add(1, 2) == 3
+
+
+def test_ray_async_actor():
+    @RayAsyncActor.transform
+    async def add(a, b):
+        return a + b
+
+    assert ray.get(add.__call__.remote(1, 2)) == 3

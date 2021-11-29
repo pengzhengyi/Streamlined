@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections import OrderedDict, defaultdict
 from functools import partial
 from typing import Any, Callable, ClassVar, Dict, Iterable, Optional, Type, Union
@@ -8,7 +9,8 @@ import networkx as nx
 
 from ..common import ASYNC_VOID, TAUTOLOGY_FACTORY, VOID
 from ..services import DependencyTracking, EventNotification, Reaction, after, before
-from .execution_unit import AsyncExecutionUnit, ExecutionUnit
+from .execution_unit import AsyncExecutionUnit, ExecutionStatus, ExecutionUnit
+from .executor import RayExecutor
 
 
 class NotifyNewRequirement(Reaction):
@@ -141,6 +143,23 @@ class DependencyTrackingAsyncExecutionUnit(AsyncExecutionUnit, DependencyTrackin
 
     def __init__(self, _callable: Callable = ASYNC_VOID):
         super().__init__(_callable=_callable)
+
+
+class DependencyTrackingRayExecutionUnit(DependencyTrackingAsyncExecutionUnit):
+    def __init__(self, _callable=ASYNC_VOID, ray_options: Optional[Dict[str, Any]] = None):
+        super().__init__(_callable=_callable)
+        self._ray_options = ray_options
+
+    def _init_task(self, _callable: Any):
+        if asyncio.iscoroutinefunction(_callable):
+            _callable, self._coroutine_actor = RayExecutor.to_remote_function(_callable)
+
+        return super()._init_task(_callable)
+
+    async def _execute(self, *args, **kwargs):
+        return await RayExecutor.run(
+            self._callable, *args, ray_options=self._ray_options, **kwargs
+        )
 
 
 class ExecutionPlan:

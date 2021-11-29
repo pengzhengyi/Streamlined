@@ -4,6 +4,7 @@ decorator
 Faker
 isort
 mypy
+nest_asyncio
 networkx[default]
 pre-commit
 pylint

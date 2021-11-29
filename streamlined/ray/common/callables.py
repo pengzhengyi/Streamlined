@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
-from typing import Any, Callable, ClassVar, Dict, Optional
+from functools import partial
+from typing import Any, Callable, ClassVar, Coroutine, Dict, Optional
 
 import ray
 import wrapt
@@ -12,7 +14,77 @@ def check_enabled() -> bool:
     return RayRemote.ENABLED
 
 
-class RayRemote:
+class AbstractCallableDecorator:
+    """
+    An abstract class that should be subclassed to decorate different flavors of callables:
+
+    - function
+    - static method
+    - class method
+    - instance method
+    - class with `__call__`
+
+    Usage
+    --------
+
+    ```
+    @AbstractCallableDecorator(...)
+    def func(...):
+        ...
+    ```
+
+    ```
+    @AbstractCallableDecorator.transform(...)
+    def func(...):
+        ...
+    ```
+
+    ```
+    @AbstractCallableDecorator.transform
+    def func(...):
+        ...
+    ```
+
+    """
+
+    def _run(self, fn: Callable, *args: Any, **kwargs: Any):
+        """Call the decorated function with its arguments."""
+        return fn(*args, **kwargs)
+
+    @classmethod
+    def transform(cls, wrapped: Optional[Callable] = None, *args: Any, **kwargs: Any):
+        """
+        Create a wrapper by first create a decorator with provided arguments and then apply decorator to wrapped.
+        """
+        return cls(*args, **kwargs)(wrapped)
+
+    @wrapt.decorator
+    def __call__(self, wrapped, instance, args, kwargs):
+        if not callable(wrapped):
+            raise TypeError(f"{self.__class__.__name__} should decorate a callable")
+
+        if instance is None:
+            if inspect.isclass(wrapped):
+                raise TypeError(f"{self.__class__.__name__} cannot decorate a class")
+            elif inspect.isfunction(wrapped):
+                return self._run(wrapped, *args, **kwargs)
+            else:
+                try:
+                    # is callable
+                    cls = getattr(wrapped, "__class__")
+                    instance = wrapped
+                    wrapped = cls.__call__
+                except AttributeError:
+                    return self._run(wrapped, *args, **kwargs)
+
+        @decorator
+        def wrapper(fn: Callable, *args: Any, **kwargs: Any):
+            return fn(*args, **kwargs)
+
+        return self._run(wrapper(wrapped), instance, *args, **kwargs)
+
+
+class RayRemote(AbstractCallableDecorator):
     """
     Combining [`ray.remote`](https://docs.ray.io/en/master/package-ref.html#ray-remote) and invoke of remote function.
 
@@ -106,82 +178,60 @@ class RayRemote:
         if wrapped:
             raise ValueError(f"{self.__class__.__name__} should be initialized with arguments")
 
+    def _run(self, fn: Callable, *args: Any, **kwargs: Any) -> ray.ObjectRef:
+        try:
+            ray_callable = self.__ray_wrapper(fn)
+        except ValueError as error:
+            if "async def" in str(error):
+
+                @decorator
+                def wrapper(fn: Callable, *args: Any, **kwargs: Any):
+                    return fn(*args, **kwargs)
+
+                ray_callable = self.__ray_wrapper(wrapper(fn))
+            else:
+                raise
+
+        return ray_callable.remote(*args, **kwargs)
+
     def run_remote(self, fn: Callable, *args: Any, **kwargs: Any) -> ray.ObjectRef:
         """
         Run a callable in ray.
 
         This is short for `ray.remote(fn).remote(*args, **kwargs)`.
         """
-        ray_callable = self.__ray_wrapper(fn)
-        return ray_callable.remote(*args, **kwargs)
+        return self._run(fn, *args, **kwargs)
 
     @wrapt.decorator(enabled=check_enabled)
     def __call__(self, wrapped, instance, args, kwargs):
-        if not callable(wrapped):
-            raise TypeError(f"{self.__class__.__name__} should decorate a callable")
-
-        if instance is None:
-            if inspect.isclass(wrapped):
-                raise TypeError(f"{self.__class__.__name__} cannot decorate a class")
-            elif inspect.isfunction(wrapped):
-                return self.run_remote(wrapped, *args, **kwargs)
-            else:
-                try:
-                    # is callable
-                    cls = getattr(wrapped, "__class__")
-                    instance = wrapped
-                    wrapped = cls.__call__
-                except AttributeError:
-                    return self.run_remote(wrapped, *args, **kwargs)
-
-        @decorator
-        def wrapper(fn: Callable, *args: Any, **kwargs: Any):
-            return fn(*args, **kwargs)
-
-        return self.run_remote(wrapper(wrapped), instance, *args, **kwargs)
+        return super(self.__class__, self).__call__(wrapped)(*args, **kwargs)
 
 
-def ray_remote(
-    wrapped: Optional[Callable] = None,
-    *,
-    num_returns: Optional[int] = None,
-    num_cpus: Optional[float] = None,
-    num_gpus: Optional[int] = None,
-    resources: Optional[Dict[str, float]] = None,
-    accelerator_type: Optional[Any] = None,
-    max_calls: Optional[int] = None,
-    max_restarts: Optional[int] = None,
-    max_task_retries: Optional[int] = None,
-    max_retries: Optional[int] = None,
-    runtime_env: Optional[Dict[str, Any]] = None,
-    retry_exceptions: Optional[bool] = None,
-):
+class AwaitCoroutine(AbstractCallableDecorator):
     """
-    Usage
-    --------
-    ```
-    @ray_remote
-    def func(...):
-        ...
-    ```
-
-    ```
-    @ray_remote(...)
-    def func(...):
-        ...
-    ```
-
-    See Also
-    --------
-    RayRemote
+    Convert a coroutine to a blocking synchronous operation.
     """
-    kwargs = {
-        name: value
-        for name, value in locals().items()
-        if name != "kwargs" and name != "wrapped" and value is not None
-    }
 
-    if wrapped is None:
-        return RayRemote(**kwargs)
-    else:
-        return RayRemote(**kwargs)(wrapped)
+    def _run(self, fn, *args, **kwargs):
+        return asyncio.get_event_loop().run_until_complete(fn(*args, **kwargs))
+
+
+class RayAsyncActor:
+    def __init__(self, coroutine: Coroutine):
+        super().__init__()
+        self.coroutine = coroutine
+
+    @classmethod
+    def transform(cls, wrapped: Optional[Coroutine] = None, **ray_options: Any):
+        if ray_options:
+            actor_constructor = ray.remote(cls).remote(**ray_options)
+        else:
+            actor_constructor = ray.remote(cls).remote
+
+        if wrapped:
+            return actor_constructor(wrapped)
+        else:
+            return actor_constructor
+
+    async def __call__(self, *args: Any, **kwargs: Any):
+        return await self.coroutine(*args, **kwargs)

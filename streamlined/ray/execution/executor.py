@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from concurrent.futures import Executor as AbstractExecutor
 from concurrent.futures import Future
 from contextlib import ExitStack
@@ -16,10 +17,10 @@ from typing import (
 )
 
 import ray
-from ray.actor import ActorMethod
+from ray.actor import ActorClass, ActorMethod
 from ray.remote_function import RemoteFunction
 
-from ..services import RayRemote, ray_remote
+from ..common import RayAsyncActor, RayRemote
 
 
 class Executable:
@@ -111,27 +112,57 @@ class RayExecutor(AbstractExecutor):
     def _is_actor_method(fn: Any) -> bool:
         return isinstance(fn, ActorMethod)
 
-    def _to_remote_function(
-        self,
+    @classmethod
+    def _is_bound_actor_method(cls, fn: Any) -> bool:
+        try:
+            return cls._is_actor_method(fn.__self__)
+        except AttributeError:
+            return False
+
+    @staticmethod
+    def _is_actor(fn: Any) -> bool:
+        return isinstance(fn, ActorClass)
+
+    @classmethod
+    def to_remote_function(
+        cls,
         fn: Callable,
         ray_options: Optional[Dict[str, Any]] = None,
     ) -> ray.ObjectRef:
-        if self._is_remote_function(fn) or self._is_actor_method(fn):
+        if cls._is_bound_actor_method(fn):
+            return fn
+        elif cls._is_remote_function(fn) or cls._is_actor_method(fn):
             if ray_options:
                 fn = fn.options(**ray_options)
             return fn.remote
+        elif asyncio.iscoroutinefunction(fn):
+            if ray_options:
+                actor_constructor = RayAsyncActor.transform(**ray_options)
+            else:
+                actor_constructor = RayAsyncActor.transform
+
+            actor = actor_constructor(fn)
+            return actor.__call__.remote, actor
         else:
             if ray_options:
                 return RayRemote(**ray_options)(fn)
             else:
-                return ray_remote(fn)
+                return RayRemote.transform(fn)
 
-    def submit(self, fn: Callable, *args, ray_options: Optional[Dict[str, Any]] = None, **kwargs):
-        remote_func = self._to_remote_function(fn, ray_options)
+    @classmethod
+    def run(cls, fn: Callable, *args, ray_options: Optional[Dict[str, Any]] = None, **kwargs):
+        if asyncio.iscoroutinefunction(fn):
+            remote_func, actor = cls.to_remote_function(fn, ray_options)
+        else:
+            remote_func = cls.to_remote_function(fn, ray_options)
+
         return remote_func(*args, **kwargs)
 
+    def submit(self, fn: Callable, *args, ray_options: Optional[Dict[str, Any]] = None, **kwargs):
+        return self.run(fn, *args, ray_options=ray_options, **kwargs)
+
     def map(self, func, *iterables, ray_options: Optional[Dict[str, Any]] = None):
-        remote_func = self._to_remote_function(func, ray_options)
+        remote_func = self.to_remote_function(func, ray_options)
         for args in zip(*iterables):
             yield remote_func(*args)
 

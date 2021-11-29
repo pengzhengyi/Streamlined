@@ -65,7 +65,7 @@ class ExecutionUnit:
     @staticmethod
     def bind(execution_unit: ExecutionUnit):
         def _decorate(_callable: Callable):
-            execution_unit.callable = _callable
+            execution_unit._callable = _callable
 
             def wrapper(_callable: Callable, *args: Any, **kwargs: Any):
                 return execution_unit(*args, **kwargs)
@@ -75,20 +75,26 @@ class ExecutionUnit:
         return _decorate
 
     def __init__(self, _callable: Callable = VOID):
-        self.__init_task(_callable)
+        self._init_task(_callable)
 
-    def __init_task(self, _callable: Callable) -> None:
-        self.callable = _callable
-        self.__init_task_on_complete()
+    def _init_task(self, _callable: Callable) -> None:
+        self._callable = _callable
+        self._init_task_on_complete()
         self.status = ExecutionStatus.NotStarted
 
-    def __init_task_on_complete(self) -> None:
+    def _init_task_on_complete(self) -> None:
         self.on_complete = EventNotification()
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def _before_call(self, *args: Any, **kwargs: Any) -> None:
         self.status = ExecutionStatus.Started
 
-        result = self.callable(*args, **kwargs)
+    def _execute(self, *args: Any, **kwargs: Any) -> Any:
+        return self._callable(*args, **kwargs)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        self._before_call(*args, **kwargs)
+
+        result = self._execute(*args, **kwargs)
 
         self.set_complete(result, *args, **kwargs)
         return result
@@ -111,7 +117,7 @@ class AsyncExecutionUnit(ExecutionUnit):
     @staticmethod
     def bind(execution_unit: ExecutionUnit):
         def _decorate(_callable: Callable):
-            execution_unit.callable = _callable
+            execution_unit._callable = _callable
 
             async def wrapper(_callable: Callable, *args: Any, **kwargs: Any):
                 return await execution_unit(*args, **kwargs)
@@ -123,10 +129,13 @@ class AsyncExecutionUnit(ExecutionUnit):
     def __init__(self, _callable=ASYNC_VOID):
         super().__init__(_callable=_callable)
 
-    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        self.status = ExecutionStatus.Started
+    async def _execute(self, *args: Any, **kwargs: Any) -> Any:
+        return await self._callable(*args, **kwargs)
 
-        result = await self.callable(*args, **kwargs)
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        self._before_call(*args, **kwargs)
+
+        result = await self._execute(*args, **kwargs)
 
         self.set_complete(result, *args, **kwargs)
         return result

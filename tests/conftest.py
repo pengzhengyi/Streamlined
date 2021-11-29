@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from logging.handlers import BufferingHandler
 
+import nest_asyncio
 import pytest
 from faker import Faker
 
@@ -15,6 +16,8 @@ from streamlined.manager import (
     TagGrouping,
 )
 from streamlined.manager.manager import create_manager
+
+nest_asyncio.apply()
 
 
 @pytest.fixture(scope="session")
