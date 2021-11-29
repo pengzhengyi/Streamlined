@@ -13,3 +13,4 @@ pytest-cov
 ray[default]
 treelib
 types-requests
+wrapt
