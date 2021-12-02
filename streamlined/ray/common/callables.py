@@ -2,8 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from functools import partial
-from typing import Any, Callable, ClassVar, Coroutine, Dict, Optional
+from subprocess import PIPE
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Coroutine,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import ray
 import wrapt
@@ -235,3 +245,36 @@ class RayAsyncActor:
 
     async def __call__(self, *args: Any, **kwargs: Any):
         return await self.coroutine(*args, **kwargs)
+
+
+class ShellActor:
+    def __init__(self, *args: List[str], stdin=PIPE, stdout=PIPE, stderr=PIPE, **kwargs: Any):
+        self.args = args
+        self.stdin = stdin
+        self.stdout = stdout
+        self.stderr = stderr
+        self.shell_kwargs = kwargs
+
+    async def _start_async(self) -> None:
+        self.process: asyncio.Process = await asyncio.create_subprocess_exec(
+            *self.args,
+            stdin=self.stdin,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            **self.shell_kwargs,
+        )
+
+    async def _communicate(
+        self, _input: Optional[bytes] = None, encoding: Optional[str] = None
+    ) -> Tuple[Union[str, bytes], Union[str, bytes]]:
+        stdout, stderr = await self.process.communicate(_input)
+        if encoding:
+            return stdout.decode(), stderr.decode()
+        else:
+            return stdout, stderr
+
+    async def run_async(
+        self, _input: Optional[bytes] = None, encoding: Optional[str] = None
+    ) -> Tuple[Union[str, bytes], Union[str, bytes]]:
+        await self._start_async()
+        return await self._communicate(_input, encoding)

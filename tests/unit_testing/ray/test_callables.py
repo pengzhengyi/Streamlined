@@ -1,6 +1,8 @@
+import os
+
 import ray
 
-from streamlined.ray.common import AwaitCoroutine, RayAsyncActor, RayRemote
+from streamlined.ray.common import AwaitCoroutine, RayAsyncActor, RayRemote, ShellActor
 
 
 def test_ray_remote_on_function():
@@ -43,3 +45,10 @@ def test_ray_async_actor():
         return a + b
 
     assert ray.get(add.__call__.remote(1, 2)) == 3
+
+
+def test_shell_actor_with_ray():
+    Shell = ray.remote(ShellActor)
+    pwd = Shell.remote("pwd")
+    stdout, _ = ray.get(pwd.run_async.remote(encoding="utf-8"))
+    assert stdout.strip() == os.getcwd()
