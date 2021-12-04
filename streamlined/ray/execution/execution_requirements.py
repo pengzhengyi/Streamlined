@@ -34,11 +34,11 @@ class NotifyRequirementsSatisfied(Reaction):
         self,
         execution_requirements: ExecutionRequirements,
         prerequisite: DependencyTracking,
-        is_satisfied: bool,
         *args: Any,
         **kwargs: Any,
     ):
-        if is_satisfied:
+        # since `is_satisfied` might be modified by condition, check directly
+        if execution_requirements[prerequisite]:
             for group in execution_requirements.groups[prerequisite]:
                 if execution_requirements.are_requirements_satisfied(group):
                     return True

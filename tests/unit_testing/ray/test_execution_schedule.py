@@ -51,6 +51,52 @@ def test_execution_schedule_synchronous_execution():
     checkout_eu()
 
 
+def test_execution_schedule_circular_execution():
+    """
+    WeekStart ────── Day ────── Night ┰─── = day7 ─── WeekEnd
+                      ┗━━━ < day 7 ━━━┛
+    """
+
+    # passing of a week
+    week_schedule = ExecutionSchedule()
+
+    # Tasks
+    week_start_eu = week_schedule.push(
+        week_start := Mock(name="week start"), has_prerequisites=False, has_dependents=True
+    )
+    day_eu = week_schedule.push(
+        day := Mock(name="day"), has_prerequisites=True, has_dependents=True
+    )
+    night_eu = week_schedule.push(
+        night := Mock(name="night"), has_prerequisites=True, has_dependents=True
+    )
+    week_end_eu = week_schedule.push(
+        week_end := Mock(name="week end"), has_prerequisites=True, has_dependents=False
+    )
+
+    day_eu.require(week_start_eu, group="from week start")
+    night_eu.require(day_eu)
+
+    transition_from_night_to_day = Mock()
+    transition_from_night_to_day.side_effect = [True, True, True, True, True, True, False]
+    day_eu.require(night_eu, condition=transition_from_night_to_day, group="from night")
+    transition_to_week_end = Mock()
+    transition_to_week_end.side_effect = [False, False, False, False, False, False, True]
+    week_end_eu.require(night_eu, transition_to_week_end)
+
+    queue = deque()
+
+    for task in week_schedule.walk(queue, enqueue=queue.append, dequeue=queue.popleft):
+        task()
+
+    week_start.assert_called_once()
+    assert day.call_count == 7
+    assert transition_from_night_to_day.call_count == 7
+    assert night.call_count == 7
+    assert transition_to_week_end.call_count == 7
+    week_end.assert_called_once()
+
+
 @pytest.mark.asyncio
 async def test_execution_schedule_asynchronous_execution():
     prepare_mock = Mock()

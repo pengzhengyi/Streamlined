@@ -27,8 +27,8 @@ class DependencyTrackingExecutionUnit(DependencyTracking, ExecutionUnit):
     def require(
         self,
         prerequisite: DependencyTrackingExecutionUnit,
-        group: Optional[Union[Any, Iterable[Any]]] = None,
         condition: Optional[Callable[[], bool]] = None,
+        group: Optional[Union[Any, Iterable[Any]]] = None,
     ):
         if condition:
             self._requirements.conditions[prerequisite] = condition
