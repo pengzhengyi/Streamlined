@@ -26,4 +26,4 @@ def test_execution_requirements_on_requirements_satisfied():
 
     assert mock.call_count == 0
     todos["buy milk"] = True
-    mock.assert_called_once_with()
+    mock.assert_called_once_with("buy milk")

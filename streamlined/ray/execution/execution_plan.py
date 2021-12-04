@@ -1,110 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from collections import OrderedDict, defaultdict
 from functools import partial
 from typing import Any, Callable, ClassVar, Dict, Iterable, Optional, Type, Union
 
 import networkx as nx
 
-from ..common import ASYNC_VOID, TAUTOLOGY_FACTORY, VOID
-from ..services import DependencyTracking, EventNotification, Reaction, after, before
-from .execution_unit import AsyncExecutionUnit, ExecutionStatus, ExecutionUnit
+from ..common import ASYNC_VOID, VOID
+from ..services import DependencyTracking, EventNotification
+from .execution_requirements import ExecutionRequirements
+from .execution_unit import AsyncExecutionUnit, ExecutionUnit
 from .executor import RayExecutor
-
-
-class NotifyNewRequirement(Reaction):
-    def when(
-        self,
-        dependency_requirements: DependencyRequirements,
-        prerequisite: DependencyTracking,
-        is_satisfied: bool,
-    ):
-        return prerequisite not in dependency_requirements
-
-    def react(
-        self,
-        dependency_requirements: DependencyRequirements,
-        prerequisite: DependencyTracking,
-        is_satisfied: bool,
-    ):
-        dependency_requirements.on_new_requirement(prerequisite=prerequisite)
-
-
-NOTIFY_NEW_REQUIREMENT = NotifyNewRequirement()
-
-
-class NotifyAllRequirementsSatisfied(Reaction):
-    def when(
-        self,
-        dependency_requirements: DependencyRequirements,
-        prerequisite: DependencyTracking,
-        is_satisfied: bool,
-        *args: Any,
-        **kwargs: Any,
-    ):
-        return is_satisfied and dependency_requirements.are_requirements_satisfied
-
-    def react(
-        self,
-        dependency_requirements: DependencyRequirements,
-        prerequisite: DependencyTracking,
-        is_satisfied: bool,
-        *args: Any,
-        **kwargs: Any,
-    ):
-        dependency_requirements.on_all_requirements_satisfied()
-
-
-NOTIFY_ALL_REQUIREMENTS_SATISFIED = NotifyAllRequirementsSatisfied()
-
-
-class DependencyRequirements(OrderedDict):
-    """
-    DependencyRequirements provides two important properties:
-
-    - ordering
-    - event notification when all prerequisites are satisfied
-
-    !  Since check for event notification happens when a prerequisite is marked as satisfied (set to True), it is possible to trigger `on_all_requirements_satisfied` more than once. Due to the same reason, `on_all_requirements_satisfied` is only triggered when there exists requirements.
-    """
-
-    _conditions: Dict[DependencyTracking, Callable[[], bool]]
-
-    def __init__(self):
-        super().__init__()
-        self.__init_events()
-        self._conditions = defaultdict(TAUTOLOGY_FACTORY)
-
-    def __init_events(self):
-        self.on_new_requirement = EventNotification()
-        self.on_all_requirements_satisfied = EventNotification()
-
-    def __getitem__(self, prerequisite: DependencyTracking) -> bool:
-        return super().__getitem__(prerequisite)
-
-    @NOTIFY_NEW_REQUIREMENT.bind(at=before)
-    @NOTIFY_ALL_REQUIREMENTS_SATISFIED.bind(at=after)
-    def __setitem__(self, prerequisite: DependencyTracking, is_satisfied: bool):
-        if is_satisfied:
-            is_satisfied = self._conditions[prerequisite]()
-
-        super().__setitem__(prerequisite, is_satisfied)
-
-    @property
-    def are_requirements_satisfied(self) -> bool:
-        return all(self.values())
-
-    def add_condition(
-        self, prerequisite: DependencyTracking, condition: Callable[..., bool]
-    ) -> None:
-        """
-        Adding a condition for a prerequisite.
-
-        When marking a prerequisite as satisfied, the condition is evaluated.
-        Only if it evaluates to True will the prerequisite be marked as  satisfied.
-        """
-        self._conditions[prerequisite] = condition
 
 
 class DependencyTrackingExecutionUnit(DependencyTracking, ExecutionUnit):
@@ -112,8 +18,8 @@ class DependencyTrackingExecutionUnit(DependencyTracking, ExecutionUnit):
     Beyond plain `ExecutionUnit` and `DependencyTracking`, this provides EventNotification when all prerequisites are satisfied and when execution completed.
     """
 
-    REQUIREMENTS_FACTORY: ClassVar[Type[DependencyRequirements]] = DependencyRequirements
-    _requirements: DependencyRequirements
+    REQUIREMENTS_FACTORY: ClassVar[Type[ExecutionRequirements]] = ExecutionRequirements
+    _requirements: ExecutionRequirements
 
     def __init__(self, _callable: Callable = VOID):
         super().__init__(_callable=_callable)
@@ -121,19 +27,36 @@ class DependencyTrackingExecutionUnit(DependencyTracking, ExecutionUnit):
     def require(
         self,
         prerequisite: DependencyTrackingExecutionUnit,
+        group: Optional[Union[Any, Iterable[Any]]] = None,
         condition: Optional[Callable[[], bool]] = None,
     ):
         if condition:
-            self._requirements.add_condition(prerequisite, condition)
+            self._requirements.conditions[prerequisite] = condition
+        if group:
+            try:
+                for _group in group:
+                    self.add_to_group(prerequisite, _group)
+            except TypeError:
+                self.add_to_group(prerequisite, group)
         return super().require(prerequisite)
+
+    def add_to_group(self, prerequisite: DependencyTrackingExecutionUnit, group: Any) -> None:
+        """
+        Add a prerequisite into a requirement group.
+
+        When all prerequisites in a requirement group are satisfied, the requirements of this execution unit is considered satisfied.
+
+        All prerequisites are automatically in a default requirement group.
+        """
+        self._requirements.groups[group] = prerequisite
 
     @property
     def on_new_requirement(self) -> EventNotification:
         return self._requirements.on_new_requirement
 
     @property
-    def on_all_requirements_satisfied(self) -> EventNotification:
-        return self._requirements.on_all_requirements_satisfied
+    def on_requirements_satisfied(self) -> EventNotification:
+        return self._requirements.on_requirements_satisfied
 
 
 class DependencyTrackingAsyncExecutionUnit(AsyncExecutionUnit, DependencyTrackingExecutionUnit):
@@ -164,13 +87,15 @@ class DependencyTrackingRayExecutionUnit(DependencyTrackingAsyncExecutionUnit):
 
 class ExecutionPlan:
     """
-    ExecutionPlan can be seen as a Directed Acyclic Graph of ExecutionUnit. More specifically, nodes are callables while edges are dependency relationships.
+    ExecutionPlan can be seen as a Graph of ExecutionUnit.
+
+    More specifically, nodes are callables while edges are execution dependency relationships.
 
     Events
     --------
     ExecutionPlan also exposes two events:
 
-    + `on_all_requirements_satisfied(execution_unit)` This event signals an execution unit is ready to execute
+    + `on_requirements_satisfied(execution_unit, prerequisite)` This event signals an execution unit is ready to execute
     + `on_complete(result, execution_unit)` This event notifies an execution unit has completed its execution.
 
     Usage
@@ -206,7 +131,7 @@ class ExecutionPlan:
         self._init_graph()
 
     def _init_events(self):
-        self.on_all_requirements_satisfied = EventNotification()
+        self.on_requirements_satisfied = EventNotification()
         self.on_complete = EventNotification()
 
     def _init_graph(self) -> None:
@@ -219,8 +144,8 @@ class ExecutionPlan:
         execution_unit.on_new_requirement.register(
             partial(self.__track_requirement, dependent=execution_unit)
         )
-        execution_unit.on_all_requirements_satisfied.register(
-            partial(self.on_all_requirements_satisfied, execution_unit)
+        execution_unit.on_requirements_satisfied.register(
+            partial(self.on_requirements_satisfied, execution_unit)
         )
         execution_unit.on_complete.register(
             partial(self.on_complete, execution_unit=execution_unit)
@@ -231,7 +156,10 @@ class ExecutionPlan:
         """
         Returns a generator of execution units in topologically sorted order.
         """
-        return nx.topological_sort(self.graph)
+        try:
+            return nx.topological_sort(self.graph)
+        except nx.NetworkXUnfeasible:
+            return self.graph.nodes()
 
     def __iter__(self):
         yield from self.execution_units

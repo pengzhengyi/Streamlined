@@ -4,6 +4,7 @@ from asyncio import Queue as AsyncQueue
 from contextlib import contextmanager
 from typing import Any, AsyncIterable, Callable, ClassVar, Iterable, Optional, Union
 
+import wrapt
 from ray.util.queue import Queue
 
 from ..common import VOID
@@ -21,10 +22,16 @@ def closing(thing: Any):
             return
 
 
+@wrapt.decorator
+def wrap_enqueue_on_requirements_satisfied(wrapped, instance, args, kwargs) -> None:
+    return wrapped(args[0])
+
+
 class ExecutionSchedule(ExecutionPlan):
     """
-    Beyond what offers by ExecutionPlan (dependency tracking), ExecutionSchedule offers
-    execution scheduling -- it can determine which execution units are ready to execute
+    Beyond what offers by ExecutionPlan (dependency tracking),
+    ExecutionSchedule offers execution scheduling -- it can
+    determine which execution units are ready to execute
     (based primarily on topology ordering) and take care of dependencies.
     """
 
@@ -136,7 +143,9 @@ class ExecutionSchedule(ExecutionPlan):
             dequeue = queue.get
 
         with closing(queue):
-            with self.on_all_requirements_satisfied.registering(enqueue):
+            with self.on_requirements_satisfied.registering(
+                wrap_enqueue_on_requirements_satisfied(enqueue)
+            ):
                 self._source()
 
                 while (execution_unit := dequeue()) != self._sink:
@@ -162,9 +171,14 @@ class ExecutionSchedule(ExecutionPlan):
         if dequeue is None:
             dequeue = queue.get
 
+        def queue_task_done(*args: Any, **kwargs) -> None:
+            queue.task_done()
+
         with closing(queue):
-            with self.on_complete.registering(lambda *args, **kwargs: queue.task_done()):
-                with self.on_all_requirements_satisfied.registering(enqueue):
+            with self.on_complete.registering(queue_task_done):
+                with self.on_requirements_satisfied.registering(
+                    wrap_enqueue_on_requirements_satisfied(enqueue)
+                ):
                     self._source()
 
                     while (execution_unit := await dequeue()) != self._sink:

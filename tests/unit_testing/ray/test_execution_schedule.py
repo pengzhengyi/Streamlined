@@ -31,7 +31,6 @@ def test_execution_schedule_synchronous_execution():
     tasks = shopping_schedule.walk(queue, enqueue=queue.append, dequeue=queue.popleft)
 
     # execute first task -- go shopping
-    # assert len(queue) == 1
     assert go_shopping_eu == next(tasks)
     assert len(queue) == 0
     go_shopping_eu()
