@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from collections import UserDict
-from contextlib import contextmanager
-from typing import Any, Optional
+import uuid
+from collections import UserDict, deque
+from typing import Any, Iterable, Optional
 
 from treelib import Node, Tree
-
-from .service import Service
 
 
 def to_magic_naming(name: str) -> str:
@@ -24,6 +22,15 @@ class Scope(UserDict):
     Scope stores mappings from name to value.
     """
 
+    __hash__ = object.__hash__
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(args, **kwargs)
+        self.name = uuid.uuid4()
+
+    def __str__(self) -> str:
+        return f"{self.name}={super().__str__()}"
+
     def setmagic(self, name: str, value: Any) -> None:
         """
         Similar to `self[name] = value` but applies magic nomenclature.
@@ -36,7 +43,7 @@ class Scope(UserDict):
         self[to_magic_naming(name)] = value
 
 
-class Scoping(Service):
+class Scoping:
     """
     Scoping can be used as a calltree to track execution.
 
@@ -44,137 +51,196 @@ class Scoping(Service):
 
     - caller-callee corresponds to parent-child relationship
     - parallel-execution corresponds to sibling relationship
+    """
 
-    >>> scoping = Scoping()
-    >>> scoping['x'] = 1
-    >>> _ = scoping.create_scope(identifier='child', y=10)
-    >>> scoping['x'] + scoping['y']
-    11
-    >>> scoping.exit_scope()
-    True
-    >>> 'x' in scoping
-    True
-    >>> 'y' in scoping
-    False
+    def __init__(self, _tree: Optional[Tree] = None):
+        """
+        The constructor can be invoked in two flavors:
+
+        - Create New: call with no arguments
+        - From Existing: provide `_tree`
+        """
+        self.__init_tree(_tree)
+
+    def __init_tree(
+        self,
+        _tree: Optional[Tree] = None,
+    ):
+        if _tree is None:
+            # create new
+            self._tree = Tree()
+            self._tree.create_node(identifier=Scope())
+        else:
+            # from existing
+            self._tree = _tree
+
+    def __contains__(self, scope: Scope):
+        return self._tree.contains(scope)
+
+    @property
+    def global_scope(self) -> Scope:
+        return self._tree.root
+
+    def ancestors(self, scope: Scope, start_at_root: bool = False) -> Iterable[Node]:
+        """
+        Get ancestors of a specified node.
+
+        If `start_at_root` is True, then the ancestors will be enumerated from root.
+        Otherwise, they will be enumerated from specified node.
+        """
+        if start_at_root:
+            ancestors = deque()
+
+        node = self._get_node(scope)
+        while node is not None:
+            if start_at_root:
+                ancestors.appendleft(node)
+            else:
+                yield node
+            node = self._tree.parent(node.identifier)
+
+        if start_at_root:
+            yield from ancestors
+
+    def enclosing_scopes(self, scope: Scope, start_at_root: bool = False) -> Iterable[Scope]:
+        for node in self.ancestors(scope, start_at_root):
+            yield node.identifier
+
+    def _get_node(self, scope: Scope) -> Node:
+        return self._tree[scope]
+
+    def get(self, name, scope: Scope):
+        for scope in self.enclosing_scopes(scope):
+            try:
+                return scope[name]
+            except KeyError:
+                continue
+        else:
+            raise KeyError(f"{name} is not in ancestors of {scope}")
+
+    def update(self, scoped: Scoped) -> None:
+        parent_scope = None
+        for incoming_scope in scoped:
+            try:
+                if parent_scope is None:
+                    current_scopes = {self.global_scope}
+                else:
+                    current_scopes = {
+                        node.identifier for node in self._tree.children(parent_scope)
+                    }
+
+                if incoming_scope in current_scopes:
+                    parent_scope = incoming_scope
+                else:
+                    for current_scope in current_scopes:
+                        if incoming_scope.name == current_scope.name:
+                            current_scope.update(incoming_scope)
+                            parent_scope = current_scope
+                            break
+                    else:
+                        raise KeyError
+            except KeyError:
+                # new node
+                self.add_scope(parent_scope, incoming_scope)
+                parent_scope = incoming_scope
+
+    def add_scope(self, parent_scope: Scope, scope: Scope) -> Node:
+        return self._tree.create_node(identifier=scope, parent=parent_scope)
+
+    def create_scope(self, parent_scope: Scope, **kwargs: Any) -> Scope:
+        scope = Scope(**kwargs)
+        self.add_scope(parent_scope, scope)
+        return scope
+
+    def create_scoped(self, parent_scope: Scope, **kwargs) -> Scoped:
+        scope = self.create_scope(parent_scope, **kwargs)
+        return Scoped(self, scope)
+
+
+class Scoped(Scoping):
+    """
+    While Scoping is a tree of Scope, Scoped is a branch of Scope.
     """
 
     def __init__(
         self,
-        *args: Any,
-        _tree: Optional[Tree] = None,
-        _root_tag: Any = "global",
-        _root_identifier: Any = "global",
-        _head: Optional[Node] = None,
-        **kwargs: Any,
+        scoping: Scoping,
+        scope: Scope,
     ):
-        """
-        The constructor can be invoked in two flavors:
+        super().__init__(_tree=Tree())
+        self.__init_branch(scoping, scope)
 
-        - Create New: provide `_root_tag` and `_root_identifier` if defaults aren't good
-        - From Existing: provide `_tree` and optionally provide `_head`
-        """
-        super().__init__(*args, **kwargs)
-        self.__init_tree(_root_tag, _root_identifier, _tree, _head)
+    def __init_branch(self, scoping: Scoping, scope: Scope) -> None:
+        self.current_scope = scope
 
-    def __init_tree(
-        self,
-        _root_tag: Any,
-        _root_identifier: Any,
-        _tree: Optional[Tree] = None,
-        _head: Optional[Node] = None,
-    ):
-        if _tree:
-            # from existing
-            self._tree = _tree
-            self._root = self._tree[self._tree.root]
-            self._head = _head if _head else self._root
-        else:
-            # create new
-            self._tree = Tree()
-            self._root = self._tree.create_node(
-                tag=_root_tag, identifier=_root_identifier, data=Scope()
-            )
-            self._head = self._root
+        parent = None
+        for node in scoping.ancestors(self.current_scope, start_at_root=True):
+            parent = self._tree.create_node(identifier=node.identifier, parent=parent)
 
-    @property
-    def current_scope(self) -> Scope:
-        return self._head.data
+    def __getitem__(self, name):
+        return self.get(name, scope=self.current_scope)
 
-    @property
-    def global_scope(self) -> Scope:
-        return self._root.data
-
-    def __getitem__(self, name: str) -> Any:
+    def __contains__(self, name: Any) -> bool:
         try:
-            identifier = next(
-                self._tree.rsearch(self._head.identifier, filter=lambda node: name in node.data)
-            )
-            return self._tree[identifier].data[name]
-        except StopIteration as error:
-            raise KeyError from error
-
-    def __contains__(self, name: str) -> bool:
-        try:
-            _ = self[name]
+            self[name]
             return True
-        except KeyError:
+        except:
             return False
 
-    def __setitem__(self, name: str, value: Any) -> None:
+    def __setitem__(self, name, value):
         self.current_scope[name] = value
 
-    def setmagic(self, name: str, value: Any) -> None:
-        self.current_scope.setmagic(name, value)
+    def __iter__(self):
+        yield from self.enclosing_scopes(start_at_root=True)
 
-    def create_scope(self, tag: Any = None, identifier: Any = None, **mappings: Any) -> Scope:
-        self._head = self._tree.create_node(
-            tag=tag, identifier=identifier, parent=self._head, data=Scope(**mappings)
-        )
-        return self._head.data
+    def ancestors(
+        self, scope: Optional[Scope] = None, start_at_root: bool = False
+    ) -> Iterable[Node]:
+        if scope is None:
+            scope = self.current_scope
+        return super().ancestors(scope, start_at_root=start_at_root)
 
-    def exit_scope(self, identifier: Any = None, scope: Optional[Scope] = None) -> bool:
+    def enclosing_scopes(
+        self, scope: Optional[Scope] = None, start_at_root: bool = False
+    ) -> Iterable[Scope]:
+        if scope is None:
+            scope = self.current_scope
+        return super().enclosing_scopes(scope, start_at_root=start_at_root)
+
+    def up(self, num_scope_up: int = 0) -> Scope:
+        for i, scope in enumerate(self.enclosing_scopes()):
+            if i == num_scope_up:
+                return scope
+
+    def set(self, name, value, num_scope_up: int = 0):
+        scope = self.up(num_scope_up)
+        scope[name] = value
+
+    def setmagic(self, name, value, num_scope_up: int = 0):
+        scope = self.up(num_scope_up)
+        scope.setmagic(name, value)
+
+    def create_scope(self, **kwargs: Any) -> Scope:
+        return super().create_scope(parent_scope=self.current_scope, **kwargs)
+
+    def create_scoped(self, **kwargs) -> Scoped:
+        return super().create_scoped(parent_scope=self.current_scope, **kwargs)
+
+    def enter_scope(self, scope: Scope):
+        self.current_scope = scope
+
+    def exit_scope(self, scope: Scope) -> bool:
         """
         Exit a given scope. The current scope (head) will be set to its parent scope.
 
-        The scope to exit can be specified either by identifier or reference.
-        When both are supplied, identifier takes precedence.
-
         * The global (root) scope will not be exited.
-        * In current implementation, the exited scope is still accessible in the scoping. But this behavior is not guaranteed.
-        * When neither identifier nor scope are specified, current scope will be exited.
-
-        :param identifier: Identifier of the scope.
-        :param scope: A reference to the scope.
-        :returns: True if specified scope is exited. False when it cannot be exited.
-        :throws: When the specified scope cannot be found.
+        * In current implementation, the exited scope is still accessible in the scoping. It is simply not looked up when calling `__getitem__`.
         """
-        if scope is None:
-            if identifier is None:
-                identifier = self._head.identifier
-            node = self._tree[identifier]
-        else:
-            if identifier is None:
-                node = next(self._tree.filter_nodes(lambda node: node.data == scope))
-                identifier = node.identifier
-            else:
-                # identifier takes precedence
-                node = self._tree[identifier]
-
-        if not node.is_root():
-            self._head = self._tree.parent(identifier)
+        if parent := self._tree.parent(scope):
+            self.enter_scope(parent)
             return True
-
-        return False
-
-    @contextmanager
-    def new_scope(self, tag: Any = None, identifier: Any = None, **mappings: Any) -> None:
-        """Execute inside a new scope."""
-        scope = self.create_scope(tag=tag, identifier=identifier, **mappings)
-
-        try:
-            yield scope
-        finally:
-            self.exit_scope(identifier=identifier)
+        else:
+            return False
 
 
 if __name__ == "__main__":

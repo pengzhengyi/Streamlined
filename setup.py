@@ -20,6 +20,7 @@ setup(
         "networkx[default]",
         "decorator",
         "wrapt",
+        "uuid",
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",

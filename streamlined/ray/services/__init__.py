@@ -15,5 +15,5 @@ from .reaction import (
     bind_reaction,
     raises,
 )
-from .scoping import Scoping, to_magic_naming
+from .scoping import Scoped, Scoping, to_magic_naming
 from .service import Service
