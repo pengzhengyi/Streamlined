@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Callable
 
 from ..common import (
     ACTION,
@@ -14,8 +14,9 @@ from ..common import (
     RETURN_FALSE,
     VALUE,
 )
+from .action import Action
 from .middleware import Middleware
-from .parser import Parser
+from .parser import NestedParser
 
 
 def _TRANSFORM_WHEN_NOT_DICT(value):
@@ -40,7 +41,15 @@ def _TRANSFORM_WHEN_MISSING_VALUE(value):
     return value
 
 
-class Skip(Parser, Middleware):
+class Skip(NestedParser, Middleware):
+    @property
+    def _when_skip(self) -> Callable:
+        return self._action
+
+    def _init_subparsers(self) -> None:
+        super()._init_subparsers()
+        self.subparsers.append(Action)
+
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
@@ -60,21 +69,23 @@ class Skip(Parser, Middleware):
         # transform `{'skip': {ACTION: ...}}` to `{'skip': {VALUE: lambda: False, ACTION: ...}}`
         self.simplifications.append((AND(IS_DICT, _MISSING_VALUE), _TRANSFORM_WHEN_MISSING_VALUE))
 
-    def _do_parse(self, value: Any) -> Any:
+    def _do_parse(self, value):
+        parsed = dict()
+
         if not IS_DICT(value):
             raise TypeError(f"{value} should be dict")
 
         if _MISSING_VALUE(value):
             raise ValueError(f"{value} should have {VALUE} property")
         else:
-            self._should_skip = value[VALUE]
+            parsed["should_skip"] = value[VALUE]
 
         if _MISSING_ACTION(value):
             raise ValueError(f"{value} should have {ACTION} property")
-        elif IS_CALLABLE(action := value[ACTION]):
-            self._when_skip = action
         else:
-            raise ValueError(f"{ACTION} should be callable, received {action} instead")
+            parsed.update(super()._do_parse(value))
+
+        return parsed
 
     async def should_skip(self, executor) -> bool:
         if IS_CALLABLE(self._should_skip):
@@ -94,4 +105,4 @@ class Skip(Parser, Middleware):
             await next()
 
 
-SKIP: str = Skip({}).name
+SKIP = Skip.get_name()

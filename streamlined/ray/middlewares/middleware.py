@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable, List
 
+from streamlined.ray import middlewares
+
 from ..common import ASYNC_VOID
 
 if TYPE_CHECKING:
@@ -13,6 +15,10 @@ class Middleware:
     A middleware should specify how it modifies the execution chain
     through the `apply` method.
     """
+
+    @classmethod
+    def get_name(cls):
+        return cls.__name__.lower()
 
     async def apply(self, executor: Executor, next):
         """

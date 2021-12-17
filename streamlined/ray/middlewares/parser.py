@@ -1,6 +1,7 @@
-from functools import cached_property
-from operator import methodcaller
-from typing import Any
+from __future__ import annotations
+
+from functools import cached_property, partial
+from typing import Any, Dict, List, Type
 
 from ..common import IS_DICT, TAUTOLOGY
 from ..parsing import Parser as AbstractParser
@@ -25,11 +26,36 @@ class Parser(AbstractParser):
     def __init__(self, value) -> None:
         super().__init__()
         self._init_simplifications()
-        self.parse(value)
+        self._init_from_parsed(self.parse(value))
 
-    def parse(self, value: Any) -> Any:
+    def _init_from_parsed(self, parsed: Dict):
+        for name, value in parsed.items():
+            setattr(self, f"_{name}", value)
+
+    def parse(self, value: Any) -> Dict:
         if IS_DICT(value):
             value = value.get(self.name, None)
             return super().parse(value)
         else:
             raise TypeError(f"Expect {value} to be a Dictionary")
+
+
+class NestedParser(Parser):
+    subparsers: List[Type[Parser]]
+
+    def __init__(self, value) -> None:
+        self._init_subparsers()
+        super().__init__(value)
+
+    def _init_subparsers(self) -> None:
+        self.subparsers = []
+
+    def _do_parse(self, value: Any) -> Dict[str, Any]:
+        parsed = dict()
+
+        for subparser_class in self.subparsers:
+            subparser = subparser_class(value)
+
+            parsed.update(subparser.parse(value))
+
+        return parsed
