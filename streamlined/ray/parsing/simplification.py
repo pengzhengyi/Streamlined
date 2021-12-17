@@ -8,6 +8,9 @@ class Simplification:
 
     simplifications: List[Tuple[Predicate, Transform]]
 
+    def _init_simplifications(self) -> None:
+        self.simplifications = []
+
     def simplify(self, value: Any):
         for predicate, transform in self.simplifications:
             if predicate(value):

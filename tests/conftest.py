@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+from concurrent.futures import Executor, Future
 from logging.handlers import BufferingHandler
+from typing import Any, Callable
 
 import nest_asyncio
 import pytest
@@ -56,3 +59,17 @@ def minimum_manager():
 @pytest.fixture(scope="session")
 def get_buffering_logger_message():
     return lambda logger, index: logger.handlers[0].buffer[index].msg
+
+
+class SimpleExecutor(Executor):
+    def submit(self, __fn, *args: Any, **kwargs: Any):
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+        result = __fn(*args, **kwargs)
+        future.set_result(result)
+        return future
+
+
+@pytest.fixture(scope="session")
+def simple_executor():
+    return SimpleExecutor()

@@ -1,6 +1,6 @@
 import operator
 from functools import partial
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, List
 
 IS_NONE = partial(operator.is_, None)
 
@@ -20,15 +20,19 @@ def IS_DICT(value) -> bool:
     return isinstance(value, dict)
 
 
+def IS_NOT_DICT(value) -> bool:
+    return not IS_DICT(value)
+
+
 Predicate = Callable[[Any], bool]
 
 
-def AND(predicates: Iterable[Predicate]) -> Predicate:
+def AND(*predicates: List[Predicate]) -> Predicate:
     def wrapper(value):
         for predicate in predicates:
-            if predicate(value):
-                return True
-        else:
-            return False
+            if not predicate(value):
+                return False
+
+        return True
 
     return wrapper

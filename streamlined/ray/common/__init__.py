@@ -17,6 +17,7 @@ from .predicates import (
     IS_FALSY,
     IS_NONE,
     IS_NOT_CALLABLE,
+    IS_NOT_DICT,
     IS_TRUTHY,
     Predicate,
 )

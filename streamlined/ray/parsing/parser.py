@@ -13,4 +13,4 @@ class Parser(Simplification):
         return self._do_parse(simplified_value)
 
     def _do_parse(self, value: Any) -> Any:
-        pass
+        raise NotImplementedError()

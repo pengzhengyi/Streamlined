@@ -9,7 +9,12 @@ if TYPE_CHECKING:
 
 
 class Middleware:
-    def apply(self, executor: Executor, next: Callable[[], None]):
+    """
+    A middleware should specify how it modifies the execution chain
+    through the `apply` method.
+    """
+
+    async def apply(self, executor: Executor, next):
         """
         Apply this middleware onto the execution chain.
 
@@ -19,7 +24,7 @@ class Middleware:
         Tasks can be submitted to this executor for async and parallel execution.
         next: Current execution chain. This is usually the result of `apply` of next middleware.
         """
-        next()
+        raise NotImplementedError
 
 
 class Middlewares:
@@ -34,7 +39,7 @@ class Middlewares:
 
     def apply(self, executor):
         """
-        Transform these middleware to an executable.
+        Transform these middleware to an async executable.
         """
         if not self.middlewares:
             return ASYNC_VOID
