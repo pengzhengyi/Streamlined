@@ -119,6 +119,11 @@ class Scoping:
             raise KeyError(f"{name} is not in ancestors of {scope}")
 
     def update(self, scoped: Scoped) -> None:
+        """
+        This is similar to `git merge`.
+
+        It merges in the changes introduced in a same-rooted branch.
+        """
         parent_scope = None
         for incoming_scope in scoped:
             try:
@@ -220,11 +225,15 @@ class Scoped(Scoping):
         scope = self.up(num_scope_up)
         scope.setmagic(name, value)
 
-    def create_scope(self, **kwargs: Any) -> Scope:
-        return super().create_scope(parent_scope=self.current_scope, **kwargs)
+    def create_scope(self, parent_scope: Optional[Scope] = None, **kwargs: Any) -> Scope:
+        if parent_scope is None:
+            parent_scope = self.current_scope
+        return super().create_scope(parent_scope, **kwargs)
 
-    def create_scoped(self, **kwargs) -> Scoped:
-        return super().create_scoped(parent_scope=self.current_scope, **kwargs)
+    def create_scoped(self, parent_scope: Optional[Scope] = None, **kwargs) -> Scoped:
+        if parent_scope is None:
+            parent_scope = self.current_scope
+        return super().create_scoped(parent_scope, **kwargs)
 
     def enter_scope(self, scope: Scope):
         self.current_scope = scope

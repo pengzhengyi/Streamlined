@@ -30,7 +30,7 @@ class Parser(AbstractParser):
 
     def _init_from_parsed(self, parsed: Dict):
         for name, value in parsed.items():
-            setattr(self, f"_{name}", value)
+            setattr(self, name, value)
 
     def parse(self, value: Any) -> Dict:
         if IS_DICT(value):

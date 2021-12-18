@@ -4,6 +4,7 @@ from ..common import (
     ACTION,
     AND,
     CONTRADICTION,
+    DEFAULT_KEYERROR,
     IDENTITY_FACTORY,
     IS_CALLABLE,
     IS_DICT,
@@ -13,9 +14,10 @@ from ..common import (
     NOOP,
     RETURN_FALSE,
     VALUE,
+    get_or_raise,
 )
 from .action import Action
-from .middleware import Middleware
+from .middleware import Middleware, MiddlewareContext
 from .parser import NestedParser
 
 
@@ -53,20 +55,20 @@ class Skip(NestedParser, Middleware):
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
-        # transform `{'skip': None}` to `{'skip': False}`
+        # `{'skip': None}` -> `{'skip': False}`
         self.simplifications.append((IS_NONE, CONTRADICTION))
 
-        # transform `{'skip': <bool>}` to `{'skip': lambda: <bool>}`
+        # `{'skip': <bool>}` -> `{'skip': lambda: <bool>}`
         self.simplifications.append((AND(IS_NOT_DICT, IS_NOT_CALLABLE), IDENTITY_FACTORY))
 
         self.simplifications.append((IS_NOT_DICT, _TRANSFORM_WHEN_NOT_DICT))
 
-        # transform `{'skip': {VALUE: ...}}` to `{'skip': {VALUE: ..., ACTION: lambda: NONE}}`
+        # `{'skip': {VALUE: ...}}` -> `{'skip': {VALUE: ..., ACTION: lambda: NONE}}`
         self.simplifications.append(
             (AND(IS_DICT, _MISSING_ACTION), _TRANSFORM_WHEN_MISSING_ACTION)
         )
 
-        # transform `{'skip': {ACTION: ...}}` to `{'skip': {VALUE: lambda: False, ACTION: ...}}`
+        # `{'skip': {ACTION: ...}}` -> `{'skip': {VALUE: lambda: False, ACTION: ...}}`
         self.simplifications.append((AND(IS_DICT, _MISSING_VALUE), _TRANSFORM_WHEN_MISSING_VALUE))
 
     def _do_parse(self, value):
@@ -75,34 +77,34 @@ class Skip(NestedParser, Middleware):
         if not IS_DICT(value):
             raise TypeError(f"{value} should be dict")
 
-        if _MISSING_VALUE(value):
-            raise ValueError(f"{value} should have {VALUE} property")
-        else:
-            parsed["should_skip"] = value[VALUE]
+        parsed["_should_skip"] = get_or_raise(value, VALUE)
 
         if _MISSING_ACTION(value):
-            raise ValueError(f"{value} should have {ACTION} property")
+            raise DEFAULT_KEYERROR(value, ACTION)
         else:
             parsed.update(super()._do_parse(value))
 
         return parsed
 
     async def should_skip(self, executor) -> bool:
-        if IS_CALLABLE(self._should_skip):
-            future = executor.submit(self._should_skip)
+        if IS_CALLABLE(should_skip := self._should_skip):
+            future = executor.submit(should_skip)
             return await future
         else:
-            return self._should_skip
+            return should_skip
 
     async def when_skip(self, executor):
         future = executor.submit(self._when_skip)
         return await future
 
-    async def _do_apply(self, executor, next):
-        if await self.should_skip(executor):
-            await self.when_skip(executor)
+    async def _do_apply(self, context: MiddlewareContext):
+        should_skip = await self.should_skip(context.executor)
+        context.scoped.setmagic(self.name, should_skip)
+        if should_skip:
+            context.scoped.setmagic(VALUE, await self.when_skip(context.executor))
         else:
-            await next()
+            await context.next()
+        return context.scoped
 
 
 SKIP = Skip.get_name()

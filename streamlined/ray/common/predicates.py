@@ -24,6 +24,10 @@ def IS_NOT_DICT(value) -> bool:
     return not IS_DICT(value)
 
 
+def IS_STR(value) -> bool:
+    return isinstance(value, str)
+
+
 Predicate = Callable[[Any], bool]
 
 

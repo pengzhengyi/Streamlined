@@ -9,7 +9,8 @@ from .constants import (
     VOID,
 )
 from .data_structures import Bag, BidirectionalIndex
-from .names import ACTION, VALUE
+from .dictionary import DEFAULT_KEYERROR, get_or_raise
+from .names import ACTION, LEVEL, LOGGER, MESSAGE, VALUE
 from .predicates import (
     AND,
     IS_CALLABLE,
@@ -18,6 +19,7 @@ from .predicates import (
     IS_NONE,
     IS_NOT_CALLABLE,
     IS_NOT_DICT,
+    IS_STR,
     IS_TRUTHY,
     Predicate,
 )

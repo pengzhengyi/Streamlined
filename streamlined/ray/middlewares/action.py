@@ -1,5 +1,5 @@
-from ..common import IDENTITY_FACTORY, IS_NOT_CALLABLE
-from .middleware import Middleware
+from ..common import IDENTITY_FACTORY, IS_NOT_CALLABLE, VALUE
+from .middleware import Middleware, MiddlewareContext
 from .parser import Parser
 
 
@@ -13,11 +13,12 @@ class Action(Parser, Middleware):
         if IS_NOT_CALLABLE(value):
             raise TypeError(f"{value} should be a callable")
         else:
-            return {"action": value}
+            return {"_action": value}
 
-    async def _do_apply(self, executor, next):
-        await executor.submit(self._action)
-        await next()
+    async def _do_apply(self, context: MiddlewareContext):
+        context.scoped.setmagic(VALUE, await context.executor.submit(self._action))
+        await context.next()
+        return context.scoped
 
 
 ACTION = Action.get_name()
