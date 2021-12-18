@@ -88,14 +88,12 @@ class Skip(NestedParser, Middleware):
 
     async def should_skip(self, executor) -> bool:
         if IS_CALLABLE(should_skip := self._should_skip):
-            future = executor.submit(should_skip)
-            return await future
+            return await executor.submit(should_skip)
         else:
             return should_skip
 
     async def when_skip(self, executor):
-        future = executor.submit(self._when_skip)
-        return await future
+        return await executor.submit(self._when_skip)
 
     async def _do_apply(self, context: MiddlewareContext):
         should_skip = await self.should_skip(context.executor)

@@ -76,22 +76,19 @@ class Log(Parser, Middleware):
 
     async def get_log_level(self, executor) -> int:
         if IS_CALLABLE(level := self._level):
-            future = executor.submit(level)
-            return await future
+            return await executor.submit(level)
         else:
             return level
 
     async def get_logger(self, executor) -> logging.Logger:
         if IS_CALLABLE(logger := self._logger):
-            future = executor.submit(logger)
-            return await future
+            return await executor.submit(logger)
         else:
             return logger
 
     async def get_message(self, executor) -> str:
         if IS_CALLABLE(message := self._message):
-            future = executor.submit(message)
-            return await future
+            return await executor.submit(message)
         else:
             return message
 

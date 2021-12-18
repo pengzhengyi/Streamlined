@@ -31,6 +31,9 @@ class Scope(UserDict):
     def __str__(self) -> str:
         return f"{self.name}={super().__str__()}"
 
+    def getmagic(self, name: str) -> Any:
+        return self[to_magic_naming(name)]
+
     def setmagic(self, name: str, value: Any) -> None:
         """
         Similar to `self[name] = value` but applies magic nomenclature.
@@ -216,6 +219,9 @@ class Scoped(Scoping):
         for i, scope in enumerate(self.enclosing_scopes()):
             if i == num_scope_up:
                 return scope
+
+    def getmagic(self, name: str) -> Any:
+        return self[to_magic_naming(name)]
 
     def set(self, name, value, num_scope_up: int = 0):
         scope = self.up(num_scope_up)

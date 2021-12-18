@@ -28,6 +28,10 @@ def IS_STR(value) -> bool:
     return isinstance(value, str)
 
 
+def IS_NOT_STR(value) -> bool:
+    return not IS_STR(value)
+
+
 Predicate = Callable[[Any], bool]
 
 
