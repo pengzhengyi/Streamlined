@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, List
-
-from streamlined.ray import middlewares
+from typing import TYPE_CHECKING, List
 
 from ..common import ASYNC_VOID
 
@@ -33,6 +31,16 @@ class Middleware:
         raise NotImplementedError
 
 
+class _BoundMiddleware:
+    def __init__(self, middleware: Middleware, executor: Executor, next) -> None:
+        self.middleware = middleware
+        self.executor = executor
+        self.next = next
+
+    async def apply(self):
+        return await self.middleware.apply(self.executor, self.next)
+
+
 class Middlewares:
     """
     A queue of middleware.
@@ -53,10 +61,10 @@ class Middlewares:
         return self._apply(executor, index=0)
 
     def _apply(self, executor, index: int = 0):
-        if index == (len(self.middlewares) - 1):
+        if index == len(self.middlewares):
             return ASYNC_VOID
 
         # recursively apply for each middleware
         next = self._apply(executor, index + 1)
-        current_middleware = self.middlewares[index]
-        return current_middleware.apply(executor, next)
+        current_middleware = _BoundMiddleware(self.middlewares[index], executor, next)
+        return current_middleware.apply

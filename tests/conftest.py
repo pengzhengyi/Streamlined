@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from concurrent.futures import Executor, Future
+from concurrent.futures import Executor
 from logging.handlers import BufferingHandler
-from typing import Any, Callable
+from typing import Any
 
 import nest_asyncio
 import pytest
@@ -63,11 +63,14 @@ def get_buffering_logger_message():
 
 class SimpleExecutor(Executor):
     def submit(self, __fn, *args: Any, **kwargs: Any):
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-        result = __fn(*args, **kwargs)
-        future.set_result(result)
-        return future
+        if asyncio.iscoroutinefunction(__fn):
+            return __fn(*args, **kwargs)
+        else:
+            loop = asyncio.get_running_loop()
+            future = loop.create_future()
+            result = __fn(*args, **kwargs)
+            future.set_result(result)
+            return future
 
 
 @pytest.fixture(scope="session")
