@@ -22,11 +22,21 @@ class Middleware:
         """
         Apply this middleware onto the execution chain.
 
+        Can be overridden in subclasses to provide some common code around middleware application.
+
         Parameters
         ------
         executor: An instance of [Executor](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor).
         Tasks can be submitted to this executor for async and parallel execution.
         next: Current execution chain. This is usually the result of `apply` of next middleware.
+        """
+        return await self._do_apply(executor, next)
+
+    async def _do_apply(self, executor: Executor, next):
+        """
+        Apply this middleware onto the execution chain.
+
+        Should be overridden in subclasses to provide functionality.
         """
         raise NotImplementedError
 

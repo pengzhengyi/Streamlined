@@ -15,7 +15,7 @@ class Action(Parser, Middleware):
         else:
             return {"action": value}
 
-    async def apply(self, executor, next):
+    async def _do_apply(self, executor, next):
         await executor.submit(self._action)
         await next()
 

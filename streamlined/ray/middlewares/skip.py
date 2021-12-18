@@ -98,7 +98,7 @@ class Skip(NestedParser, Middleware):
         future = executor.submit(self._when_skip)
         return await future
 
-    async def apply(self, executor, next):
+    async def _do_apply(self, executor, next):
         if await self.should_skip(executor):
             await self.when_skip(executor)
         else:
