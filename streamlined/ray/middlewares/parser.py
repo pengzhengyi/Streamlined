@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from functools import cached_property, partial
-from typing import Any, Dict, List, Type
+from functools import cached_property
+from typing import Any, Dict, Iterable, List, Optional, Type
 
-from ..common import IS_DICT, TAUTOLOGY
+from ..common import IS_DICT
 from ..parsing import Parser as AbstractParser
 
 
@@ -23,6 +23,19 @@ class Parser(AbstractParser):
     def name(self) -> str:
         return self.__class__.__name__.lower()
 
+    @classmethod
+    def get_name(cls):
+        return cls.__name__.lower()
+
+    @classmethod
+    def verify(cls, value: Any) -> None:
+        """
+        Validate whether a value is appropriate for parsing.
+
+        Should return nothing but throw exception for illegal input format.
+        """
+        pass
+
     def __init__(self, value) -> None:
         super().__init__()
         self._init_simplifications()
@@ -38,24 +51,3 @@ class Parser(AbstractParser):
             return super().parse(value)
         else:
             raise TypeError(f"Expect {value} to be a Dictionary")
-
-
-class NestedParser(Parser):
-    subparsers: List[Type[Parser]]
-
-    def __init__(self, value) -> None:
-        self._init_subparsers()
-        super().__init__(value)
-
-    def _init_subparsers(self) -> None:
-        self.subparsers = []
-
-    def _do_parse(self, value: Any) -> Dict[str, Any]:
-        parsed = dict()
-
-        for subparser_class in self.subparsers:
-            subparser = subparser_class(value)
-
-            parsed.update(subparser.parse(value))
-
-        return parsed

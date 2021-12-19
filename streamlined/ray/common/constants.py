@@ -27,5 +27,9 @@ def NOOP():
     return None
 
 
+def RETURN_TRUE():
+    return True
+
+
 def RETURN_FALSE():
     return False

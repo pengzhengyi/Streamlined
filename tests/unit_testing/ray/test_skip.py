@@ -21,5 +21,5 @@ async def test_skip_when_custom_action_is_run(simple_executor):
     context, _ = MiddlewareContext.new(simple_executor)
     await skip.apply(context)
 
-    custom_action.assert_called_once()
-    original_action.assert_not_called()
+    custom_action.assert_awaited_once()
+    original_action.assert_not_awaited()

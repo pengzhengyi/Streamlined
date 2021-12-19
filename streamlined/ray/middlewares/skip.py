@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Any, Callable
 
 from ..common import (
     ACTION,
@@ -14,11 +14,10 @@ from ..common import (
     NOOP,
     RETURN_FALSE,
     VALUE,
-    get_or_raise,
 )
 from .action import Action
 from .middleware import Middleware, MiddlewareContext
-from .parser import NestedParser
+from .parser import Parser
 
 
 def _TRANSFORM_WHEN_NOT_DICT(value):
@@ -43,14 +42,23 @@ def _TRANSFORM_WHEN_MISSING_VALUE(value):
     return value
 
 
-class Skip(NestedParser, Middleware):
+class Skip(Parser, Middleware):
+    @classmethod
+    def verify(cls, value: Any) -> None:
+        super().verify(value)
+
+        if not IS_DICT(value):
+            raise TypeError(f"{value} should be dict")
+
+        if _MISSING_ACTION(value):
+            raise DEFAULT_KEYERROR(value, ACTION)
+
+        if _MISSING_VALUE(value):
+            raise DEFAULT_KEYERROR(value, VALUE)
+
     @property
     def _when_skip(self) -> Callable:
         return self._action
-
-    def _init_subparsers(self) -> None:
-        super()._init_subparsers()
-        self.subparsers.append(Action)
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
@@ -72,17 +80,11 @@ class Skip(NestedParser, Middleware):
         self.simplifications.append((AND(IS_DICT, _MISSING_VALUE), _TRANSFORM_WHEN_MISSING_VALUE))
 
     def _do_parse(self, value):
-        parsed = dict()
+        self.verify(value)
 
-        if not IS_DICT(value):
-            raise TypeError(f"{value} should be dict")
+        parsed = self.parse_with(value, [Action])
 
-        parsed["_should_skip"] = get_or_raise(value, VALUE)
-
-        if _MISSING_ACTION(value):
-            raise DEFAULT_KEYERROR(value, ACTION)
-        else:
-            parsed.update(super()._do_parse(value))
+        parsed["_should_skip"] = value[VALUE]
 
         return parsed
 

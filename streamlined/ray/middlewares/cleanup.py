@@ -10,6 +10,7 @@ class Cleanup(Action):
     async def _do_apply(self, context: MiddlewareContext):
         await context.next()
         await context.executor.submit(self._action)
+        return context.scoped
 
 
 CLEANUP = Cleanup.get_name()

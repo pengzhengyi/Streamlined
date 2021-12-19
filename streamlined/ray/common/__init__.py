@@ -4,13 +4,14 @@ from .constants import (
     CONTRADICTION,
     NOOP,
     RETURN_FALSE,
+    RETURN_TRUE,
     TAUTOLOGY,
     TAUTOLOGY_FACTORY,
     VOID,
 )
 from .data_structures import Bag, BidirectionalIndex
 from .dictionary import DEFAULT_KEYERROR, get_or_raise
-from .names import ACTION, LEVEL, LOGGER, MESSAGE, VALUE
+from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, VALUE
 from .predicates import (
     AND,
     IS_CALLABLE,

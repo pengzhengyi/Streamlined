@@ -1,8 +1,9 @@
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, Optional
+from typing import Any, Awaitable, Dict, Optional
 
 from ..common import (
     AND,
+    DEFAULT_KEYERROR,
     IS_CALLABLE,
     IS_DICT,
     IS_STR,
@@ -63,15 +64,29 @@ class Log(Parser, Middleware):
             (AND(IS_DICT, _MISSING_LOGGER), _TRANSFORM_WHEN_MISSING_LOGGER)
         )
 
-    def _do_parse(self, value: Dict[str, Any]) -> Dict:
+    @classmethod
+    def verify(cls, value: Any) -> None:
+        super().verify(value)
 
         if not IS_DICT(value):
             raise TypeError(f"{value} should be dict")
 
+        if _MISSING_LEVEL(value):
+            raise DEFAULT_KEYERROR(value, LEVEL)
+
+        if _MISSING_LOGGER(value):
+            raise DEFAULT_KEYERROR(value, LOGGER)
+
+        if _MISSING_MESSAGE(value):
+            raise DEFAULT_KEYERROR(value, MESSAGE)
+
+    def _do_parse(self, value: Dict[str, Any]) -> Dict:
+        self.verify(value)
+
         return {
-            "_message": get_or_raise(value, MESSAGE),
-            "_logger": get_or_raise(value, LOGGER),
-            "_level": get_or_raise(value, LEVEL),
+            "_message": value[MESSAGE],
+            "_logger": value[LOGGER],
+            "_level": value[LEVEL],
         }
 
     async def get_log_level(self, executor) -> int:

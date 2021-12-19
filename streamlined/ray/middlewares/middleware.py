@@ -61,6 +61,7 @@ class Middleware:
     """
 
     def __init__(self) -> None:
+        super().__init__()
         self._init_events()
 
     def _init_events(self) -> None:
@@ -70,6 +71,21 @@ class Middleware:
     @classmethod
     def get_name(cls):
         return cls.__name__.lower()
+
+    async def _do_apply(self, context: MiddlewareContext) -> Awaitable[Scoped]:
+        """
+        Apply this middleware onto the execution chain.
+
+        Should be overridden in subclasses to provide functionality.
+
+        Returns
+        ------
+        Modified scope.
+
+        * Return of modified scope is necessary in parallel execution scenario to
+        * ensure the updates is captured.
+        """
+        return context.scoped
 
     async def apply(self, context: MiddlewareContext) -> Awaitable[Scoped]:
         """
@@ -87,19 +103,20 @@ class Middleware:
         self.after_apply(middleware=self, context=context, scoped=scoped)
         return scoped
 
-    async def _do_apply(self, context: MiddlewareContext) -> Awaitable[Optional[Scoped]]:
+    async def apply_to(self, context: MiddlewareContext) -> Awaitable[Scoped]:
         """
-        Apply this middleware onto the execution chain.
+        Different from `apply` where middleware is committing the change to the scope,
+        `apply_to` will add a scope to the existing scope in the context and make changes to it.
 
-        Should be overridden in subclasses to provide functionality.
-
-        Returns
+        Return
         ------
-        Modified scope.
-
-        * Return of modified scope is necessary in parallel execution scenario to
-        * ensure the updates is captured.
+        The modified scope will be returned.
         """
+        new_context = replace(context, scoped=context.scoped.create_scoped())
+        scoped = await self.apply(new_context)
+
+        if scoped is not None:
+            context.scoped.update(scoped)
         return context.scoped
 
 
@@ -108,8 +125,11 @@ class _BoundMiddleware:
     middleware: Middleware
     context: MiddlewareContext
 
-    async def apply(self) -> Awaitable[Optional[Scoped]]:
+    async def apply(self) -> Awaitable[Scoped]:
         return await self.middleware.apply(self.context)
+
+    async def apply_to(self) -> Awaitable[Scoped]:
+        return await self.middleware.apply_to(self.context)
 
 
 class Middlewares:
@@ -120,11 +140,10 @@ class Middlewares:
     middlewares: List[Middleware]
 
     def __init__(self) -> None:
+        super().__init__()
         self.middlewares = []
 
-    def apply(
-        self, context: MiddlewareContext
-    ) -> Coroutine[None, None, Awaitable[Optional[Scoped]]]:
+    def apply(self, context: MiddlewareContext) -> Coroutine[None, None, Awaitable[Scoped]]:
         """
         Transform these middleware to a coroutine function.
         """
@@ -143,13 +162,7 @@ class Middlewares:
         next = self._apply(context, index + 1)
         middleware = self.middlewares[index]
 
-        middleware.after_apply.register(partial(_update_scoped, original=context.scoped))
-        middleware_context = replace(context, scoped=context.scoped.create_scoped(), next=next)
+        middleware_context = replace(context, next=next)
         bound_middleware = _BoundMiddleware(middleware, middleware_context)
 
-        return bound_middleware.apply
-
-
-def _update_scoped(*, original: Scoped, scoped: Scoped, **kwargs: Any) -> None:
-    if scoped is not None:
-        original.update(scoped)
+        return bound_middleware.apply_to
