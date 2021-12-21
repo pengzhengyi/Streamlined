@@ -26,3 +26,4 @@ from .predicates import (
     Predicate,
 )
 from .transforms import IDENTITY_FACTORY, Transform
+from .tree import update
