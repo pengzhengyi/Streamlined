@@ -6,6 +6,8 @@ from typing import Any, Iterable, Optional
 
 from treelib import Node, Tree
 
+from ..common import update as tree_update
+
 
 def to_magic_naming(name: str) -> str:
     """
@@ -46,6 +48,18 @@ class Scope(UserDict):
         self[to_magic_naming(name)] = value
 
 
+def _are_scope_nodes_equal(scope_node: Node, other_scope_node: Node) -> bool:
+    return (
+        scope_node is other_scope_node
+        or (scope := scope_node.identifier) is (other_scope := other_scope_node.identifier)
+        or scope.name == other_scope.name
+    )
+
+
+def _update_equal_scope_nodes(scope_node: Node, other_scope_node: Node) -> None:
+    scope_node.identifier.update(other_scope_node.identifier)
+
+
 class Scoping:
     """
     Scoping can be used as a calltree to track execution.
@@ -84,6 +98,11 @@ class Scoping:
     def global_scope(self) -> Scope:
         return self._tree.root
 
+    @property
+    def all_scopes(self) -> Iterable[Scope]:
+        for node in self._tree.all_nodes_itr():
+            yield node.identifier
+
     def ancestors(self, scope: Scope, start_at_root: bool = False) -> Iterable[Node]:
         """
         Get ancestors of a specified node.
@@ -121,36 +140,18 @@ class Scoping:
         else:
             raise KeyError(f"{name} is not in ancestors of {scope}")
 
-    def update(self, scoped: Scoped) -> None:
+    def update(self, scoping: Scoping) -> None:
         """
         This is similar to `git merge`.
 
         It merges in the changes introduced in a same-rooted branch.
         """
-        parent_scope = None
-        for incoming_scope in scoped:
-            try:
-                if parent_scope is None:
-                    current_scopes = {self.global_scope}
-                else:
-                    current_scopes = {
-                        node.identifier for node in self._tree.children(parent_scope)
-                    }
-
-                if incoming_scope in current_scopes:
-                    parent_scope = incoming_scope
-                else:
-                    for current_scope in current_scopes:
-                        if incoming_scope.name == current_scope.name:
-                            current_scope.update(incoming_scope)
-                            parent_scope = current_scope
-                            break
-                    else:
-                        raise KeyError
-            except KeyError:
-                # new node
-                self.add_scope(parent_scope, incoming_scope)
-                parent_scope = incoming_scope
+        tree_update(
+            self._tree,
+            scoping._tree,
+            are_equal=_are_scope_nodes_equal,
+            update_equal=_update_equal_scope_nodes,
+        )
 
     def add_scope(self, parent_scope: Scope, scope: Scope) -> Node:
         return self._tree.create_node(identifier=scope, parent=parent_scope)

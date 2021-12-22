@@ -31,3 +31,16 @@ def test_nested_scope():
     activities.update(day_activities)
     activities.update(night_activities)
     assert activities.get("sleep", night_activities.current_scope) == 8
+
+
+def test_scoping_update():
+    scoping = Scoping()
+    scoping.global_scope["Alice"] = "US"
+
+    scoped = scoping.create_scoped(scoping.global_scope, Bob="UK")
+    scoped["Jerry"] = "Germany"
+    scoped.create_scope(Mary="France")
+
+    scoping.update(scoped)
+
+    assert len(list(scoping.all_scopes)) == 3

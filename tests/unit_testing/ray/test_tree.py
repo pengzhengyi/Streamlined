@@ -26,6 +26,7 @@ def test_update_insert():
         └── Mark
             ├── Alice
             └── Bob
+                └── Jerry
     """
     hierarchy_of_mark = Tree()
     hierarchy_of_mark.create_node("Harry", "harry")
@@ -33,6 +34,7 @@ def test_update_insert():
     hierarchy_of_mark.create_node("Mark", "mark", parent="jane")
     hierarchy_of_mark.create_node("Alice", "alice", parent="mark")
     hierarchy_of_mark.create_node("Bob", "bob", parent="mark")
+    hierarchy_of_mark.create_node("Jerry", "jerry", parent="bob")
 
     update(
         original,
@@ -49,11 +51,13 @@ def test_update_insert():
         └── Mark
             ├── Alice
             └── Bob
+                └── Jerry
     """
 
     assert len(original.children("mark")) == 2
     assert "alice" in original
     assert "bob" in original
+    assert "jerry" in original
 
 
 def test_update_update_equal():

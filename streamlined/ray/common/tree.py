@@ -56,5 +56,25 @@ def update(
                 update_equal(source_equal_node, target_node)
                 to_examine.append((source_equal_node, target.children(target_node.identifier)))
             except StopIteration:
-                target_subtree = target.subtree(target_node.identifier)
-                source.paste(parent.identifier, target_subtree)
+                transplant(source, source_node=parent, target=target, target_node=target_node)
+
+
+def transplant(source: Tree, source_node: Node, target: Tree, target_node: Node) -> None:
+    """
+    Transplant will recreate similar subtree under target node in source tree.
+
+    The new subtree will be child of source node.
+    """
+    parent_to_children: Deque[Tuple[Node, List[Node]]] = deque()
+
+    parent_to_children.append((source_node, [target_node]))
+
+    while parent_to_children:
+        parent, children = parent_to_children.popleft()
+
+        for child in children:
+            new_node = source.create_node(
+                tag=child.tag, identifier=child.identifier, parent=parent, data=child.data
+            )
+            new_children = target.children(child.identifier)
+            parent_to_children.append((new_node, new_children))
