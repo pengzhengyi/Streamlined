@@ -13,7 +13,7 @@ from ..common import (
     get_or_raise,
 )
 from ..services import Scoped
-from .middleware import Middleware, MiddlewareContext
+from .middleware import Context, Middleware
 from .parser import Parser
 
 
@@ -89,32 +89,32 @@ class Log(Parser, Middleware):
             "_level": value[LEVEL],
         }
 
-    async def get_log_level(self, executor) -> int:
+    async def get_log_level(self, context: Context) -> int:
         if IS_CALLABLE(level := self._level):
-            return await executor.submit(level)
+            return await context.submit(level)
         else:
             return level
 
-    async def get_logger(self, executor) -> logging.Logger:
+    async def get_logger(self, context: Context) -> logging.Logger:
         if IS_CALLABLE(logger := self._logger):
-            return await executor.submit(logger)
+            return await context.submit(logger)
         else:
             return logger
 
-    async def get_message(self, executor) -> str:
+    async def get_message(self, context: Context) -> str:
         if IS_CALLABLE(message := self._message):
-            return await executor.submit(message)
+            return await context.submit(message)
         else:
             return message
 
-    async def _do_apply(self, context: MiddlewareContext) -> Awaitable[Optional[Scoped]]:
-        message = await self.get_message(context.executor)
+    async def _do_apply(self, context: Context) -> Awaitable[Optional[Scoped]]:
+        message = await self.get_message(context)
         context.scoped.setmagic(MESSAGE, message)
 
-        level = await self.get_log_level(context.executor)
+        level = await self.get_log_level(context)
         context.scoped.setmagic(LEVEL, level)
 
-        logger = await self.get_logger(context.executor)
+        logger = await self.get_logger(context)
         logger.log(level, message)
 
         await context.next()

@@ -22,19 +22,7 @@ from ray.remote_function import RemoteFunction
 
 from ..common import RayAsyncActor, RayRemote
 
-
-class Executable:
-    """
-    Capture function and arguments.
-    """
-
-    def __init__(self, fn: Callable, *args: Any, **kwargs: Any):
-        self.fn = fn
-        self.args = args
-        self.kwargs = kwargs
-
-    def __call__(self) -> Any:
-        return self.fn(*self.args, **self.kwargs)
+Executable = Callable[[], Any]
 
 
 class Executor(AbstractExecutor):
@@ -64,21 +52,16 @@ class Executor(AbstractExecutor):
         self.executing.pop(future, None)
         self.executed[future] = executable
 
-    def submit(self, fn: Union[Callable, Executable], *args: Any, **kwargs: Any) -> Future:
-        executable = fn if isinstance(fn, Executable) else Executable(fn, *args, **kwargs)
-
-        future = self.executor.submit(executable.fn, *executable.args, **executable.kwargs)
+    def submit(self, executable: Executable, *args: Any, **kwargs: Any) -> Future:
+        future = self.executor.submit(executable, *args, **kwargs)
         self.executing[future] = executable
         future.add_done_callback(partial(self._on_complete, executable=executable))
         return future
 
-    def map(self, executables: Iterable[Executable]) -> Iterable[Future]:
-        for executable in executables:
-            yield self.submit(executable)
-
-    async def map_async(self, executables: AsyncIterable[Executable]) -> AsyncIterable[Future]:
-        async for executable in executables:
-            yield self.submit(executable)
+    def map(
+        self, fn, *iterables: Iterable[Any], timeout: float | None = ..., chunksize: int = ...
+    ):
+        raise NotImplementedError()
 
     def shutdown(self, wait: bool, *args: Any, **kwargs: Any) -> None:
         return super().shutdown(wait, *args, **kwargs)
@@ -143,7 +126,7 @@ class RayExecutor(AbstractExecutor):
 
             actor = actor_constructor(fn)
             return actor.__call__.remote, actor
-        else:
+        else:  # regular function
             if ray_options:
                 return RayRemote(**ray_options)(fn)
             else:
@@ -162,9 +145,7 @@ class RayExecutor(AbstractExecutor):
         return self.run(fn, *args, ray_options=ray_options, **kwargs)
 
     def map(self, func, *iterables, ray_options: Optional[Dict[str, Any]] = None):
-        remote_func = self.to_remote_function(func, ray_options)
-        for args in zip(*iterables):
-            yield remote_func(*args)
+        raise NotImplementedError()
 
     def shutdown(self, wait):
         return self._exit_stack.close()

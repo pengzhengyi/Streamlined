@@ -7,13 +7,13 @@ from streamlined.ray.middlewares import (
     NAME,
     Argument,
     Arguments,
-    MiddlewareContext,
+    Context,
 )
 
 
 @pytest.mark.asyncio
 async def test_argument_set_in_scope(simple_executor):
-    context, scoping = MiddlewareContext.new(simple_executor)
+    context, scoping = Context.new(simple_executor)
     argument = Argument({ARGUMENT: {NAME: "first_name", VALUE: "Alice"}})
     scoped = await argument.apply(context)
     assert scoped["first_name"] == "Alice"
@@ -21,7 +21,7 @@ async def test_argument_set_in_scope(simple_executor):
 
 @pytest.mark.asyncio
 async def test_arguments_set_in_scope(simple_executor):
-    context, scoping = MiddlewareContext.new(simple_executor)
+    context, scoping = Context.new(simple_executor)
     arguments = Arguments(
         {ARGUMENTS: [{NAME: "first_name", VALUE: "John"}, {NAME: "last_name", VALUE: "Doe"}]}
     )

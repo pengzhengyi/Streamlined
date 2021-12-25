@@ -8,7 +8,7 @@ from streamlined.ray.middlewares import (
     SKIP,
     Action,
     Cleanup,
-    MiddlewareContext,
+    Context,
     Middlewares,
     Skip,
 )
@@ -29,7 +29,7 @@ async def test_middlewares_apply(simple_executor):
     act.assert_not_awaited()
     clean.assert_not_awaited()
 
-    context, _ = MiddlewareContext.new(simple_executor)
+    context, _ = Context.new(simple_executor)
     coroutine = middleware_queue.apply(context)
 
     await coroutine()

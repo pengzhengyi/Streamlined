@@ -5,6 +5,7 @@ from functools import partial
 from inspect import Parameter
 from typing import Any, Callable, ClassVar, Iterable, List, Mapping, Optional
 
+from ..common import get_or_default
 from .service import Service
 
 
@@ -57,16 +58,16 @@ class DependencyInjection(Service):
                 if parameter.default == Parameter.empty:
                     args.append(providers[name])
                 else:
-                    args.append(providers.get(name, parameter.default))
+                    args.append(get_or_default(providers, name, parameter.default))
             elif parameter.kind == Parameter.VAR_POSITIONAL:
-                args.extend(providers.get(name, []))
+                args.extend(get_or_default(providers, name, default=[]))
             elif parameter.kind == Parameter.KEYWORD_ONLY:
                 if parameter.default == Parameter.empty:
                     kwargs[name] = providers[name]
                 else:
-                    kwargs[name] = providers.get(name, parameter.default)
+                    kwargs[name] = get_or_default(providers, name, parameter.default)
             elif parameter.kind == Parameter.VAR_KEYWORD:
-                kwargs.update(providers.get(name, dict()))
+                kwargs.update(get_or_default(providers, name, default=dict()))
 
         return signature.bind(*args, **kwargs)
 

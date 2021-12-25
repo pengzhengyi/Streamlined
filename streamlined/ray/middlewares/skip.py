@@ -16,7 +16,7 @@ from ..common import (
     VALUE,
 )
 from .action import Action
-from .middleware import Middleware, MiddlewareContext
+from .middleware import Context, Middleware
 from .parser import Parser
 
 
@@ -88,20 +88,20 @@ class Skip(Parser, Middleware):
 
         return parsed
 
-    async def should_skip(self, executor) -> bool:
+    async def should_skip(self, context: Context) -> bool:
         if IS_CALLABLE(should_skip := self._should_skip):
-            return await executor.submit(should_skip)
+            return await context.submit(should_skip)
         else:
             return should_skip
 
-    async def when_skip(self, executor):
-        return await executor.submit(self._when_skip)
+    async def when_skip(self, context: Context):
+        return await context.submit(self._when_skip)
 
-    async def _do_apply(self, context: MiddlewareContext):
-        should_skip = await self.should_skip(context.executor)
+    async def _do_apply(self, context: Context):
+        should_skip = await self.should_skip(context)
         context.scoped.setmagic(self.name, should_skip)
         if should_skip:
-            context.scoped.setmagic(VALUE, await self.when_skip(context.executor))
+            context.scoped.setmagic(VALUE, await self.when_skip(context))
         else:
             await context.next()
         return context.scoped

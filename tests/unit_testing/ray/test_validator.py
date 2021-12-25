@@ -6,7 +6,7 @@ from streamlined.ray.common import ACTION, HANDLERS, RETURN_TRUE
 from streamlined.ray.middlewares import (
     VALIDATOR,
     VALIDATOR_AFTER_STAGE,
-    MiddlewareContext,
+    Context,
     Validator,
 )
 
@@ -26,7 +26,7 @@ async def test_validator_handler(simple_executor):
         }
     )
 
-    context, scoping = MiddlewareContext.new(simple_executor)
+    context, scoping = Context.new(simple_executor)
     scoped = await validator.apply(context)
 
     true_handler_mock.assert_awaited_once()

@@ -1,7 +1,7 @@
 from typing import Any
 
 from ..common import IS_CALLABLE, IS_NOT_CALLABLE, IS_NOT_STR
-from .middleware import Middleware, MiddlewareContext
+from .middleware import Context, Middleware
 from .parser import Parser
 
 
@@ -18,14 +18,14 @@ class Name(Parser, Middleware):
 
         return {"_name": value}
 
-    async def get_register_name(self, executor) -> str:
+    async def get_register_name(self, context: Context) -> str:
         if IS_CALLABLE(name := self._name):
-            return await executor.submit(name)
+            return await context.submit(name)
         else:
             return name
 
-    async def _do_apply(self, context: MiddlewareContext):
-        name = await self.get_register_name(context.executor)
+    async def _do_apply(self, context: Context):
+        name = await self.get_register_name(context)
 
         context.scoped.setmagic(NAME, name, num_scope_up=1)
 

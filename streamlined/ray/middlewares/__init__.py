@@ -2,7 +2,7 @@ from .action import ACTION, Action
 from .argument import ARGUMENT, ARGUMENTS, Argument, Arguments
 from .cleanup import CLEANUP, Cleanup
 from .log import LOG, Log
-from .middleware import Middleware, MiddlewareContext, Middlewares
+from .middleware import Context, Middleware, Middlewares
 from .name import NAME, Name
 from .skip import SKIP, Skip
 from .validator import (

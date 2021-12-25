@@ -1,4 +1,4 @@
-from typing import Dict, Optional, TypeVar
+from typing import Dict, Mapping, Optional, TypeVar
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -15,3 +15,10 @@ def get_or_raise(value: Dict[K, V], property: K, error: Optional[Exception] = No
         if error is None:
             error = DEFAULT_KEYERROR(value, property)
         raise error from keyerror
+
+
+def get_or_default(mapping: Mapping[K, V], key: K, default: V) -> V:
+    try:
+        return mapping[key]
+    except KeyError:
+        return default

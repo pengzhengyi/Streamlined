@@ -10,7 +10,7 @@ from .constants import (
     VOID,
 )
 from .data_structures import Bag, BidirectionalIndex
-from .dictionary import DEFAULT_KEYERROR, get_or_raise
+from .dictionary import DEFAULT_KEYERROR, get_or_default, get_or_raise
 from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, VALUE
 from .predicates import (
     AND,

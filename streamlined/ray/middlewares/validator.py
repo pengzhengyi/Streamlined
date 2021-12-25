@@ -25,7 +25,7 @@ from ..services import Scoped
 from .action import Action
 from .cleanup import Cleanup
 from .log import LOG, Log
-from .middleware import Middleware, MiddlewareContext, WithMiddlewares
+from .middleware import Context, Middleware, WithMiddlewares
 from .name import Name
 from .parser import AbstractParser, Parser
 
@@ -91,7 +91,7 @@ class ValidatorHandler(Parser, Middleware, WithMiddlewares):
 
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    async def _do_apply(self, context: MiddlewareContext):
+    async def _do_apply(self, context: Context):
         coroutine = WithMiddlewares.apply(self, context)
         return await coroutine()
 
@@ -162,8 +162,8 @@ class ValidatorStage(Parser, Middleware):
 
         return parsed
 
-    async def validate(self, executor) -> Any:
-        return await executor.submit(self._action)
+    async def validate(self, context: Context) -> Any:
+        return await context.submit(self._action)
 
     def get_handler(self, result: Any) -> ValidatorHandler:
         try:
@@ -171,8 +171,8 @@ class ValidatorStage(Parser, Middleware):
         except KeyError:
             return self._handlers[DEFAULT]
 
-    async def _do_apply(self, context: MiddlewareContext):
-        validation_result = await self.validate(context.executor)
+    async def _do_apply(self, context: Context):
+        validation_result = await self.validate(context)
         context.scoped.setmagic(VALUE, validation_result)
 
         handler = self.get_handler(validation_result)
@@ -233,22 +233,20 @@ class Validator(Parser, Middleware):
 
         return parsed
 
-    async def _validate_stage(
-        self, stage_name: str, context: MiddlewareContext
-    ) -> Awaitable[Scoped]:
+    async def _validate_stage(self, stage_name: str, context: Context) -> Awaitable[Scoped]:
         try:
             validator: ValidatorStage = getattr(self, f"_{stage_name}_validator")
             return await validator.apply_to(replace(context, next=ASYNC_VOID))
         except AttributeError:
             return context.scoped
 
-    async def validate_before(self, context: MiddlewareContext) -> Awaitable[Scoped]:
+    async def validate_before(self, context: Context) -> Awaitable[Scoped]:
         return await self._validate_stage(VALIDATOR_BEFORE_STAGE, context)
 
-    async def validate_after(self, context: MiddlewareContext) -> Awaitable[Scoped]:
+    async def validate_after(self, context: Context) -> Awaitable[Scoped]:
         return await self._validate_stage(VALIDATOR_AFTER_STAGE, context)
 
-    async def _do_apply(self, context: MiddlewareContext):
+    async def _do_apply(self, context: Context):
         context.scoped.update(await self.validate_before(context))
 
         await context.next()

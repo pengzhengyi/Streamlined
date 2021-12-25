@@ -6,7 +6,7 @@ from ..services import Scoped
 from .action import Action
 from .cleanup import Cleanup
 from .log import LOG, Log
-from .middleware import Middleware, MiddlewareContext, WithMiddlewares
+from .middleware import Context, Middleware, WithMiddlewares
 from .name import NAME, Name
 from .parser import Parser
 from .validator import Validator
@@ -52,7 +52,7 @@ class Argument(Parser, Middleware, WithMiddlewares):
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    async def _do_apply(self, context: MiddlewareContext):
+    async def _do_apply(self, context: Context):
         action_middleware_index = self.middleware_types.index(Action)
         after_action_middlewares = self.get_middlewares_by_type(
             self.middleware_types[action_middleware_index + 1 :]
@@ -134,7 +134,7 @@ class Arguments(Parser, Middleware, WithMiddlewares):
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    async def _do_apply(self, context: MiddlewareContext) -> Awaitable[Scoped]:
+    async def _do_apply(self, context: Context) -> Awaitable[Scoped]:
         coroutine = WithMiddlewares.apply_to(self, context)
         return await coroutine()
 
