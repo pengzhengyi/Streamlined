@@ -1,24 +1,7 @@
 from dataclasses import replace
-from typing import Any, Awaitable, Callable, ClassVar, Dict, Iterable, List, Type
+from typing import Any, Awaitable, Dict, Iterable, List
 
-from ..common import (
-    ACTION,
-    AND,
-    ASYNC_VOID,
-    DEFAULT,
-    DEFAULT_KEYERROR,
-    HANDLERS,
-    IDENTITY_FACTORY,
-    IS_CALLABLE,
-    IS_DICT,
-    IS_NONE,
-    IS_NOT_CALLABLE,
-    IS_NOT_DICT,
-    IS_STR,
-    NOOP,
-    VALUE,
-    get_or_raise,
-)
+from ..common import DEFAULT_KEYERROR, IS_DICT, IS_LIST, IS_NONE, IS_NOT_DICT, VALUE
 from ..services import Scoped
 from .action import Action
 from .cleanup import Cleanup
@@ -97,3 +80,63 @@ class Argument(Parser, Middleware, WithMiddlewares):
 
 
 ARGUMENT = Argument.get_name()
+
+
+def _IS_NOT_LIST_OF_DICT(value: Any) -> bool:
+    if IS_LIST(value):
+        for listitem in value:
+            if IS_NOT_DICT(listitem):
+                return True
+        return False
+    else:
+        return True
+
+
+def _TRANSFORM_WHEN_ARGUMENTS_IS_NONE(value: None) -> List[Dict[str, Any]]:
+    return []
+
+
+def _TRANSFORM_WHEN_ARGUMENTS_IS_DICT(value: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [value]
+
+
+class Arguments(Parser, Middleware, WithMiddlewares):
+    def _init_middleware_types(self):
+        super()._init_middleware_types()
+        self.middleware_types.append(Argument)
+
+    def create_middlewares_from(self, value: List[Dict[str, Any]]) -> Iterable[Middleware]:
+        for middleware_type, middleware_name in zip(
+            self.middleware_types, self.get_middleware_names()
+        ):
+            if middleware_type is Argument:
+                for argument_value in value:
+                    new_value = {ARGUMENT: argument_value}
+                    yield middleware_type(new_value)
+
+    def _init_simplifications(self) -> None:
+        super()._init_simplifications()
+
+        # `{ARGUMENTS: None}` -> `{ARGUMENTS: []}`
+        self.simplifications.append((IS_NONE, _TRANSFORM_WHEN_ARGUMENTS_IS_NONE))
+
+        # `{ARGUMENTS: {...}}` -> `{ARGUMENTS: [{...}]}`
+        self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_ARGUMENTS_IS_DICT))
+
+    @classmethod
+    def verify(cls, value: Any) -> None:
+        super().verify(value)
+
+        if _IS_NOT_LIST_OF_DICT(value):
+            raise TypeError(f"{value} should be list of dict")
+
+    def _do_parse(self, value: Any) -> Dict:
+        self.verify(value)
+        return {"middlewares": list(self.create_middlewares_from(value))}
+
+    async def _do_apply(self, context: MiddlewareContext) -> Awaitable[Scoped]:
+        coroutine = WithMiddlewares.apply_to(self, context)
+        return await coroutine()
+
+
+ARGUMENTS = Arguments.get_name()

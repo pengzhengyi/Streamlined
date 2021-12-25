@@ -32,6 +32,14 @@ def IS_NOT_STR(value) -> bool:
     return not IS_STR(value)
 
 
+def IS_LIST(value) -> bool:
+    return isinstance(value, list)
+
+
+def IS_NOT_LIST(value) -> bool:
+    return not IS_LIST(value)
+
+
 Predicate = Callable[[Any], bool]
 
 
