@@ -1,8 +1,23 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, replace
 from functools import partial
-from typing import TYPE_CHECKING, Any, Awaitable, Coroutine, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    ClassVar,
+    Coroutine,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 from ..common import ASYNC_VOID
 from ..services import EventNotification, Scoped, Scoping
@@ -69,7 +84,7 @@ class Middleware:
         self.after_apply = EventNotification()
 
     @classmethod
-    def get_name(cls):
+    def get_name(cls) -> str:
         return cls.__name__.lower()
 
     async def _do_apply(self, context: MiddlewareContext) -> Awaitable[Scoped]:
@@ -139,30 +154,117 @@ class Middlewares:
 
     middlewares: List[Middleware]
 
+    @classmethod
+    def apply_middlewares(
+        cls, context: MiddlewareContext, middlewares: Iterable[Middleware]
+    ) -> Coroutine[None, None, Awaitable[Scoped]]:
+        """
+        Create a coroutine function where each middleware will be applied in order.
+        """
+        return cls._apply(context, middlewares, apply_method="apply")
+
+    @classmethod
+    def apply_middlewares_to(
+        cls, context: MiddlewareContext, middlewares: Iterable[Middleware]
+    ) -> Coroutine[None, None, Awaitable[Scoped]]:
+        """
+        Create a coroutine function where each middleware will be applied in order.
+
+        Different from `apply`, the middlewares will be applied in new scope
+        instead of existing scope.
+        """
+        return cls._apply(context, middlewares, apply_method="apply_to")
+
+    @classmethod
+    def _apply(
+        cls,
+        context: MiddlewareContext,
+        middlewares: Iterable[Middlewares],
+        apply_method: Union[Literal["apply"], Literal["apply_to"]] = "apply",
+    ) -> Coroutine[None, None, Awaitable[Scoped]]:
+        try:
+            middleware = next(middlewares)
+            context_next = cls._apply(context, middlewares, apply_method)
+
+            middleware_context = replace(context, next=context_next)
+            bound_middleware = _BoundMiddleware(middleware, middleware_context)
+
+            return getattr(bound_middleware, apply_method)
+        except StopIteration:
+            return context.next
+
     def __init__(self) -> None:
         super().__init__()
         self.middlewares = []
 
+    def get_middleware_by_type(self, middleware_type: Type[Middleware]) -> Middleware:
+        """
+        Get middleware by its type.
+        """
+        for middleware in self.middlewares:
+            if isinstance(middleware, middleware_type):
+                return middleware
+        raise TypeError(f"No midleware has the specified type {middleware_type}")
+
+    def get_middlewares_by_type(
+        self, middleware_types: Iterable[Type[Middleware]]
+    ) -> Iterable[Middleware]:
+        """
+        Get middlewares specified by their types.
+
+        Existing middlewares will be yielded.
+        """
+        for middleware_type in middleware_types:
+            with contextlib.suppress(TypeError):
+                yield self.get_middleware_by_type(middleware_type)
+
     def apply(self, context: MiddlewareContext) -> Coroutine[None, None, Awaitable[Scoped]]:
         """
-        Transform these middleware to a coroutine function.
+        Transform the registered middleware to a coroutine function.
         """
-        if not self.middlewares:
-            return context.next
+        return self.apply_middlewares(context, iter(self.middlewares))
 
-        return self._apply(context, index=0)
+    def apply_to(self, context: MiddlewareContext) -> Coroutine[None, None, Awaitable[Scoped]]:
+        """
+        Transform the registered middleware to a coroutine function.
 
-    def _apply(
-        self, context: MiddlewareContext, index: int = 0
-    ) -> Coroutine[None, None, Awaitable[Scoped]]:
-        if index == len(self.middlewares):
-            return context.next
+        Different from `apply`, the middlewares will be applied in separate scope.
+        """
+        return self.apply_middlewares_to(context, iter(self.middlewares))
 
-        # recursively apply for each middleware
-        next = self._apply(context, index + 1)
-        middleware = self.middlewares[index]
 
-        middleware_context = replace(context, next=next)
-        bound_middleware = _BoundMiddleware(middleware, middleware_context)
+class WithMiddlewares(Middlewares):
+    """
+    A derived class of Middlewares that supports initialization of middlewares
+    through their types.
 
-        return bound_middleware.apply_to
+    To use `WithMiddlewares`, derived class should implement `_init_middleware_types`
+    with desired middleware types. Then call `create_middlewares_from` at appropriate place
+    to initialize `self.middlewares`.
+    """
+
+    middleware_types: List[Type[Middleware]]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._init_middleware_types()
+
+    def _init_middleware_types(self):
+        self.middleware_types = []
+
+    def get_middleware_names(self) -> Iterable[str]:
+        for middleware_type in self.middleware_types:
+            yield middleware_type.get_name()
+
+    def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:
+        """
+        Create middlewares using `value` if `value` is a dictionary and contains
+        the middleware name.
+
+        This assumes middleware config is keyed under middleware name.
+        """
+        for middleware_type, middleware_name in zip(
+            self.middleware_types, self.get_middleware_names()
+        ):
+            if middleware_name in value:
+                yield middleware_type(value)

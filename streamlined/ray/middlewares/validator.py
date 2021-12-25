@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import replace
 from typing import Any, Awaitable, Callable, ClassVar, Dict, List, Type
 
@@ -23,7 +25,7 @@ from ..services import Scoped
 from .action import Action
 from .cleanup import Cleanup
 from .log import LOG, Log
-from .middleware import Middleware, MiddlewareContext, Middlewares
+from .middleware import Middleware, MiddlewareContext, WithMiddlewares
 from .name import Name
 from .parser import AbstractParser, Parser
 
@@ -49,9 +51,7 @@ def _TRANSFORM_WHEN_HANDLER_MISSING_ACTION(value: Dict) -> Dict:
     return value
 
 
-class ValidatorHandler(Parser, Middleware, Middlewares):
-    _HANDLER_PARSERS: ClassVar[List[Type[Parser]]] = [Action, Log]
-
+class ValidatorHandler(Parser, Middleware, WithMiddlewares):
     @classmethod
     def verify(self, value: Any) -> None:
         super().verify(value)
@@ -61,6 +61,10 @@ class ValidatorHandler(Parser, Middleware, Middlewares):
 
         if _MISSING_HANDLER_ACTION(value):
             raise DEFAULT_KEYERROR(value, ACTION)
+
+    def _init_middleware_types(self):
+        super()._init_middleware_types()
+        self.middleware_types.extend([Action, Log])
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
@@ -85,14 +89,10 @@ class ValidatorHandler(Parser, Middleware, Middlewares):
     def _do_parse(self, value: Any) -> Dict:
         self.verify(value)
 
-        return {
-            "middlewares": [
-                parser(value) for parser in self._HANDLER_PARSERS if parser.get_name() in value
-            ]
-        }
+        return {"middlewares": list(self.create_middlewares_from(value))}
 
     async def _do_apply(self, context: MiddlewareContext):
-        coroutine = Middlewares.apply(self, context)
+        coroutine = WithMiddlewares.apply(self, context)
         return await coroutine()
 
 

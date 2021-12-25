@@ -33,6 +33,9 @@ class Scope(UserDict):
     def __str__(self) -> str:
         return f"{self.name}={super().__str__()}"
 
+    def __lt__(self, other: Scope):
+        return self.name < other.name
+
     def getmagic(self, name: str) -> Any:
         return self[to_magic_naming(name)]
 
