@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Awaitable, Dict, List
+from typing import Any, Awaitable, Dict, Iterable, List
 
 from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT, VOID
 from ..services import Scoped
@@ -7,7 +7,14 @@ from .action import ACTION, Action
 from .argument import ARGUMENT, ARGUMENTS, Argument, Arguments
 from .cleanup import Cleanup
 from .log import LOG, Log
-from .middleware import Context, Middleware, StackMiddleware, WithMiddlewares
+from .middleware import (
+    APPLY_INTO,
+    APPLY_ONTO,
+    Context,
+    Middleware,
+    StackMiddleware,
+    WithMiddlewares,
+)
 from .name import NAME, Name
 from .parser import Parser
 from .skip import SKIP, Skip
@@ -52,6 +59,21 @@ class Runstep(Parser, Middleware, WithMiddlewares):
             [Name, Skip, Argument, Arguments, Validator, Action, Log, Cleanup]
         )
 
+    def _init_middleware_apply_methods(self):
+        super()._init_middleware_apply_methods()
+        self.middleware_apply_methods.extend(
+            [
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_INTO,
+                APPLY_INTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+            ]
+        )
+
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
@@ -70,7 +92,7 @@ class Runstep(Parser, Middleware, WithMiddlewares):
         return {"middlewares": list(self.create_middlewares_from(value))}
 
     async def _do_apply(self, context: Context) -> Awaitable[Scoped]:
-        coroutine = WithMiddlewares.apply_to(self, context)
+        coroutine = WithMiddlewares.apply(self, context)
         return await coroutine()
 
 

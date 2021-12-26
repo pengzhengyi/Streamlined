@@ -15,7 +15,14 @@ from ..services import Scoped
 from .action import Action
 from .cleanup import Cleanup
 from .log import LOG, Log
-from .middleware import Context, Middleware, StackMiddleware, WithMiddlewares
+from .middleware import (
+    APPLY_INTO,
+    APPLY_ONTO,
+    Context,
+    Middleware,
+    StackMiddleware,
+    WithMiddlewares,
+)
 from .name import NAME, Name
 from .parser import Parser
 from .validator import Validator
@@ -34,6 +41,12 @@ class Argument(Parser, Middleware, WithMiddlewares):
         super()._init_middleware_types()
         self.middleware_types.extend([Name, Validator, Action, Log, Cleanup])
 
+    def _init_middleware_apply_methods(self):
+        super()._init_middleware_apply_methods()
+        self.middleware_apply_methods.extend(
+            [APPLY_ONTO, APPLY_ONTO, APPLY_INTO, APPLY_ONTO, APPLY_ONTO]
+        )
+
     def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:
         for middleware_type, middleware_name in zip(
             self.middleware_types, self.get_middleware_names()
@@ -43,20 +56,6 @@ class Argument(Parser, Middleware, WithMiddlewares):
                 yield middleware_type(new_value)
             elif middleware_name in value:
                 yield middleware_type(value)
-
-    @property
-    def _before_value_middlewares(self) -> Iterable[Middleware]:
-        middleware_types = self.middleware_types[: self.middleware_types.index(Action)]
-        return self.get_middlewares_by_type(middleware_types)
-
-    @property
-    def _set_value_middlewares(self) -> Iterable[Middleware]:
-        yield self.get_middleware_by_type(Action)
-
-    @property
-    def _after_value_middlewares(self) -> Iterable[Middleware]:
-        middleware_types = self.middleware_types[self.middleware_types.index(Action) + 1 :]
-        return self.get_middlewares_by_type(middleware_types)
 
     @classmethod
     def verify(cls, value: Any) -> None:
@@ -75,30 +74,6 @@ class Argument(Parser, Middleware, WithMiddlewares):
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    async def _before_get_value(self, context: Context) -> Scoped:
-        void_next_context = replace(context, next=ASYNC_VOID)
-        coroutine = self.apply_middlewares_to(
-            context=void_next_context, middlewares=self._before_value_middlewares
-        )
-        scoped = await coroutine()
-        return context.update_scoped(scoped)
-
-    async def _get_value(self, context: Context) -> Scoped:
-        void_next_context = replace(context, next=ASYNC_VOID)
-        coroutine = self.apply_middlewares(
-            context=void_next_context, middlewares=self._set_value_middlewares
-        )
-        scoped = await coroutine()
-        return context.update_scoped(scoped)
-
-    async def _after_get_value(self, context: Context) -> Scoped:
-        void_next_context = replace(context, next=ASYNC_VOID)
-        coroutine = self.apply_middlewares_to(
-            context=void_next_context, middlewares=self._after_value_middlewares
-        )
-        scoped = await coroutine()
-        return context.update_scoped(scoped)
-
     def _set_value(self, scoped: Scoped) -> Scoped:
         name = scoped.getmagic("name")
         value = scoped.getmagic("value")
@@ -106,9 +81,8 @@ class Argument(Parser, Middleware, WithMiddlewares):
         return scoped
 
     async def _do_apply(self, context: Context):
-        await self._before_get_value(context)
-        await self._get_value(context)
-        await self._after_get_value(context)
+        coroutine = WithMiddlewares.apply(self, context.replace_with_void_next())
+        await coroutine()
 
         self._set_value(context.scoped)
         await context.next()
@@ -141,7 +115,7 @@ class Arguments(Parser, Middleware, StackMiddleware):
         return {"middlewares": list(self.create_middlewares_from(value))}
 
     async def _do_apply(self, context: Context) -> Awaitable[Scoped]:
-        coroutine = StackMiddleware.apply(self, context)
+        coroutine = StackMiddleware.apply_onto(self, context)
         return await coroutine()
 
 

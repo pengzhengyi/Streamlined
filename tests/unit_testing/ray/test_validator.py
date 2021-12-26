@@ -27,7 +27,7 @@ async def test_validator_handler(simple_executor):
     )
 
     context, scoping = Context.new(simple_executor)
-    scoped = await validator.apply(context)
+    scoped = await validator.apply_into(context)
 
     true_handler_mock.assert_awaited_once()
     false_handler_mock.assert_not_awaited()

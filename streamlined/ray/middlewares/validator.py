@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any, Awaitable, Callable, ClassVar, Dict, List, Type
+from typing import Any, Awaitable, Callable, Dict
 
 from ..common import (
     ACTION,
@@ -23,10 +23,8 @@ from ..common import (
 )
 from ..services import Scoped
 from .action import Action
-from .cleanup import Cleanup
 from .log import LOG, Log
-from .middleware import Context, Middleware, WithMiddlewares
-from .name import Name
+from .middleware import APPLY_INTO, Context, Middleware, WithMiddlewares
 from .parser import AbstractParser, Parser
 
 
@@ -65,6 +63,10 @@ class ValidatorHandler(Parser, Middleware, WithMiddlewares):
     def _init_middleware_types(self):
         super()._init_middleware_types()
         self.middleware_types.extend([Action, Log])
+
+    def _init_middleware_apply_methods(self):
+        super()._init_middleware_apply_methods()
+        self.middleware_apply_methods.extend([APPLY_INTO, APPLY_INTO])
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
@@ -176,7 +178,7 @@ class ValidatorStage(Parser, Middleware):
         context.scoped.setmagic(VALUE, validation_result)
 
         handler = self.get_handler(validation_result)
-        scoped = await handler.apply_to(context)
+        scoped = await handler.apply_onto(context)
 
         return scoped
 
@@ -236,7 +238,7 @@ class Validator(Parser, Middleware):
     async def _validate_stage(self, stage_name: str, context: Context) -> Awaitable[Scoped]:
         try:
             validator: ValidatorStage = getattr(self, f"_{stage_name}_validator")
-            return await validator.apply_to(replace(context, next=ASYNC_VOID))
+            return await validator.apply_onto(replace(context, next=ASYNC_VOID))
         except AttributeError:
             return context.scoped
 

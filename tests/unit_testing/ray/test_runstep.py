@@ -34,6 +34,5 @@ async def test_runstep_action_requires_arguments(simple_executor):
             }
         }
     )
-
-    scoped = await runstep.apply(context)
+    scoped = await runstep.apply_into(context)
     mock.assert_called_once_with(10, 20)

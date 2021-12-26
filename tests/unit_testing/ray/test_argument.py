@@ -15,7 +15,7 @@ from streamlined.ray.middlewares import (
 async def test_argument_set_in_scope(simple_executor):
     context, scoping = Context.new(simple_executor)
     argument = Argument({ARGUMENT: {NAME: "first_name", VALUE: "Alice"}})
-    scoped = await argument.apply(context)
+    scoped = await argument.apply_into(context)
     assert scoped["first_name"] == "Alice"
 
 
@@ -25,6 +25,6 @@ async def test_arguments_set_in_scope(simple_executor):
     arguments = Arguments(
         {ARGUMENTS: [{NAME: "first_name", VALUE: "John"}, {NAME: "last_name", VALUE: "Doe"}]}
     )
-    scoped = await arguments.apply(context)
+    scoped = await arguments.apply_into(context)
     assert scoped["first_name"] == "John"
     assert scoped["last_name"] == "Doe"

@@ -30,7 +30,7 @@ async def test_middlewares_apply(simple_executor):
     clean.assert_not_awaited()
 
     context, _ = Context.new(simple_executor)
-    coroutine = middleware_queue.apply(context)
+    coroutine = middleware_queue.apply_into(context)
 
     await coroutine()
     act.assert_awaited_once()

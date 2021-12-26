@@ -23,7 +23,7 @@ async def test_skip_when_custom_action_is_run(simple_executor):
     context, _ = Context.new(simple_executor)
     context = replace(context, next=original_action)
 
-    await skip.apply(context)
+    await skip.apply_into(context)
 
     custom_action.assert_awaited_once()
     original_action.assert_not_awaited()
