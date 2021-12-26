@@ -22,6 +22,7 @@ from .predicates import (
     IS_NOT_CALLABLE,
     IS_NOT_DICT,
     IS_NOT_LIST,
+    IS_NOT_LIST_OF_DICT,
     IS_NOT_STR,
     IS_STR,
     IS_TRUTHY,

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 from dataclasses import dataclass, replace
-from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
-    ClassVar,
     Coroutine,
     Dict,
     Iterable,
@@ -20,7 +19,7 @@ from typing import (
     Union,
 )
 
-from ..common import ASYNC_VOID
+from ..common import ASYNC_VOID, IS_NOT_LIST_OF_DICT
 from ..services import DependencyInjection, EventNotification, Scoped, Scoping
 
 if TYPE_CHECKING:
@@ -65,6 +64,14 @@ class Context:
         prepared_action = DependencyInjection.prepare(_callable, self.scoped)
         return await self.executor.submit(prepared_action)
 
+    def update_scoped(self, scoped: Scoped) -> Scoped:
+        """
+        Update with another scoped. Updated scoped will be returned.
+        """
+        if scoped is not None:
+            self.scoped.update(scoped)
+        return self.scoped
+
 
 class Middleware:
     """
@@ -79,14 +86,6 @@ class Middleware:
     this middleware, middleware context, and `apply` invocation result,
     which should be the modified scope.
     """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._init_events()
-
-    def _init_events(self) -> None:
-        self.before_apply = EventNotification()
-        self.after_apply = EventNotification()
 
     @classmethod
     def get_name(cls) -> str:
@@ -118,10 +117,8 @@ class Middleware:
         executor:
         next: Current execution chain. This is usually the result of `apply` of next middleware.
         """
-        self.before_apply(middleware=self, context=context)
         scoped = await self._do_apply(context)
-        self.after_apply(middleware=self, context=context, scoped=scoped)
-        return scoped
+        return context.update_scoped(scoped)
 
     async def apply_to(self, context: Context) -> Awaitable[Scoped]:
         """
@@ -133,11 +130,7 @@ class Middleware:
         The modified scope will be returned.
         """
         new_context = replace(context, scoped=context.scoped.create_scoped())
-        scoped = await self.apply(new_context)
-
-        if scoped is not None:
-            context.scoped.update(scoped)
-        return context.scoped
+        return await self.apply(new_context)
 
 
 @dataclass
@@ -273,3 +266,58 @@ class WithMiddlewares(Middlewares):
         ):
             if middleware_name in value:
                 yield middleware_type(value)
+
+
+class StackMiddleware(WithMiddlewares):
+    """
+    StackMiddleware means middleware of same type is stacked --
+    multiple instances of this middleware type is initialized.
+
+    The value to parse should be a list of dictionary where each
+    dictionary is parseable by that middleware type.
+
+    At its application, the initialized instances will be applied in list order.
+
+    When `_init_stacked_middleware_type` is not overridden, the
+    default typename will be current class name without ending 's'
+    and type will be resolved dynamically by looking at class defined
+    in same module name.
+    """
+
+    @classmethod
+    def _get_default_stacked_middleware_name(cls) -> str:
+        self_name = cls.__name__
+
+        if self_name.endswith("s"):
+            return self_name[:-1]
+
+        raise ValueError("Cannot infer middleware name to stack")
+
+    def __init__(self) -> None:
+        self._init_stacked_middleware_type()
+        super().__init__()
+
+    def _init_stacked_middleware_type(self) -> None:
+        self._stacked_middleware_typename = self._get_default_stacked_middleware_name()
+
+        self._stacked_middleware_type = self._convert_middleware_typename_to_type(
+            self._stacked_middleware_typename
+        )
+
+    def _convert_middleware_typename_to_type(self, name: str) -> Type[Middleware]:
+        current_module_path = __name__
+        parent_module_path = current_module_path[: current_module_path.rindex(".")]
+        module = importlib.import_module(f".{name.lower()}", parent_module_path)
+        return getattr(module, name)
+
+    def _init_middleware_types(self):
+        super()._init_middleware_types()
+        self.middleware_types.append(self._stacked_middleware_type)
+
+    def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:
+        for middleware_type, middleware_name in zip(
+            self.middleware_types, self.get_middleware_names()
+        ):
+            for argument_value in value:
+                new_value = {middleware_name: argument_value}
+                yield middleware_type(new_value)

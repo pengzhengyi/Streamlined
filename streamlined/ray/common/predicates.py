@@ -40,6 +40,16 @@ def IS_NOT_LIST(value) -> bool:
     return not IS_LIST(value)
 
 
+def IS_NOT_LIST_OF_DICT(value: Any) -> bool:
+    if IS_LIST(value):
+        for listitem in value:
+            if IS_NOT_DICT(listitem):
+                return True
+        return False
+    else:
+        return True
+
+
 Predicate = Callable[[Any], bool]
 
 
