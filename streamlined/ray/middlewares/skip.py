@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable, Dict
 
 from ..common import (
     ACTION,
@@ -15,30 +15,40 @@ from ..common import (
     RETURN_FALSE,
     VALUE,
 )
+from ..services import Scoped
 from .action import Action
 from .middleware import Context, Middleware
 from .parser import Parser
 
 
-def _TRANSFORM_WHEN_NOT_DICT(value):
+def _TRANSFORM_WHEN_NOT_DICT(value: Any) -> Dict[str, Any]:
     return {VALUE: value}
 
 
-def _MISSING_ACTION(value):
+def _MISSING_ACTION(value: Dict[str, Any]) -> bool:
     return ACTION not in value
 
 
-def _TRANSFORM_WHEN_MISSING_ACTION(value):
+def _TRANSFORM_WHEN_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:
     value[ACTION] = NOOP
     return value
 
 
-def _MISSING_VALUE(value):
+def _MISSING_VALUE(value: Dict[str, Any]) -> bool:
     return VALUE not in value
 
 
-def _TRANSFORM_WHEN_MISSING_VALUE(value):
+def _TRANSFORM_WHEN_MISSING_VALUE(value: Dict[str, Any]) -> Dict[str, Any]:
     value[VALUE] = RETURN_FALSE
+    return value
+
+
+def _VALUE_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
+    return IS_NOT_CALLABLE(value[VALUE])
+
+
+def _TRANSFORM_WHEN_VALUE_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
+    value[VALUE] = IDENTITY_FACTORY(value[VALUE])
     return value
 
 
@@ -56,10 +66,6 @@ class Skip(Parser, Middleware):
         if _MISSING_VALUE(value):
             raise DEFAULT_KEYERROR(value, VALUE)
 
-    @property
-    def _when_skip(self) -> Callable:
-        return self._action
-
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
@@ -69,39 +75,40 @@ class Skip(Parser, Middleware):
         # `{'skip': <bool>}` -> `{'skip': lambda: <bool>}`
         self.simplifications.append((AND(IS_NOT_DICT, IS_NOT_CALLABLE), IDENTITY_FACTORY))
 
+        # `{'skip': <any>}` -> `{'skip': {VALUE: <any>}}`
         self.simplifications.append((IS_NOT_DICT, _TRANSFORM_WHEN_NOT_DICT))
 
-        # `{'skip': {VALUE: ...}}` -> `{'skip': {VALUE: ..., ACTION: lambda: NONE}}`
+        # `{'skip': {VALUE: ...}}` -> `{'skip': {VALUE: ..., ACTION: NOOP}}`
         self.simplifications.append(
             (AND(IS_DICT, _MISSING_ACTION), _TRANSFORM_WHEN_MISSING_ACTION)
         )
 
-        # `{'skip': {ACTION: ...}}` -> `{'skip': {VALUE: lambda: False, ACTION: ...}}`
+        # `{'skip': {ACTION: ...}}` -> `{'skip': {VALUE: RETURN_FALSE, ACTION: ...}}`
         self.simplifications.append((AND(IS_DICT, _MISSING_VALUE), _TRANSFORM_WHEN_MISSING_VALUE))
+
+        # `{'skip': {VALUE: <non-callable>, ACTION: ...}}`
+        self.simplifications.append(
+            (AND(IS_DICT, _VALUE_NOT_CALLABLE), _TRANSFORM_WHEN_VALUE_NOT_CALLABLE)
+        )
 
     def _do_parse(self, value):
         self.verify(value)
 
-        parsed = self.parse_with(value, [Action])
+        return {"_should_skip": Action({ACTION: value[VALUE]}), "_when_skip": Action(value)}
 
-        parsed["_should_skip"] = value[VALUE]
+    async def should_skip(self, context: Context) -> Awaitable[bool]:
+        scoped: Scoped = await Middleware.apply_onto(self._should_skip, context)
+        skipped = scoped.getmagic(VALUE)
+        context.scoped.setmagic(SKIP, skipped)
+        return skipped
 
-        return parsed
-
-    async def should_skip(self, context: Context) -> bool:
-        if IS_CALLABLE(should_skip := self._should_skip):
-            return await context.submit(should_skip)
-        else:
-            return should_skip
-
-    async def when_skip(self, context: Context):
-        return await context.submit(self._when_skip)
+    async def when_skip(self, context: Context) -> Awaitable[Scoped]:
+        scoped: Scoped = await Middleware.apply_into(self._when_skip, context)
+        return scoped.getmagic(VALUE)
 
     async def _do_apply(self, context: Context):
-        should_skip = await self.should_skip(context)
-        context.scoped.setmagic(self.name, should_skip)
-        if should_skip:
-            context.scoped.setmagic(VALUE, await self.when_skip(context))
+        if await self.should_skip(context.replace_with_void_next()):
+            await self.when_skip(context.replace_with_void_next())
         else:
             await context.next()
         return context.scoped

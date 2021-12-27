@@ -156,16 +156,17 @@ class ValidatorStage(Parser, Middleware):
     def _do_parse(self, value: Any) -> Dict[str, Any]:
         self.verify(value)
 
-        parsed = self.parse_with(value, [Action])
-        parsed["_handlers"] = {
-            handler_name: ValidatorHandler(handler)
-            for handler_name, handler in value[HANDLERS].items()
+        return {
+            ACTION: Action(value),
+            "_handlers": {
+                handler_name: ValidatorHandler(handler)
+                for handler_name, handler in value[HANDLERS].items()
+            },
         }
 
-        return parsed
-
-    async def validate(self, context: Context) -> Any:
-        return await context.submit(self._action)
+    async def validate(self, context: Context) -> Awaitable[Any]:
+        scoped: Scoped = await Middleware.apply_into(getattr(self, ACTION), context)
+        return scoped.getmagic(VALUE)
 
     def get_handler(self, result: Any) -> ValidatorHandler:
         try:
@@ -173,22 +174,27 @@ class ValidatorStage(Parser, Middleware):
         except KeyError:
             return self._handlers[DEFAULT]
 
-    async def _do_apply(self, context: Context):
-        validation_result = await self.validate(context)
-        context.scoped.setmagic(VALUE, validation_result)
-
+    async def apply_handler(self, validation_result: Any, context: Context) -> Awaitable[Scoped]:
         handler = self.get_handler(validation_result)
-        scoped = await handler.apply_onto(context)
+        return await handler.apply_onto(context)
 
-        return scoped
+    async def _do_apply(self, context: Context):
+        raise NotImplementedError()
 
 
 class Before(ValidatorStage):
-    pass
+    async def _do_apply(self, context: Context):
+        validation_result = await self.validate(context.replace_with_void_next())
+        scoped = await self.apply_handler(validation_result, context)
+        return scoped
 
 
 class After(ValidatorStage):
-    pass
+    async def _do_apply(self, context: Context):
+        await context.next()
+        validation_result = await self.validate(context.replace_with_void_next())
+        scoped = await self.apply_handler(validation_result, context.replace_with_void_next())
+        return scoped
 
 
 def _MISSING_BEFORE_STAGE(value) -> bool:
