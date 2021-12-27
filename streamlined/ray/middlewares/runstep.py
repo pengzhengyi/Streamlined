@@ -1,7 +1,14 @@
 import uuid
 from typing import Any, Awaitable, Dict, Iterable, List
 
-from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT, VOID
+from ..common import (
+    AND,
+    DEFAULT_KEYERROR,
+    IS_DICT,
+    IS_NOT_DICT,
+    IS_NOT_LIST_OF_DICT,
+    VOID,
+)
 from ..services import Scoped
 from .action import ACTION, Action
 from .argument import ARGUMENT, ARGUMENTS, Argument, Arguments
@@ -104,11 +111,26 @@ def _TRANSFORM_WHEN_RUNSTEPS_IS_DICT(value: Dict[str, Any]) -> List[Dict[str, An
 
 
 class Runsteps(Parser, Middleware, StackMiddleware):
+    @classmethod
+    def verify(cls, value: Any) -> None:
+        super().verify(value)
+
+        if IS_NOT_LIST_OF_DICT(value):
+            raise TypeError(f"{value} should be list of dict")
+
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
         # `{Runsteps: {...}}` -> `{Runsteps: [{...}]}`
         self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_RUNSTEPS_IS_DICT))
+
+    def _do_parse(self, value: Any) -> Dict:
+        self.verify(value)
+        return {"middlewares": list(self.create_middlewares_from(value))}
+
+    async def _do_apply(self, context: Context) -> Awaitable[Scoped]:
+        coroutine = StackMiddleware.apply_onto(self, context)
+        return await coroutine()
 
 
 RUNSTEPS = Runsteps.get_name()

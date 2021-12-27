@@ -1,28 +1,50 @@
-from typing import Any
+from typing import Any, Dict, Iterable
 
-from ..common import IS_CALLABLE, IS_NOT_CALLABLE, IS_NOT_STR
-from .middleware import Context, Middleware
+from ..common import IDENTITY_FACTORY, IS_NOT_CALLABLE, IS_STR, VALUE
+from .action import Action
+from .middleware import APPLY_INTO, Context, Middleware, WithMiddlewares
 from .parser import Parser
 
 
-class Name(Parser, Middleware):
+class Name(Parser, Middleware, WithMiddlewares):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)
 
-        if IS_NOT_CALLABLE(value) and IS_NOT_STR(value):
+        if IS_NOT_CALLABLE(value):
             raise TypeError(f"{value} should be either a callable or a string")
+
+    def _init_simplifications(self) -> None:
+        super()._init_simplifications()
+
+        self.simplifications.append((IS_STR, IDENTITY_FACTORY))
+
+    def _init_middleware_types(self):
+        super()._init_middleware_types()
+        self.middleware_types.append(Action)
+
+    def _init_middleware_apply_methods(self):
+        super()._init_middleware_apply_methods()
+        self.middleware_apply_methods.append(APPLY_INTO)
+
+    def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:
+        for middleware_type, middleware_name in zip(
+            self.middleware_types, self.get_middleware_names()
+        ):
+            # assert middleware_type is Action
+            new_value = {middleware_name: value}
+            yield middleware_type(new_value)
 
     def _do_parse(self, value):
         self.verify(value)
 
-        return {"_name": value}
+        return {"middlewares": list(self.create_middlewares_from(value))}
 
     async def get_register_name(self, context: Context) -> str:
-        if IS_CALLABLE(name := self._name):
-            return await context.submit(name)
-        else:
-            return name
+        coroutine = WithMiddlewares.apply(self, context.replace_with_void_next())
+        await coroutine()
+
+        return context.scoped.getmagic(VALUE)
 
     async def _do_apply(self, context: Context):
         name = await self.get_register_name(context)

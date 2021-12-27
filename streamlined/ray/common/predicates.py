@@ -1,4 +1,5 @@
 import operator
+from collections.abc import Iterable
 from functools import partial
 from typing import Any, Callable, List
 
@@ -48,6 +49,10 @@ def IS_NOT_LIST_OF_DICT(value: Any) -> bool:
         return False
     else:
         return True
+
+
+def IS_ITERABLE(value: Any) -> bool:
+    return isinstance(value, Iterable)
 
 
 Predicate = Callable[[Any], bool]

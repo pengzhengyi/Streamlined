@@ -12,15 +12,15 @@ from typing import (
     Coroutine,
     Dict,
     Iterable,
+    Iterator,
     List,
-    Literal,
     Optional,
     Tuple,
     Type,
     Union,
 )
 
-from ..common import ASYNC_VOID
+from ..common import ASYNC_VOID, IS_ITERABLE
 from ..services import DependencyInjection, Scoped, Scoping
 
 if TYPE_CHECKING:
@@ -203,6 +203,9 @@ class Middlewares:
     def apply_middlewares(
         cls, context: Context, middlewares: Iterable[Middleware], apply_methods: APPLY_METHODS
     ) -> Coroutine[None, None, Awaitable[Scoped]]:
+        if IS_ITERABLE(middlewares):
+            middlewares = iter(middlewares)
+
         if isinstance(apply_methods, str):
             apply_methods = itertools.repeat(apply_methods)
 
@@ -210,7 +213,7 @@ class Middlewares:
 
     @classmethod
     def _apply_middlewares(
-        cls, context: Context, middlewares: Iterable[Middlewares], apply_methods: APPLY_METHODS
+        cls, context: Context, middlewares: Iterator[Middlewares], apply_methods: APPLY_METHODS
     ) -> Coroutine[None, None, Awaitable[Scoped]]:
         try:
             middleware = next(middlewares)
@@ -254,7 +257,7 @@ class Middlewares:
         """
         Transform the registered middlewares to a coroutine function.
         """
-        return self.apply_middlewares_into(context, iter(self.middlewares))
+        return self.apply_middlewares_into(context, self.middlewares)
 
     def apply_onto(self, context: Context) -> Coroutine[None, None, Awaitable[Scoped]]:
         """
@@ -262,7 +265,7 @@ class Middlewares:
 
         Different from `apply`, the middlewares will be applied in separate scope.
         """
-        return self.apply_middlewares_onto(context, iter(self.middlewares))
+        return self.apply_middlewares_onto(context, self.middlewares)
 
     def apply(
         self, context: Context, apply_methods: APPLY_METHODS
@@ -273,7 +276,7 @@ class Middlewares:
         Each middleware will be applied in the method specified in
         `apply_methods`.
         """
-        return self.apply_middlewares(context, iter(self.middlewares), apply_methods)
+        return self.apply_middlewares(context, self.middlewares, apply_methods)
 
 
 class WithMiddlewares(Middlewares):

@@ -1,18 +1,22 @@
+import itertools
 import logging
 from typing import Any, Awaitable, Dict, Optional
 
 from ..common import (
     AND,
     DEFAULT_KEYERROR,
+    IDENTITY_FACTORY,
     IS_CALLABLE,
     IS_DICT,
+    IS_NOT_CALLABLE,
     IS_STR,
     LEVEL,
     LOGGER,
     MESSAGE,
-    get_or_raise,
+    VALUE,
 )
 from ..services import Scoped
+from .action import ACTION, Action
 from .middleware import Context, Middleware
 from .parser import Parser
 
@@ -43,6 +47,33 @@ def _TRANSFORM_WHEN_MISSING_LOGGER(value):
     return value
 
 
+def _MESSAGE_IS_STR(value: Dict[str, Any]) -> bool:
+    return IS_STR(value[MESSAGE])
+
+
+def _TRANSFORM_WHEN_MESSAGE_IS_STR(value: Dict[str, Any]) -> Dict[str, Any]:
+    value[MESSAGE] = IDENTITY_FACTORY(value[MESSAGE])
+    return value
+
+
+def _LEVEL_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
+    return IS_NOT_CALLABLE(value[LEVEL])
+
+
+def _TRANSFORM_WHEN_LEVEL_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
+    value[LEVEL] = IDENTITY_FACTORY(value[LEVEL])
+    return value
+
+
+def _LOGGER_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
+    return IS_NOT_CALLABLE(value[LOGGER])
+
+
+def _TRANSFORM_WHEN_LOGGER_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
+    value[LOGGER] = IDENTITY_FACTORY(value[LOGGER])
+    return value
+
+
 _TRANSFORM_WHEN_IS_CALLABLE = _TRANSFORM_WHEN_IS_STR
 
 
@@ -64,6 +95,21 @@ class Log(Parser, Middleware):
             (AND(IS_DICT, _MISSING_LOGGER), _TRANSFORM_WHEN_MISSING_LOGGER)
         )
 
+        # `{'log': {MESSAGE: <str>, LOGGER: ..., LEVEL: ...}}` -> `{'log': {MESSAGE: IDENTITY_FACTORY(<str>), LOGGER: ..., LEVEL: ...}}`
+        self.simplifications.append(
+            (AND(IS_DICT, _MESSAGE_IS_STR), _TRANSFORM_WHEN_MESSAGE_IS_STR)
+        )
+
+        # `{'log': {MESSAGE: ..., LOGGER: ..., LEVEL: <int>}}` -> `{'log': {MESSAGE: ..., LOGGER: ..., LEVEL: IDENTITY_FACTORY(<int>)}}`
+        self.simplifications.append(
+            (AND(IS_DICT, _LEVEL_NOT_CALLABLE), _TRANSFORM_WHEN_LEVEL_NOT_CALLABLE)
+        )
+
+        # `{'log': {MESSAGE: ..., LOGGER: <logger> LEVEL: ...}}` -> `{'log': {MESSAGE: ..., LOGGER: IDENTITY_FACTORY(<logger>), LEVEL: ...)}}`
+        self.simplifications.append(
+            (AND(IS_DICT, _LOGGER_NOT_CALLABLE), _TRANSFORM_WHEN_LOGGER_NOT_CALLABLE)
+        )
+
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)
@@ -83,36 +129,42 @@ class Log(Parser, Middleware):
     def _do_parse(self, value: Dict[str, Any]) -> Dict:
         self.verify(value)
 
-        return {
-            "_message": value[MESSAGE],
-            "_logger": value[LOGGER],
-            "_level": value[LEVEL],
-        }
+        parsed = dict()
+        middleware_name = ACTION
+        for middleware_type, keyname in zip(itertools.repeat(Action), [LOGGER, LEVEL, MESSAGE]):
+            new_value = {middleware_name: value[keyname]}
+            parsed[keyname] = middleware_type(new_value)
+
+        return parsed
 
     async def get_log_level(self, context: Context) -> int:
-        if IS_CALLABLE(level := self._level):
-            return await context.submit(level)
-        else:
-            return level
+        scoped = await Middleware.apply_onto(
+            getattr(self, LEVEL), context.replace_with_void_next()
+        )
+        level = scoped.getmagic(VALUE)
+        context.scoped.setmagic(LEVEL, level)
+        return level
 
     async def get_logger(self, context: Context) -> logging.Logger:
-        if IS_CALLABLE(logger := self._logger):
-            return await context.submit(logger)
-        else:
-            return logger
+        scoped = await Middleware.apply_onto(
+            getattr(self, LOGGER), context.replace_with_void_next()
+        )
+        logger = scoped.getmagic(VALUE)
+        context.scoped.setmagic(LOGGER, logger)
+        return logger
 
     async def get_message(self, context: Context) -> str:
-        if IS_CALLABLE(message := self._message):
-            return await context.submit(message)
-        else:
-            return message
+        scoped = await Middleware.apply_onto(
+            getattr(self, MESSAGE), context.replace_with_void_next()
+        )
+        message = scoped.getmagic(VALUE)
+        context.scoped.setmagic(MESSAGE, message)
+        return message
 
     async def _do_apply(self, context: Context) -> Awaitable[Optional[Scoped]]:
         message = await self.get_message(context)
-        context.scoped.setmagic(MESSAGE, message)
 
         level = await self.get_log_level(context)
-        context.scoped.setmagic(LEVEL, level)
 
         logger = await self.get_logger(context)
         logger.log(level, message)

@@ -17,6 +17,7 @@ from .predicates import (
     IS_CALLABLE,
     IS_DICT,
     IS_FALSY,
+    IS_ITERABLE,
     IS_LIST,
     IS_NONE,
     IS_NOT_CALLABLE,
