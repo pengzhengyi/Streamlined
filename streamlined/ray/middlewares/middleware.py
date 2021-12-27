@@ -20,7 +20,7 @@ from typing import (
     Union,
 )
 
-from ..common import ASYNC_VOID, IS_ITERABLE
+from ..common import ASYNC_VOID, IS_ITERABLE, ProxyDictionary
 from ..services import DependencyInjection, Scoped, Scoping
 
 if TYPE_CHECKING:
@@ -61,9 +61,17 @@ class Context:
             scoping,
         )
 
+    def prepare(self, _callable: Callable) -> Callable:
+        provider = ProxyDictionary(self.scoped, __scoped__=self.scoped)
+        return DependencyInjection.prepare(_callable, provider)
+
     async def submit(self, _callable: Callable) -> Any:
-        prepared_action = DependencyInjection.prepare(_callable, self.scoped)
-        return await self.executor.submit(prepared_action)
+        prepared_action = self.prepare(_callable)
+        result = await self.executor.submit(prepared_action)
+
+        if isinstance(result, Scoping):
+            self.scoped.update(result)
+        return result
 
     def update_scoped(self, scoped: Scoped) -> Scoped:
         """
