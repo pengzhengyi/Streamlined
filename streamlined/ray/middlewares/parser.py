@@ -24,7 +24,7 @@ class Parser(AbstractParser):
         return self.__class__.__name__.lower()
 
     @classmethod
-    def get_name(cls):
+    def get_name(cls) -> str:
         return cls.__name__.lower()
 
     @classmethod
@@ -38,7 +38,6 @@ class Parser(AbstractParser):
 
     def __init__(self, value) -> None:
         super().__init__()
-        self._init_simplifications()
         self._init_from_parsed(self.parse(value))
 
     def _init_from_parsed(self, parsed: Dict):

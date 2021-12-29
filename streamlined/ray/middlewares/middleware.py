@@ -61,11 +61,11 @@ class Context:
             scoping,
         )
 
-    def prepare(self, _callable: Callable) -> Callable:
+    def prepare(self, _callable: Callable[..., Any]) -> Callable[..., Any]:
         provider = ProxyDictionary(self.scoped, __scoped__=self.scoped)
         return DependencyInjection.prepare(_callable, provider)
 
-    async def submit(self, _callable: Callable) -> Any:
+    async def submit(self, _callable: Callable[..., Any]) -> Any:
         prepared_action = self.prepare(_callable)
         result = await self.executor.submit(prepared_action)
 
@@ -115,7 +115,7 @@ class Middleware:
     def get_name(cls) -> str:
         return cls.__name__.lower()
 
-    async def _do_apply(self, context: Context) -> Awaitable[Scoped]:
+    async def _do_apply(self, context: Context) -> Scoped:
         """
         Apply this middleware onto the execution chain.
 
@@ -130,7 +130,7 @@ class Middleware:
         """
         return context.scoped
 
-    async def apply_into(self, context: Context) -> Awaitable[Scoped]:
+    async def apply_into(self, context: Context) -> Scoped:
         """
         Apply this middleware onto the execution chain.
 
@@ -327,10 +327,10 @@ class WithMiddlewares(Middlewares):
         self._init_middleware_types()
         self._init_middleware_apply_methods()
 
-    def _init_middleware_types(self):
+    def _init_middleware_types(self) -> None:
         self.middleware_types = []
 
-    def _init_middleware_apply_methods(self):
+    def _init_middleware_apply_methods(self) -> None:
         self.middleware_apply_methods = []
 
     def get_middleware_names(self) -> Iterable[str]:
@@ -350,7 +350,7 @@ class WithMiddlewares(Middlewares):
             if middleware_name in value:
                 yield middleware_type(value)
 
-    def apply(self, context: Context) -> Coroutine[None, None, Awaitable[Scoped]]:
+    def apply(self, context: Context) -> Coroutine[None, None, Scoped]:
         return super().apply(context, self.apply_methods)
 
 
@@ -396,7 +396,7 @@ class StackMiddleware(WithMiddlewares):
         module = importlib.import_module(f".{name.lower()}", parent_module_path)
         return getattr(module, name)
 
-    def _init_middleware_types(self):
+    def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.append(self._stacked_middleware_type)
 
