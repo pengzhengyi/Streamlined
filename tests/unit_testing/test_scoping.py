@@ -1,6 +1,6 @@
 import pytest
 
-from streamlined.ray.services import Scoped, Scoping
+from streamlined.services import Scoped, Scoping
 
 
 def test_scoping_two_scopes():

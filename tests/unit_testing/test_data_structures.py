@@ -1,4 +1,4 @@
-from streamlined.ray.common import Bag, BidirectionalIndex
+from streamlined.common import Bag, BidirectionalIndex
 
 
 def test_bag():

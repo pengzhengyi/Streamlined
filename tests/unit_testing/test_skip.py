@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from streamlined.ray.common import ACTION, VALUE
-from streamlined.ray.middlewares import SKIP, Context, Skip
+from streamlined.common import ACTION, VALUE
+from streamlined.middlewares import SKIP, Context, Skip
 
 
 @pytest.mark.asyncio

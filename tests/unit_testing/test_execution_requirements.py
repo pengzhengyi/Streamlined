@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from streamlined.ray.execution import ExecutionRequirements
+from streamlined.execution import ExecutionRequirements
 
 
 def test_execution_requirements_on_new_requirement():

@@ -2,7 +2,7 @@ import os
 
 import ray
 
-from streamlined.ray.common import AwaitCoroutine, RayAsyncActor, RayRemote, ShellActor
+from streamlined.common import AwaitCoroutine, RayAsyncActor, RayRemote, ShellActor
 
 
 def test_ray_remote_on_function():

@@ -2,9 +2,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from streamlined.ray.common import VALUE
-from streamlined.ray.middlewares import ACTION, NAME, RUNSTEP, Context, Runstep
-from streamlined.ray.middlewares.argument import ARGUMENTS
+from streamlined.common import VALUE
+from streamlined.middlewares import ACTION, NAME, RUNSTEP, Context, Runstep
+from streamlined.middlewares.argument import ARGUMENTS
 
 
 @pytest.mark.asyncio

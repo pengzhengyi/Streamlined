@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from streamlined.ray.execution import DependencyTrackingRayExecutionUnit
+from streamlined.execution import DependencyTrackingRayExecutionUnit
 
 
 @pytest.mark.asyncio

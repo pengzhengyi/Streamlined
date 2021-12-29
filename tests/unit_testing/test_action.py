@@ -2,16 +2,8 @@ from subprocess import PIPE
 
 import pytest
 
-from streamlined.ray.common import TYPE, VALUE
-from streamlined.ray.middlewares import (
-    ACTION,
-    ARGS,
-    SHELL,
-    STDIN,
-    STDOUT,
-    Action,
-    Context,
-)
+from streamlined.common import TYPE, VALUE
+from streamlined.middlewares import ACTION, ARGS, SHELL, STDIN, STDOUT, Action, Context
 
 
 @pytest.mark.asyncio

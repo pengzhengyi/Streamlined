@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import ray
 
-from streamlined.ray.execution import Executable, Executor, RayExecutor
+from streamlined.execution import Executable, Executor, RayExecutor
 
 
 def test_executor_with_simple_tasks():

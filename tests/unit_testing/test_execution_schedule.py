@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from streamlined.ray.execution import (
+from streamlined.execution import (
     DependencyTrackingAsyncExecutionUnit,
     ExecutionSchedule,
 )

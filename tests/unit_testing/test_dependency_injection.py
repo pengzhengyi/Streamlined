@@ -1,4 +1,4 @@
-from streamlined.ray.services import DependencyInjection
+from streamlined.services import DependencyInjection
 
 
 def test_dependency_injection_prepare():

@@ -2,13 +2,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from streamlined.ray.common import ACTION, HANDLERS, RETURN_TRUE
-from streamlined.ray.middlewares import (
-    VALIDATOR,
-    VALIDATOR_AFTER_STAGE,
-    Context,
-    Validator,
-)
+from streamlined.common import ACTION, HANDLERS, RETURN_TRUE
+from streamlined.middlewares import VALIDATOR, VALIDATOR_AFTER_STAGE, Context, Validator
 
 
 @pytest.mark.asyncio

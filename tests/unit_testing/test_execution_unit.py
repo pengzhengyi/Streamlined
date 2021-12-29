@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from streamlined.ray.execution import AsyncExecutionUnit, ExecutionStatus, ExecutionUnit
+from streamlined.execution import AsyncExecutionUnit, ExecutionStatus, ExecutionUnit
 
 
 def test_execution_status():

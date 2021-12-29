@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from streamlined.ray.services import EventNotification
+from streamlined.services import EventNotification
 
 
 def test_unregister():

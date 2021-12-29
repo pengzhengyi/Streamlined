@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from streamlined.ray.middlewares import (
+from streamlined.middlewares import (
     ACTION,
     CLEANUP,
     SKIP,

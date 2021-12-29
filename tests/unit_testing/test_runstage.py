@@ -2,8 +2,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from streamlined.ray.common import VALUE
-from streamlined.ray.middlewares import (
+from streamlined.common import VALUE
+from streamlined.middlewares import (
     ACTION,
     NAME,
     RUNSTEP,
@@ -12,9 +12,9 @@ from streamlined.ray.middlewares import (
     Runstage,
     Runstep,
 )
-from streamlined.ray.middlewares.argument import ARGUMENTS
-from streamlined.ray.middlewares.runstage import RUNSTAGE
-from streamlined.ray.services.scoping import Scoped
+from streamlined.middlewares.argument import ARGUMENTS
+from streamlined.middlewares.runstage import RUNSTAGE
+from streamlined.services.scoping import Scoped
 
 
 @pytest.mark.asyncio

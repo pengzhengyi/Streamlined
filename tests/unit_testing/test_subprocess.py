@@ -1,6 +1,6 @@
 import pytest
 
-from streamlined.ray.common import run
+from streamlined.common import run
 
 
 @pytest.mark.asyncio

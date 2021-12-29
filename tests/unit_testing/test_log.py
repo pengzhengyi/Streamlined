@@ -6,8 +6,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from streamlined.ray.common import LEVEL, LOGGER, MESSAGE
-from streamlined.ray.middlewares import LOG, Context, Log
+from streamlined.common import LEVEL, LOGGER, MESSAGE
+from streamlined.middlewares import LOG, Context, Log
 
 
 @pytest.mark.asyncio

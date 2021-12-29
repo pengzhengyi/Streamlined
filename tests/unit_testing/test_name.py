@@ -1,6 +1,6 @@
 import pytest
 
-from streamlined.ray.middlewares import NAME, Context, Name
+from streamlined.middlewares import NAME, Context, Name
 
 
 @pytest.mark.asyncio

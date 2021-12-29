@@ -1,6 +1,6 @@
 from treelib import Node, Tree
 
-from streamlined.ray.common import update
+from streamlined.common import update
 
 
 def test_update_insert():

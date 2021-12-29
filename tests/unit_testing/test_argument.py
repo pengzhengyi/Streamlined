@@ -1,7 +1,7 @@
 import pytest
 
-from streamlined.ray.common import VALUE
-from streamlined.ray.middlewares import (
+from streamlined.common import VALUE
+from streamlined.middlewares import (
     ARGUMENT,
     ARGUMENTS,
     NAME,
