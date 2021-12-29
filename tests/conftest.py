@@ -12,16 +12,6 @@ import nest_asyncio
 import pytest
 from faker import Faker
 
-from streamlined.manager import (
-    ExecutionWithDependencyInjection,
-    Logging,
-    NameTracking,
-    ResultCollection,
-    Scoping,
-    TagGrouping,
-)
-from streamlined.manager.manager import create_manager
-
 nest_asyncio.apply()
 
 
@@ -43,19 +33,6 @@ def buffering_logger(faker, buffering_handler):
 
     logger.addHandler(buffering_handler)
     return logger
-
-
-@pytest.fixture
-def minimum_manager():
-    services = [
-        NameTracking,
-        ResultCollection,
-        ExecutionWithDependencyInjection,
-        Scoping,
-        Logging,
-        TagGrouping,
-    ]
-    return create_manager(*services)()
 
 
 @pytest.fixture(scope="session")
