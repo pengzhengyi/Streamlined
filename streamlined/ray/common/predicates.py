@@ -75,3 +75,21 @@ def AND(*predicates: Predicate) -> Predicate:
         return True
 
     return wrapper
+
+
+def OR(*predicates: Predicate) -> Predicate:
+    def wrapper(value: Any) -> bool:
+        for predicate in predicates:
+            if predicate(value):
+                return True
+
+        return False
+
+    return wrapper
+
+
+def NOT(predicate: Predicate) -> Predicate:
+    def wrapper(value: Any) -> bool:
+        return not predicate(value)
+
+    return wrapper

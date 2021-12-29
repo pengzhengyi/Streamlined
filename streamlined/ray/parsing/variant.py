@@ -1,7 +1,7 @@
 from functools import cached_property
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 
-from ..common import AND, IS_DICT, TYPE, Predicate, Transform
+from ..common import AND, IS_DICT, NOT, OR, TYPE, Predicate, Transform
 from .simplification import Simplification
 
 
@@ -20,32 +20,51 @@ class Variant(Simplification):
         super().__init__(*args, **kwargs)
 
     @classmethod
-    def verify(cls, value: Any) -> None:
-        """
-        Verify is compliant variant config format.
-
-        Should raise exception when not compliant and return `value` when compliant.
-        """
-        return value
-
-    @cached_property
-    def name(self) -> str:
-        return self.__class__.get_name()
-
-    @classmethod
     def get_name(cls) -> str:
         return cls.__name__.lower()
 
     @classmethod
-    def standardize(cls, value: Any) -> Any:
+    def verify(cls, value: Any) -> None:
+        """
+        Verify is compliant variant config format.
+
+        Should raise exception when not compliant.
+        """
+        pass
+
+    @classmethod
+    def reduce(cls, value: Any) -> Any:
         """
         Convert value from variant format to standard format.
         """
+        cls.verify(value)
+
         return value
 
     @classmethod
     def is_variant(cls, value: Any) -> bool:
         return IS_DICT(value) and value[TYPE] == cls.get_name()
+
+    @cached_property
+    def is_simplified_variant(self) -> Callable[[Any], bool]:
+        return AND(self.is_variant, NOT(OR(*self._variant_predicates)))
+
+    @cached_property
+    def is_not_simplified_variant(self) -> Callable[[Any], bool]:
+        return AND(self.is_variant, OR(*self._variant_predicates))
+
+    @cached_property
+    def simplify_variant(self) -> Callable[[Any], Any]:
+        return self.aggregate(self._variant_simplifications)
+
+    @cached_property
+    def name(self) -> str:
+        return self.__class__.get_name()
+
+    @property
+    def _variant_predicates(self) -> Iterable[Predicate]:
+        for predicate, _ in self._variant_simplifications:
+            yield predicate
 
     def _init_simplifications_for_variant(self) -> None:
         self._variant_simplifications = []
@@ -53,13 +72,9 @@ class Variant(Simplification):
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
-        self.simplifications.append(
-            (self.is_variant, self.aggregate(self._variant_simplifications))
-        )
+        self.simplifications.append((self.is_not_simplified_variant, self.simplify_variant))
 
-        self.simplifications.append((self.is_variant, self.verify))
-
-        self.simplifications.append((self.is_variant, self.standardize))
+        self.simplifications.append((self.is_simplified_variant, self.reduce))
 
 
 class WithVariants(Simplification):

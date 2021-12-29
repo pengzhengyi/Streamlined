@@ -1,5 +1,5 @@
 from subprocess import DEVNULL, PIPE
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Any, Callable, ClassVar, Dict, List
 
 from decorator import FunctionMaker
 
@@ -9,7 +9,6 @@ from ..common import (
     DEFAULT_KEYERROR,
     IDENTITY_FACTORY,
     IS_CALLABLE,
-    IS_LIST,
     IS_NOT_CALLABLE,
     IS_NOT_LIST,
     IS_NOT_LIST_OF_CALLABLE,
@@ -18,8 +17,8 @@ from ..common import (
     StdinStream,
     Stream,
     SubprocessResult,
-    subprocess,
 )
+from ..common import run as run_
 from ..parsing import Variant, WithVariants
 from .middleware import Context, Middleware
 from .parser import Parser
@@ -29,15 +28,6 @@ STDIN = "stdin"
 STDOUT = "stdout"
 STDERR = "stderr"
 KWARGS = "kwargs"
-
-
-def _IS_ARGS_LIST(value: Dict[str, Any]) -> bool:
-    return IS_LIST(value[ARGS])
-
-
-def _TRANSFORM_WHEN_ARGS_IS_LIST(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[ARGS] = " ".join(str(arg) for arg in value[ARGS])
-    return value
 
 
 def _IS_ARGS_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
@@ -135,27 +125,28 @@ def _TRANSFORM_WHEN_KWARGS_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]
     return value
 
 
-shell: Callable[
-    [str, StdinStream, Stream, Stream, Dict[str, Any]], SubprocessResult
-] = FunctionMaker.create(
-    f"shell({VALUE}0: str, {VALUE}1: StdinStream, {VALUE}2: Stream, {VALUE}3: Stream, {VALUE}4: Dict[str, Any])",
-    f"return subprocess({VALUE}0, {VALUE}1, {VALUE}2, {VALUE}3, {VALUE}4)",
-    dict(
-        subprocess=subprocess,
-        Stream=Stream,
-        StdinStream=StdinStream,
-        Dict=Dict,
-        Any=Any,
-        _call_=ASYNC_VOID,
-    ),
-    addsource=True,
-)
-
-
 class Shell(Variant):
+    run: ClassVar[
+        Callable[[str, StdinStream, Stream, Stream, Dict[str, Any]], SubprocessResult]
+    ] = FunctionMaker.create(
+        f"run(_{VALUE}0_: str, _{VALUE}1_: StdinStream, _{VALUE}2_: Stream, _{VALUE}3_: Stream, _{VALUE}4_: Dict[str, Any])",
+        f"return run_(_{VALUE}0_, _{VALUE}1_, _{VALUE}2_, _{VALUE}3_, _{VALUE}4_)",
+        dict(
+            run_=run_,
+            Stream=Stream,
+            StdinStream=StdinStream,
+            Dict=Dict,
+            Any=Any,
+            _call_=ASYNC_VOID,
+        ),
+        addsource=True,
+    )
+
     @classmethod
-    def standardize(cls, value: Any) -> Any:
-        return [value[ARGS], value[STDIN], value[STDOUT], value[STDERR], value[KWARGS], shell]
+    def reduce(cls, value: Any) -> Any:
+        cls.verify(value)
+
+        return [value[ARGS], value[STDIN], value[STDOUT], value[STDERR], value[KWARGS], cls.run]
 
     @classmethod
     def verify(cls, value: Any) -> None:
@@ -189,8 +180,6 @@ class Shell(Variant):
     def _init_simplifications_for_variant(self) -> None:
         super()._init_simplifications_for_variant()
 
-        self._variant_simplifications.append((_IS_ARGS_LIST, _TRANSFORM_WHEN_ARGS_IS_LIST))
-
         self._variant_simplifications.append(
             (_IS_ARGS_NOT_CALLABLE, _TRANSFORM_WHEN_ARGS_NOT_CALLABLE)
         )
@@ -220,6 +209,9 @@ class Shell(Variant):
         self._variant_simplifications.append(
             (_IS_KWARGS_NOT_CALLABLE, _TRANSFORM_WHEN_KWARGS_NOT_CALLABLE)
         )
+
+
+SHELL = Shell.get_name()
 
 
 def _TRANSFORM_WHEN_NOT_LIST(value: Callable[..., Any]) -> List[Callable[..., Any]]:

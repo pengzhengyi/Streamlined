@@ -29,8 +29,10 @@ from .predicates import (
     IS_NOT_STR,
     IS_STR,
     IS_TRUTHY,
+    NOT,
+    OR,
     Predicate,
 )
-from .subprocess import StdinStream, Stream, SubprocessResult, subprocess
+from .subprocess import StdinStream, Stream, SubprocessResult, run
 from .transforms import IDENTITY_FACTORY, Transform
 from .tree import update
