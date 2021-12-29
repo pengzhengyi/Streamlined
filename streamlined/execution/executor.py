@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import Executor
 from concurrent.futures import Executor as AbstractExecutor
 from concurrent.futures import Future
 from contextlib import ExitStack
@@ -15,6 +16,7 @@ from typing import (
     Optional,
     Union,
 )
+from unittest.mock import AsyncMock
 
 import ray
 from ray.actor import ActorClass, ActorMethod
@@ -23,6 +25,26 @@ from ray.remote_function import RemoteFunction
 from ..common import RayAsyncActor, RayRemote
 
 Executable = Callable[[], Any]
+
+
+def is_async_mock_partial_method(target: Any) -> bool:
+    return isinstance(target, partial) and isinstance(target.func, AsyncMock)
+
+
+class SimpleExecutor(Executor):
+    """
+    A simple executor suitable for local testing.
+    """
+
+    def submit(self, __fn, *args: Any, **kwargs: Any) -> asyncio.Future:
+        if asyncio.iscoroutinefunction(__fn) or is_async_mock_partial_method(__fn):
+            return __fn(*args, **kwargs)
+        else:
+            loop = asyncio.get_running_loop()
+            future = loop.create_future()
+            result = __fn(*args, **kwargs)
+            future.set_result(result)
+            return future
 
 
 class Executor(AbstractExecutor):

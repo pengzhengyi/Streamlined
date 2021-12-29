@@ -44,3 +44,17 @@ def test_scoping_update():
     scoping.update(scoped)
 
     assert len(list(scoping.all_scopes)) == 3
+
+
+def test_set_nearest():
+    scoping = Scoping()
+    scoping.global_scope["Alice"] = "US"
+
+    scoped = scoping.create_scoped(scoping.global_scope, Bob="UK")
+    scoped["Jerry"] = "Germany"
+
+    scoped.set_nearest("Jerry", "UK")
+    assert scoped["Jerry"] == "UK"
+
+    with pytest.raises(KeyError):
+        scoped.set_nearest("Benjamin", "France")

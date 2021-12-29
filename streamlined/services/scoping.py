@@ -240,6 +240,14 @@ class Scoped(Scoping):
         scope = self.up(num_scope_up)
         scope[name] = value
 
+    def set_nearest(self, name: Any, value: Any) -> None:
+        """Set a value at nearest enclosing scope"""
+        for scope in self.enclosing_scopes():
+            if name in scope:
+                scope[name] = value
+                return
+        raise KeyError(f"Cannot set {name} in any enclosing scope of {self.current_scope}")
+
     def setmagic(self, name: Any, value: Any, num_scope_up: int = 0) -> None:
         scope = self.up(num_scope_up)
         scope.setmagic(name, value)

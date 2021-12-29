@@ -1,3 +1,5 @@
+from dataclasses import replace
+from functools import partial
 from typing import Any, Dict, Iterable, List
 
 from ..common import DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT, IS_NOT_LIST_OF_DICT, VALUE
@@ -64,17 +66,17 @@ class Argument(Parser, Middleware, WithMiddlewares):
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    def _set_value(self, scoped: Scoped) -> Scoped:
+    async def _set_value(self, scoped: Scoped) -> Scoped:
         name = scoped.getmagic("name")
         value = scoped.getmagic("value")
         scoped.set(name, value, 1)
         return scoped
 
     async def _do_apply(self, context: Context) -> Scoped:
-        coroutine = WithMiddlewares.apply(self, context.replace_with_void_next())
+        next_function = partial(self._set_value, scoped=context.scoped)
+        coroutine = WithMiddlewares.apply(self, replace(context, next=next_function))
         await coroutine()
 
-        self._set_value(context.scoped)
         await context.next()
         return context.scoped
 

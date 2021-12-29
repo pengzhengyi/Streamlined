@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any, Awaitable, Callable, Dict, List
 
 from ..common import (
     ACTION,
@@ -36,15 +36,17 @@ def _TRANSFORM_WHEN_HANDLER_IS_STR(value: str) -> Dict[str, str]:
     return {LOG: value}
 
 
-def _TRANSFORM_WHEN_HANDLER_IS_CALLABLE(value: Callable) -> Dict[str, Callable]:
+def _TRANSFORM_WHEN_HANDLER_IS_CALLABLE(
+    value: Callable[..., Any]
+) -> Dict[str, Callable[..., Any]]:
     return {ACTION: value}
 
 
-def _MISSING_HANDLER_ACTION(value: Dict) -> bool:
+def _MISSING_HANDLER_ACTION(value: Dict[str, Any]) -> bool:
     return ACTION not in value
 
 
-def _TRANSFORM_WHEN_HANDLER_MISSING_ACTION(value: Dict) -> Dict:
+def _TRANSFORM_WHEN_HANDLER_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:
     value[ACTION] = NOOP
     return value
 
@@ -60,11 +62,11 @@ class ValidatorHandler(Parser, Middleware, WithMiddlewares):
         if _MISSING_HANDLER_ACTION(value):
             raise DEFAULT_KEYERROR(value, ACTION)
 
-    def _init_middleware_types(self):
+    def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend([Action, Log])
 
-    def _init_middleware_apply_methods(self):
+    def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend([APPLY_INTO, APPLY_INTO])
 
@@ -85,38 +87,38 @@ class ValidatorHandler(Parser, Middleware, WithMiddlewares):
             (AND(IS_DICT, _MISSING_HANDLER_ACTION), _TRANSFORM_WHEN_HANDLER_MISSING_ACTION)
         )
 
-    def parse(self, value: Any) -> Dict:
+    def parse(self, value: Any) -> Dict[str, List[Middleware]]:
         return AbstractParser.parse(self, value)
 
-    def _do_parse(self, value: Any) -> Dict:
+    def _do_parse(self, value: Any) -> Dict[str, List[Middleware]]:
         self.verify(value)
 
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         coroutine = WithMiddlewares.apply(self, context)
         return await coroutine()
 
 
-def _MISSING_HANDLERS(value: Dict) -> bool:
+def _MISSING_HANDLERS(value: Dict[str, Any]) -> bool:
     return HANDLERS not in value
 
 
-def _TRANSFORM_WHEN_MISSING_HANDLERS(value: Dict) -> Dict:
+def _TRANSFORM_WHEN_MISSING_HANDLERS(value: Dict[str, Any]) -> Dict[str, Any]:
     value[HANDLERS] = dict()
     return value
 
 
-def _MISSING_DEFAULT_HANDLER(value: Dict) -> bool:
+def _MISSING_DEFAULT_HANDLER(value: Dict[str, Any]) -> bool:
     return DEFAULT not in value[HANDLERS]
 
 
-def _TRANSFORM_WHEN_MISSING_DEFAULT_HANDLER(value: Dict) -> Dict:
+def _TRANSFORM_WHEN_MISSING_DEFAULT_HANDLER(value: Dict[str, Any]) -> Dict:
     value[HANDLERS][DEFAULT] = NOOP
     return value
 
 
-def _TRANSFORM_WHEN_IS_CALLABLE(value: Callable) -> Dict[str, Callable]:
+def _TRANSFORM_WHEN_IS_CALLABLE(value: Callable[..., Any]) -> Dict[str, Callable[..., Any]]:
     return {ACTION: value}
 
 
@@ -174,38 +176,38 @@ class ValidatorStage(Parser, Middleware):
         except KeyError:
             return self._handlers[DEFAULT]
 
-    async def apply_handler(self, validation_result: Any, context: Context) -> Awaitable[Scoped]:
+    async def apply_handler(self, validation_result: Any, context: Context) -> Scoped:
         handler = self.get_handler(validation_result)
         return await handler.apply_onto(context)
 
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         raise NotImplementedError()
 
 
 class Before(ValidatorStage):
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         validation_result = await self.validate(context.replace_with_void_next())
         scoped = await self.apply_handler(validation_result, context)
         return scoped
 
 
 class After(ValidatorStage):
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         await context.next()
         validation_result = await self.validate(context.replace_with_void_next())
         scoped = await self.apply_handler(validation_result, context.replace_with_void_next())
         return scoped
 
 
-def _MISSING_BEFORE_STAGE(value) -> bool:
+def _MISSING_BEFORE_STAGE(value: Dict[str, Any]) -> bool:
     return VALIDATOR_BEFORE_STAGE not in value
 
 
-def _MISSING_AFTER_STAGE(value) -> bool:
+def _MISSING_AFTER_STAGE(value: Dict[str, Any]) -> bool:
     return VALIDATOR_AFTER_STAGE not in value
 
 
-def _TRANSFORM_WHEN_VALIDATOR_IS_CALLABLE(value: Callable) -> Dict:
+def _TRANSFORM_WHEN_VALIDATOR_IS_CALLABLE(value: Callable[..., Any]) -> Dict[str, Any]:
     return {VALIDATOR_AFTER_STAGE: value}
 
 
@@ -228,10 +230,10 @@ class Validator(Parser, Middleware):
         # `{VALIDATOR: <callable>}` -> `{VALIDATOR: {VALIDATOR_AFTER_STAGE: <callable>}}`
         self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_VALIDATOR_IS_CALLABLE))
 
-    def _do_parse(self, value: Any) -> Dict:
+    def _do_parse(self, value: Any) -> Dict[str, ValidatorStage]:
         self.verify(value)
 
-        parsed = dict()
+        parsed: Dict[str, ValidatorStage] = dict()
 
         if not _MISSING_BEFORE_STAGE(value):
             parsed["_before_validator"] = Before(value)
@@ -241,20 +243,20 @@ class Validator(Parser, Middleware):
 
         return parsed
 
-    async def _validate_stage(self, stage_name: str, context: Context) -> Awaitable[Scoped]:
+    async def _validate_stage(self, stage_name: str, context: Context) -> Scoped:
         try:
             validator: ValidatorStage = getattr(self, f"_{stage_name}_validator")
             return await validator.apply_onto(replace(context, next=ASYNC_VOID))
         except AttributeError:
             return context.scoped
 
-    async def validate_before(self, context: Context) -> Awaitable[Scoped]:
+    async def validate_before(self, context: Context) -> Scoped:
         return await self._validate_stage(VALIDATOR_BEFORE_STAGE, context)
 
-    async def validate_after(self, context: Context) -> Awaitable[Scoped]:
+    async def validate_after(self, context: Context) -> Scoped:
         return await self._validate_stage(VALIDATOR_AFTER_STAGE, context)
 
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         context.scoped.update(await self.validate_before(context))
 
         await context.next()

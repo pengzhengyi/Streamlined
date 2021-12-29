@@ -10,6 +10,7 @@ from .runstep import RUNSTEP, RUNSTEPS, Runstep, Runsteps
 from .setup import SETUP, Setup
 from .skip import SKIP, Skip
 from .validator import (
+    HANDLERS,
     VALIDATOR,
     VALIDATOR_AFTER_STAGE,
     VALIDATOR_BEFORE_STAGE,

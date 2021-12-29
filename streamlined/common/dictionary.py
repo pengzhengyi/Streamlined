@@ -5,7 +5,7 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-def DEFAULT_KEYERROR(value: Dict[K, V], property: K):
+def DEFAULT_KEYERROR(value: Dict[K, V], property: K) -> ValueError:
     return ValueError(f"{value} should have {property} property")
 
 

@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import logging
-from concurrent.futures import Executor
-from functools import partial
 from logging.handlers import BufferingHandler
-from typing import Any
-from unittest.mock import AsyncMock
 
 import nest_asyncio
 import pytest
 from faker import Faker
+
+from streamlined.execution.executor import SimpleExecutor
 
 nest_asyncio.apply()
 
@@ -38,22 +35,6 @@ def buffering_logger(faker, buffering_handler):
 @pytest.fixture(scope="session")
 def get_buffering_logger_message():
     return lambda logger, index: logger.handlers[0].buffer[index].msg
-
-
-def is_async_mock_partial_method(target):
-    return isinstance(target, partial) and isinstance(target.func, AsyncMock)
-
-
-class SimpleExecutor(Executor):
-    def submit(self, __fn, *args: Any, **kwargs: Any):
-        if asyncio.iscoroutinefunction(__fn) or is_async_mock_partial_method(__fn):
-            return __fn(*args, **kwargs)
-        else:
-            loop = asyncio.get_running_loop()
-            future = loop.create_future()
-            result = __fn(*args, **kwargs)
-            future.set_result(result)
-            return future
 
 
 @pytest.fixture(scope="session")
