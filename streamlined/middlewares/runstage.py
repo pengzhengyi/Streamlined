@@ -1,4 +1,4 @@
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any, Callable, Dict, List
 
 from ..common import (
     AND,
@@ -83,11 +83,11 @@ class Runstage(Parser, Middleware, WithMiddlewares):
             (AND(IS_DICT, _MISSING_RUNSTAGE_NAME), _TRANSFORM_WHEN_MISSING_NAME)
         )
 
-    def _do_parse(self, value: Any) -> Dict:
+    def _do_parse(self, value: Any) -> Dict[str, List[Middleware]]:
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    async def _do_apply(self, context: Context) -> Awaitable[Scoped]:
+    async def _do_apply(self, context: Context) -> Scoped:
         coroutine = WithMiddlewares.apply(self, context)
         return await coroutine()
 

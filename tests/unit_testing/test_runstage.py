@@ -3,15 +3,7 @@ from unittest.mock import Mock
 import pytest
 
 from streamlined.common import VALUE
-from streamlined.middlewares import (
-    ACTION,
-    NAME,
-    RUNSTEP,
-    RUNSTEPS,
-    Context,
-    Runstage,
-    Runstep,
-)
+from streamlined.middlewares import ACTION, NAME, RUNSTEPS, Context, Runstage
 from streamlined.middlewares.argument import ARGUMENTS
 from streamlined.middlewares.runstage import RUNSTAGE
 from streamlined.services.scoping import Scoped

@@ -4,6 +4,7 @@ from .cleanup import CLEANUP, Cleanup
 from .log import LOG, Log
 from .middleware import Context, Middleware, Middlewares, StackMiddleware
 from .name import NAME, Name
+from .pipeline import PIPELINE, Pipeline
 from .runstage import RUNSTAGE, RUNSTAGES, Runstage, Runstages
 from .runstep import RUNSTEP, RUNSTEPS, Runstep, Runsteps
 from .setup import SETUP, Setup
