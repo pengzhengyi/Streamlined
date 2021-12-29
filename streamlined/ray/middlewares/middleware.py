@@ -62,7 +62,7 @@ class Context:
         )
 
     def prepare(self, _callable: Callable[..., Any]) -> Callable[..., Any]:
-        provider = ProxyDictionary(self.scoped, __scoped__=self.scoped)
+        provider = ProxyDictionary(self.scoped, _scoped_=self.scoped)
         return DependencyInjection.prepare(_callable, provider)
 
     async def submit(self, _callable: Callable[..., Any]) -> Any:
@@ -144,7 +144,7 @@ class Middleware:
         scoped = await self._do_apply(context)
         return context.update_scoped(scoped)
 
-    async def apply_onto(self, context: Context) -> Awaitable[Scoped]:
+    async def apply_onto(self, context: Context) -> Scoped:
         """
         Different from `apply` where middleware is committing the change to the scope,
         `apply_to` will add a scope to the existing scope in the context and make changes to it.
@@ -156,9 +156,7 @@ class Middleware:
         new_context = replace(context, scoped=context.scoped.create_scoped())
         return await self.apply_into(new_context)
 
-    async def apply(
-        self, context: Context, apply_method: APPLY_METHOD = APPLY_INTO
-    ) -> Awaitable[Scoped]:
+    async def apply(self, context: Context, apply_method: APPLY_METHOD = APPLY_INTO) -> Scoped:
         """
         Use `apply_method` to select a way to apply this middleware
         in context.
@@ -172,10 +170,10 @@ class _BoundMiddleware:
     middleware: Middleware
     context: Context
 
-    async def apply_into(self) -> Awaitable[Scoped]:
+    async def apply_into(self) -> Scoped:
         return await self.middleware.apply_into(self.context)
 
-    async def apply_onto(self) -> Awaitable[Scoped]:
+    async def apply_onto(self) -> Scoped:
         return await self.middleware.apply_onto(self.context)
 
 
@@ -221,7 +219,10 @@ class Middlewares:
 
     @classmethod
     def _apply_middlewares(
-        cls, context: Context, middlewares: Iterator[Middlewares], apply_methods: APPLY_METHODS
+        cls,
+        context: Context,
+        middlewares: Iterator[Middleware],
+        apply_methods: Iterator[APPLY_METHOD],
     ) -> Coroutine[None, None, Awaitable[Scoped]]:
         try:
             middleware = next(middlewares)
@@ -261,13 +262,13 @@ class Middlewares:
             with contextlib.suppress(TypeError):
                 yield self.get_middleware_by_type(middleware_type)
 
-    def apply_into(self, context: Context) -> Coroutine[None, None, Awaitable[Scoped]]:
+    def apply_into(self, context: Context) -> Coroutine[None, None, Scoped]:
         """
         Transform the registered middlewares to a coroutine function.
         """
         return self.apply_middlewares_into(context, self.middlewares)
 
-    def apply_onto(self, context: Context) -> Coroutine[None, None, Awaitable[Scoped]]:
+    def apply_onto(self, context: Context) -> Coroutine[None, None, Scoped]:
         """
         Transform the registered middlewares to a coroutine function.
 

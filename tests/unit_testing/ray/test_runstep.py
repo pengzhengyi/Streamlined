@@ -3,15 +3,7 @@ from unittest.mock import Mock
 import pytest
 
 from streamlined.ray.common import VALUE
-from streamlined.ray.middlewares import (
-    ACTION,
-    NAME,
-    RUNSTEP,
-    RUNSTEPS,
-    Context,
-    Runstep,
-    Runsteps,
-)
+from streamlined.ray.middlewares import ACTION, NAME, RUNSTEP, Context, Runstep
 from streamlined.ray.middlewares.argument import ARGUMENTS
 
 
@@ -34,5 +26,7 @@ async def test_runstep_action_requires_arguments(simple_executor):
             }
         }
     )
+
     scoped = await runstep.apply_into(context)
     mock.assert_called_once_with(10, 20)
+    assert scoped.getmagic(VALUE) == 30

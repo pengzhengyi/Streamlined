@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections import UserDict, deque
-from typing import Any, Iterable, Optional
+from typing import Any, Deque, Iterable, Optional
 
 from treelib import Node, Tree
 
@@ -26,14 +26,14 @@ class Scope(UserDict):
 
     __hash__ = object.__hash__
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(args, **kwargs)
         self.name = uuid.uuid4()
 
     def __str__(self) -> str:
         return f"{self.name}={super().__str__()}"
 
-    def __lt__(self, other: Scope):
+    def __lt__(self, other: Scope) -> bool:
         return self.name < other.name
 
     def getmagic(self, name: str) -> Any:
@@ -85,7 +85,7 @@ class Scoping:
     def __init_tree(
         self,
         _tree: Optional[Tree] = None,
-    ):
+    ) -> None:
         if _tree is None:
             # create new
             self._tree = Tree()
@@ -94,7 +94,7 @@ class Scoping:
             # from existing
             self._tree = _tree
 
-    def __contains__(self, scope: Scope):
+    def __contains__(self, scope: Scope) -> bool:
         return self._tree.contains(scope)
 
     @property
@@ -114,7 +114,7 @@ class Scoping:
         Otherwise, they will be enumerated from specified node.
         """
         if start_at_root:
-            ancestors = deque()
+            ancestors: Deque[Node] = deque()
 
         node = self._get_node(scope)
         while node is not None:
@@ -134,7 +134,7 @@ class Scoping:
     def _get_node(self, scope: Scope) -> Node:
         return self._tree[scope]
 
-    def get(self, name, scope: Scope):
+    def get(self, name: Any, scope: Scope):
         for scope in self.enclosing_scopes(scope):
             try:
                 return scope[name]
@@ -174,6 +174,8 @@ class Scoped(Scoping):
     While Scoping is a tree of Scope, Scoped is a branch of Scope.
     """
 
+    current_scope: Scope
+
     def __init__(
         self,
         scoping: Scoping,
@@ -189,7 +191,7 @@ class Scoped(Scoping):
         for node in scoping.ancestors(self.current_scope, start_at_root=True):
             parent = self._tree.create_node(identifier=node.identifier, parent=parent)
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: Any) -> Any:
         return self.get(name, scope=self.current_scope)
 
     def __contains__(self, name: Any) -> bool:
@@ -199,10 +201,10 @@ class Scoped(Scoping):
         except:
             return False
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, name: Any, value: Any) -> None:
         self.current_scope[name] = value
 
-    def __iter__(self):
+    def __iter__(self) -> Iterable[Scope]:
         yield from self.enclosing_scopes(start_at_root=True)
 
     def ancestors(
@@ -223,15 +225,22 @@ class Scoped(Scoping):
         for i, scope in enumerate(self.enclosing_scopes()):
             if i == num_scope_up:
                 return scope
+        raise ValueError(f"{i} exceeds maximum tree depth")
 
-    def getmagic(self, name: str) -> Any:
+    def get(self, name: Any, scope: Optional[Scope] = None) -> Any:
+        if scope is None:
+            scope = self.current_scope
+
+        return super().get(name, scope)
+
+    def getmagic(self, name: Any) -> Any:
         return self[to_magic_naming(name)]
 
-    def set(self, name, value, num_scope_up: int = 0):
+    def set(self, name: Any, value: Any, num_scope_up: int = 0) -> None:
         scope = self.up(num_scope_up)
         scope[name] = value
 
-    def setmagic(self, name, value, num_scope_up: int = 0):
+    def setmagic(self, name: Any, value: Any, num_scope_up: int = 0) -> None:
         scope = self.up(num_scope_up)
         scope.setmagic(name, value)
 
@@ -240,12 +249,12 @@ class Scoped(Scoping):
             parent_scope = self.current_scope
         return super().create_scope(parent_scope, **kwargs)
 
-    def create_scoped(self, parent_scope: Optional[Scope] = None, **kwargs) -> Scoped:
+    def create_scoped(self, parent_scope: Optional[Scope] = None, **kwargs: Any) -> Scoped:
         if parent_scope is None:
             parent_scope = self.current_scope
         return super().create_scoped(parent_scope, **kwargs)
 
-    def enter_scope(self, scope: Scope):
+    def enter_scope(self, scope: Scope) -> None:
         self.current_scope = scope
 
     def exit_scope(self, scope: Scope) -> bool:

@@ -1,20 +1,10 @@
-from dataclasses import replace
-from functools import cached_property
-from typing import Any, Awaitable, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List
 
-from ..common import (
-    ASYNC_VOID,
-    DEFAULT_KEYERROR,
-    IS_DICT,
-    IS_NONE,
-    IS_NOT_DICT,
-    IS_NOT_LIST_OF_DICT,
-    VALUE,
-)
+from ..common import DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT, IS_NOT_LIST_OF_DICT, VALUE
 from ..services import Scoped
 from .action import Action
 from .cleanup import Cleanup
-from .log import LOG, Log
+from .log import Log
 from .middleware import (
     APPLY_INTO,
     APPLY_ONTO,
@@ -28,20 +18,20 @@ from .parser import Parser
 from .validator import Validator
 
 
-def _MISSING_ARGUMENT_NAME(value: Dict) -> bool:
+def _MISSING_ARGUMENT_NAME(value: Dict[str, Any]) -> bool:
     return NAME not in value
 
 
-def _MISSING_ARGUMENT_VALUE(value: Dict) -> bool:
+def _MISSING_ARGUMENT_VALUE(value: Dict[str, Any]) -> bool:
     return VALUE not in value
 
 
 class Argument(Parser, Middleware, WithMiddlewares):
-    def _init_middleware_types(self):
+    def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend([Name, Validator, Action, Log, Cleanup])
 
-    def _init_middleware_apply_methods(self):
+    def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
             [APPLY_ONTO, APPLY_ONTO, APPLY_INTO, APPLY_ONTO, APPLY_ONTO]
@@ -70,7 +60,7 @@ class Argument(Parser, Middleware, WithMiddlewares):
         if _MISSING_ARGUMENT_VALUE(value):
             raise DEFAULT_KEYERROR(value, VALUE)
 
-    def _do_parse(self, value: Any) -> Dict:
+    def _do_parse(self, value: Any) -> Dict[str, Any]:
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
@@ -80,7 +70,7 @@ class Argument(Parser, Middleware, WithMiddlewares):
         scoped.set(name, value, 1)
         return scoped
 
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         coroutine = WithMiddlewares.apply(self, context.replace_with_void_next())
         await coroutine()
 
@@ -110,11 +100,11 @@ class Arguments(Parser, Middleware, StackMiddleware):
         # `{ARGUMENTS: {...}}` -> `{ARGUMENTS: [{...}]}`
         self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_ARGUMENTS_IS_DICT))
 
-    def _do_parse(self, value: Any) -> Dict:
+    def _do_parse(self, value: Any) -> Dict[str, Any]:
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    async def _do_apply(self, context: Context) -> Awaitable[Scoped]:
+    async def _do_apply(self, context: Context) -> Scoped:
         coroutine = StackMiddleware.apply_onto(self, context)
         return await coroutine()
 

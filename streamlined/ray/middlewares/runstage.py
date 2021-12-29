@@ -1,5 +1,4 @@
-import uuid
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Any, Awaitable, Callable, Dict
 
 from ..common import (
     AND,
@@ -8,10 +7,8 @@ from ..common import (
     IS_DICT,
     IS_NOT_DICT,
     IS_NOT_LIST_OF_DICT,
-    VOID,
 )
 from ..services import Scoped
-from .action import ACTION, Action
 from .argument import Arguments
 from .cleanup import Cleanup
 from .log import Log
@@ -25,30 +22,25 @@ from .middleware import (
 )
 from .name import NAME, Name
 from .parser import Parser
+from .runstep import (
+    _MISSING_RUNSTEP_NAME,
+    _TRANSFORM_WHEN_MISSING_NAME,
+    _TRANSFORM_WHEN_RUNSTEPS_IS_DICT,
+    RUNSTEPS,
+    Runsteps,
+)
 from .setup import Setup
 from .skip import Skip
 from .validator import Validator
 
-
-def _MISSING_RUNSTEP_NAME(value: Dict[str, Any]) -> bool:
-    return NAME not in value
+_MISSING_RUNSTAGE_NAME = _MISSING_RUNSTEP_NAME
 
 
-def _MISSING_RUNSTEP_ACTION(value: Dict[str, Any]) -> bool:
-    return ACTION not in value
+def _MISSING_RUNSTAGE_RUNSTEPS(value: Dict[str, Any]) -> bool:
+    return RUNSTEPS not in value
 
 
-def _TRANSFORM_WHEN_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[ACTION] = VOID
-    return value
-
-
-def _TRANSFORM_WHEN_MISSING_NAME(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[NAME] = str(uuid.uuid4())
-    return value
-
-
-class Runstep(Parser, Middleware, WithMiddlewares):
+class Runstage(Parser, Middleware, WithMiddlewares):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)
@@ -56,16 +48,16 @@ class Runstep(Parser, Middleware, WithMiddlewares):
         if IS_NOT_DICT(value):
             raise TypeError(f"{value} should be dict")
 
-        if _MISSING_RUNSTEP_NAME(value):
+        if _MISSING_RUNSTAGE_NAME(value):
             raise DEFAULT_KEYERROR(value, NAME)
 
-        if _MISSING_RUNSTEP_ACTION(value):
-            raise DEFAULT_KEYERROR(value, ACTION)
+        if _MISSING_RUNSTAGE_RUNSTEPS(value):
+            raise DEFAULT_KEYERROR(value, RUNSTEPS)
 
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend(
-            [Name, Skip, Arguments, Setup, Validator, Action, Log, Cleanup]
+            [Name, Skip, Arguments, Setup, Validator, Runsteps, Log, Cleanup]
         )
 
     def _init_middleware_apply_methods(self) -> None:
@@ -77,7 +69,7 @@ class Runstep(Parser, Middleware, WithMiddlewares):
                 APPLY_INTO,
                 APPLY_ONTO,
                 APPLY_ONTO,
-                APPLY_INTO,
+                APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_ONTO,
             ]
@@ -86,14 +78,9 @@ class Runstep(Parser, Middleware, WithMiddlewares):
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
-        # `{RUNSTEP: {...}}` -> `{RUNSTEP: {.., ACTION: VOID}}`
+        # `{RUNSTAGE: {...}}` -> `{RUNSTAGE: {.., NAME: <uuid>}}`
         self.simplifications.append(
-            (AND(IS_DICT, _MISSING_RUNSTEP_ACTION), _TRANSFORM_WHEN_MISSING_ACTION)
-        )
-
-        # `{RUNSTEP: {...}}` -> `{RUNSTEP: {.., NAME: <uuid>}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_RUNSTEP_NAME), _TRANSFORM_WHEN_MISSING_NAME)
+            (AND(IS_DICT, _MISSING_RUNSTAGE_NAME), _TRANSFORM_WHEN_MISSING_NAME)
         )
 
     def _do_parse(self, value: Any) -> Dict:
@@ -105,18 +92,16 @@ class Runstep(Parser, Middleware, WithMiddlewares):
         return await coroutine()
 
 
-RUNSTEP = Runstep.get_name()
+RUNSTAGE = Runstage.get_name()
+
+_TRANSFORM_WHEN_RUNSTAGES_IS_DICT = _TRANSFORM_WHEN_RUNSTEPS_IS_DICT
 
 
-def _TRANSFORM_WHEN_RUNSTEPS_IS_CALLABLE(value: Callable[..., Any]) -> Dict[str, Any]:
-    return {ACTION: value}
+def _TRANSFORM_WHEN_RUNSTAGES_IS_CALLABLE(value: Callable[..., Any]) -> Dict[str, Any]:
+    return {RUNSTEPS: value}
 
 
-def _TRANSFORM_WHEN_RUNSTEPS_IS_DICT(value: Dict[str, Any]) -> List[Dict[str, Any]]:
-    return [value]
-
-
-class Runsteps(Parser, Middleware, StackMiddleware):
+class Runstages(Parser, Middleware, StackMiddleware):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)
@@ -127,11 +112,11 @@ class Runsteps(Parser, Middleware, StackMiddleware):
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
-        # `{RUNSTEPS: <callable>}` -> `{RUNSTEPS: {ACTION: <callable>}}`
-        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_RUNSTEPS_IS_CALLABLE))
+        # `{RUNSTAGES: <callable>}` -> `{RUNSTAGES: {RUNSTEPS: <callable>}}`
+        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_RUNSTAGES_IS_CALLABLE))
 
-        # `{RUNSTEPS: {...}}` -> `{RUNSTEPS: [{...}]}`
-        self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_RUNSTEPS_IS_DICT))
+        # `{RUNSTAGES: {...}}` -> `{RUNSTAGES: [{...}]}`
+        self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_RUNSTAGES_IS_DICT))
 
     def _do_parse(self, value: Any) -> Dict[str, Any]:
         self.verify(value)
@@ -142,4 +127,4 @@ class Runsteps(Parser, Middleware, StackMiddleware):
         return await coroutine()
 
 
-RUNSTEPS = Runsteps.get_name()
+RUNSTAGES = Runstages.get_name()
