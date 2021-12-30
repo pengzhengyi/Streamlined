@@ -7,7 +7,7 @@ import nest_asyncio
 import pytest
 from faker import Faker
 
-from streamlined.execution.executor import SimpleExecutor
+from streamlined.execution import SimpleExecutor
 
 nest_asyncio.apply()
 

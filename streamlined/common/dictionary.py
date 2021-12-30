@@ -25,6 +25,13 @@ def get_or_default(mapping: Mapping[K, V], key: K, default: V) -> V:
         return default
 
 
+def set_if_not_none(dictionary: Dict[Any, Any], key: Any, value: Any) -> bool:
+    if value is not None:
+        dictionary[key] = value
+        return True
+    return False
+
+
 class ProxyDictionary(UserDict):
     """
     A proxy dictionary is intended to provide some more key value

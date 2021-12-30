@@ -1,28 +1,53 @@
+import sys
+from functools import partial
 from subprocess import DEVNULL, PIPE
-from typing import Any, Callable, ClassVar, Dict, List
+from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Type, Union
 
 from decorator import FunctionMaker
 
 from ..common import (
     AND,
     ASYNC_VOID,
-    DEFAULT_KEYERROR,
     IDENTITY_FACTORY,
-    IS_CALLABLE,
+    IS_DICT_MISSING_KEY,
+    IS_DICTVALUE_NOT_CALLABLE,
     IS_LIST,
     IS_NOT_CALLABLE,
     IS_NOT_LIST,
     IS_NOT_LIST_OF_CALLABLE,
     IS_STR,
+    IS_TYPE,
+    OR,
     VALUE,
+    ArgparseResult,
     StdinStream,
     Stream,
     SubprocessResult,
+    get_or_raise,
+    parse_known_args,
 )
 from ..common import run as run_
 from ..parsing import Variant, WithVariants
 from .middleware import Context, Middleware
+from .name import NAME
 from .parser import Parser
+
+
+def _TRANSFORM_DICTVALUE_TO_CALLABLE(value: Dict[str, Any], key: str) -> Dict[str, Any]:
+    value[key] = IDENTITY_FACTORY(value[key])
+    return value
+
+
+def _TRANSFORM_DICTVALUE_TO_NONE(value: Dict[str, Any], key: str) -> Dict[str, Any]:
+    value[key] = None
+    return value
+
+
+def _EXPECT_CALLABLE_AT_KEY(dictionary: Dict[str, Any], key: str) -> None:
+    value = get_or_raise(dictionary, key)
+    if IS_NOT_CALLABLE(value):
+        raise TypeError(f"Expect value for {key} to be a Callable, received {value}")
+
 
 ARGS = "args"
 STDIN = "stdin"
@@ -31,17 +56,13 @@ STDERR = "stderr"
 KWARGS = "kwargs"
 
 
-def _IS_ARGS_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
-    return IS_NOT_CALLABLE(value[ARGS])
+_IS_ARGS_NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=ARGS)
 
 
-def _TRANSFORM_WHEN_ARGS_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[ARGS] = IDENTITY_FACTORY(value[ARGS])
-    return value
+_TRANSFORM_WHEN_ARGS_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=ARGS)
 
 
-def _MISSING_STDIN(value: Dict[str, Any]) -> bool:
-    return STDIN not in value
+_MISSING_STDIN = partial(IS_DICT_MISSING_KEY, key=STDIN)
 
 
 def _TRANSFORM_WHEN_MISSING_STDIN(value: Dict[str, Any]) -> Dict[str, Any]:
@@ -59,21 +80,16 @@ def _TRANSFORM_WHEN_STDIN_IS_STR(value: Dict[str, Any]) -> Dict[str, Any]:
     return value
 
 
-def _MISSING_ARGS(value: Dict[str, Any]) -> bool:
-    return ARGS not in value
+_MISSING_ARGS = partial(IS_DICT_MISSING_KEY, key=ARGS)
 
 
-def _IS_STDIN_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
-    return IS_NOT_CALLABLE(value[STDIN])
+_IS_STDIN_NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=STDIN)
 
 
-def _TRANSFORM_WHEN_STDIN_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[STDIN] = IDENTITY_FACTORY(value[STDIN])
-    return value
+_TRANSFORM_WHEN_STDIN_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=STDIN)
 
 
-def _MISSING_STDOUT(value: Dict[str, Any]) -> bool:
-    return STDOUT not in value
+_MISSING_STDOUT = partial(IS_DICT_MISSING_KEY, key=STDOUT)
 
 
 def _TRANSFORM_WHEN_MISSING_STDOUT(value: Dict[str, Any]) -> Dict[str, Any]:
@@ -81,17 +97,12 @@ def _TRANSFORM_WHEN_MISSING_STDOUT(value: Dict[str, Any]) -> Dict[str, Any]:
     return value
 
 
-def _IS_STDOUT_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
-    return IS_NOT_CALLABLE(value[STDOUT])
+_IS_STDOUT_NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=STDOUT)
 
 
-def _TRANSFORM_WHEN_STDOUT_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[STDOUT] = IDENTITY_FACTORY(value[STDOUT])
-    return value
+_TRANSFORM_WHEN_STDOUT_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=STDOUT)
 
-
-def _MISSING_STDERR(value: Dict[str, Any]) -> bool:
-    return STDERR not in value
+_MISSING_STDERR = partial(IS_DICT_MISSING_KEY, key=STDERR)
 
 
 def _TRANSFORM_WHEN_MISSING_STDERR(value: Dict[str, Any]) -> Dict[str, Any]:
@@ -99,17 +110,11 @@ def _TRANSFORM_WHEN_MISSING_STDERR(value: Dict[str, Any]) -> Dict[str, Any]:
     return value
 
 
-def _IS_STDERR_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
-    return IS_NOT_CALLABLE(value[STDERR])
+_IS_STDERR_NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=STDERR)
 
+_TRANSFORM_WHEN_STDERR_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=STDERR)
 
-def _TRANSFORM_WHEN_STDERR_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[STDERR] = IDENTITY_FACTORY(value[STDERR])
-    return value
-
-
-def _MISSING_KWARGS(value: Dict[str, Any]) -> bool:
-    return KWARGS not in value
+_MISSING_KWARGS = partial(IS_DICT_MISSING_KEY, key=KWARGS)
 
 
 def _TRANSFORM_WHEN_MISSING_KWARGS(value: Dict[str, Any]) -> Dict[str, Any]:
@@ -117,13 +122,10 @@ def _TRANSFORM_WHEN_MISSING_KWARGS(value: Dict[str, Any]) -> Dict[str, Any]:
     return value
 
 
-def _IS_KWARGS_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
-    return IS_NOT_CALLABLE(value[KWARGS])
+_IS_KWARGS_NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=KWARGS)
 
 
-def _TRANSFORM_WHEN_KWARGS_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[KWARGS] = IDENTITY_FACTORY(value[KWARGS])
-    return value
+_TRANSFORM_WHEN_KWARGS_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=KWARGS)
 
 
 class Shell(Variant):
@@ -151,31 +153,8 @@ class Shell(Variant):
 
     @classmethod
     def verify(cls, value: Any) -> None:
-        if _MISSING_ARGS(value):
-            raise DEFAULT_KEYERROR(value, ARGS)
-        if _IS_ARGS_NOT_CALLABLE(value):
-            raise TypeError(f"Expect {ARGS} to be a Callable, received {value[ARGS]}")
-
-        if _MISSING_STDIN(value):
-            raise DEFAULT_KEYERROR(value, STDIN)
-        if _IS_STDIN_NOT_CALLABLE(value):
-            raise TypeError(f"Expect {STDIN} to be a Callable, received {value[STDIN]}")
-
-        if _MISSING_STDOUT(value):
-            raise DEFAULT_KEYERROR(value, STDOUT)
-        if _IS_STDOUT_NOT_CALLABLE(value):
-            raise TypeError(f"Expect {STDOUT} to be a Callable, received {value[STDOUT]}")
-
-        if _MISSING_STDERR(value):
-            raise DEFAULT_KEYERROR(value, STDERR)
-        if _IS_STDERR_NOT_CALLABLE(value):
-            raise TypeError(f"Expect {STDERR} to be a Callable, received {value[STDERR]}")
-
-        if _MISSING_KWARGS(value):
-            raise DEFAULT_KEYERROR(value, KWARGS)
-        if _IS_KWARGS_NOT_CALLABLE(value):
-            raise TypeError(f"Expect {KWARGS} to be a Callable, received {value[KWARGS]}")
-
+        for key in [ARGS, STDIN, STDOUT, STDERR, KWARGS]:
+            _EXPECT_CALLABLE_AT_KEY(value, key)
         return value
 
     def _init_simplifications_for_variant(self) -> None:
@@ -215,6 +194,136 @@ class Shell(Variant):
 SHELL = Shell.get_name()
 
 
+NARGS = "nargs"
+CONST = "const"
+DEFAULT = "default"
+ARGTYPE = "type_"
+CHOICES = "choices"
+REQUIRED = "required"
+HELP = "help"
+METAVAR = "metavar"
+DEST = "dest"
+
+
+_NAME_NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=NAME)
+_TRANSFORM_WHEN_NAME_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=NAME)
+
+_MISSING_ARGS = partial(IS_DICT_MISSING_KEY, key=ARGS)
+
+
+def _TRANSFORM_WHEN_MISSING_ARGS(value: Dict[str, Any]) -> Dict[str, Any]:
+    value[ARGS] = sys.argv
+    return value
+
+
+_ARGS_NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=ARGS)
+_TRANSFORM_WHEN_ARGS_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=ARGS)
+
+
+def _ARGTYPE_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
+    argtype = value[ARGTYPE]
+    return IS_NOT_CALLABLE(argtype) or IS_TYPE(argtype)
+
+
+def _retrieve_argparse_value(_value_: ArgparseResult) -> Any:
+    return _value_.value
+
+
+class Argparse(Variant):
+    parse: ClassVar[
+        Callable[
+            [
+                Union[str, List[str]],
+                Optional[str],
+                Optional[Union[str, int]],
+                Optional[Any],
+                Optional[Any],
+                Optional[Type],
+                Optional[Iterable[Any]],
+                Optional[bool],
+                Optional[str],
+                Optional[str],
+                Optional[str],
+                List[str],
+            ],
+            ArgparseResult,
+        ]
+    ] = FunctionMaker.create(
+        f"parse(_{VALUE}0_: Union[str, List[str]], _{VALUE}1_: Optional[str], _{VALUE}2_: Optional[Union[str, int]], _{VALUE}3_: Optional[Any], _{VALUE}4_: Optional[Any], _{VALUE}5_: Optional[Type], _{VALUE}6_: Optional[Iterable[Any]], _{VALUE}7_: Optional[bool], _{VALUE}8_: Optional[str], _{VALUE}9_: Optional[str], _{VALUE}10_: Optional[str], _{VALUE}11_: List[str])",
+        f"return parse_known_args(_{VALUE}0_, _{VALUE}1_, _{VALUE}2_, _{VALUE}3_, _{VALUE}4_, _{VALUE}5_, _{VALUE}6_, _{VALUE}7_, _{VALUE}8_, _{VALUE}9_, _{VALUE}10_, _{VALUE}11_)",
+        dict(
+            parse_known_args=parse_known_args,
+            Union=Union,
+            List=List,
+            Optional=Optional,
+            Type=Type,
+            Any=Any,
+            Iterable=Iterable,
+        ),
+        addsource=True,
+    )
+
+    @staticmethod
+    def get_keys() -> List[str]:
+        return [
+            NAME,
+            ACTION,
+            NARGS,
+            CONST,
+            DEFAULT,
+            ARGTYPE,
+            CHOICES,
+            REQUIRED,
+            HELP,
+            METAVAR,
+            DEST,
+            ARGS,
+        ]
+
+    @classmethod
+    def reduce(cls, value: Any) -> Any:
+        actions = [value[key] for key in cls.get_keys()]
+        actions.append(cls.parse)
+        actions.append(_retrieve_argparse_value)
+        return actions
+
+    @classmethod
+    def verify(cls, value: Any) -> None:
+        for key in cls.get_keys():
+            _EXPECT_CALLABLE_AT_KEY(value, key)
+        return value
+
+    def _init_simplifications_for_variant(self) -> None:
+        super()._init_simplifications_for_variant()
+
+        self._variant_simplifications.append(
+            (_NAME_NOT_CALLABLE, _TRANSFORM_WHEN_NAME_NOT_CALLABLE)
+        )
+
+        for key in self.get_keys()[1:-1]:
+
+            MISSING = partial(IS_DICT_MISSING_KEY, key=key)
+            TRANSFORM_WHEN_MISSING = partial(_TRANSFORM_DICTVALUE_TO_NONE, key=key)
+
+            if key == ARGTYPE:
+                NOT_CALLABLE = _ARGTYPE_NOT_CALLABLE
+            else:
+                NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=key)
+
+            TRANSFORM_WHEN_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=key)
+
+            self._variant_simplifications.append((MISSING, TRANSFORM_WHEN_MISSING))
+            self._variant_simplifications.append((NOT_CALLABLE, TRANSFORM_WHEN_NOT_CALLABLE))
+
+        self._variant_simplifications.append((_MISSING_ARGS, _TRANSFORM_WHEN_MISSING_ARGS))
+        self._variant_simplifications.append(
+            (_ARGS_NOT_CALLABLE, _TRANSFORM_WHEN_ARGS_NOT_CALLABLE)
+        )
+
+
+ARGPARSE = Argparse.get_name()
+
+
 def _TRANSFORM_WHEN_NOT_LIST(value: Callable[..., Any]) -> List[Callable[..., Any]]:
     return [value]
 
@@ -231,7 +340,8 @@ class Action(WithVariants, Parser, Middleware):
 
     def _init_variants(self) -> None:
         super()._init_variants()
-        self.variants.append(Shell())
+
+        self.variants.extend([Shell(), Argparse()])
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()

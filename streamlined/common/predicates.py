@@ -1,7 +1,8 @@
 import operator
 from collections.abc import Iterable
 from functools import partial
-from typing import Any, Callable, List
+from inspect import BoundArguments
+from typing import Any, Callable, Dict
 
 IS_NONE = partial(operator.is_, None)
 
@@ -21,6 +22,14 @@ def IS_DICT(value: Any) -> bool:
     return isinstance(value, dict)
 
 
+def IS_DICT_MISSING_KEY(value: Dict[str, Any], key: str) -> bool:
+    return key not in value
+
+
+def IS_DICTVALUE_NOT_CALLABLE(value: Dict[str, Any], key: str) -> bool:
+    return IS_NOT_CALLABLE(value[key])
+
+
 def IS_NOT_DICT(value: Any) -> bool:
     return not IS_DICT(value)
 
@@ -31,6 +40,14 @@ def IS_STR(value: Any) -> bool:
 
 def IS_NOT_STR(value: Any) -> bool:
     return not IS_STR(value)
+
+
+def IS_TYPE(value: Any) -> bool:
+    return isinstance(value, type)
+
+
+def IS_NOT_TYPE(value: Any) -> bool:
+    return not IS_TYPE(value)
 
 
 def IS_LIST(value: Any) -> bool:
@@ -93,3 +110,11 @@ def NOT(predicate: Predicate) -> Predicate:
         return not predicate(value)
 
     return wrapper
+
+
+def IS_NONEMPTY_BOUND_ARGUMENTS(bound_arguments: BoundArguments) -> bool:
+    return bool(bound_arguments.args or bound_arguments.kwargs)
+
+
+def IS_EMPTY_BOUND_ARGUMENTS(bound_arguments: BoundArguments) -> bool:
+    return not IS_NONEMPTY_BOUND_ARGUMENTS(bound_arguments)

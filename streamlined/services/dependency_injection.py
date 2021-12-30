@@ -5,7 +5,7 @@ from functools import partial
 from inspect import Parameter
 from typing import Any, Callable, ClassVar, Iterable, List, Mapping, Optional
 
-from ..common import get_or_default
+from ..common import IS_EMPTY_BOUND_ARGUMENTS, get_or_default
 from .service import Service
 
 
@@ -83,6 +83,9 @@ class DependencyInjection(Service):
         cls, _callable: Callable[..., Any], providers: Mapping[Any, Any]
     ) -> Callable[[], Any]:
         bound_arguments = cls.inject_callable(_callable, providers)
+        if IS_EMPTY_BOUND_ARGUMENTS(bound_arguments):
+            return _callable
+
         return partial(_callable, *bound_arguments.args, **bound_arguments.kwargs)
 
 

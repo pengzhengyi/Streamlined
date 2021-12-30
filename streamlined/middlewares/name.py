@@ -1,7 +1,7 @@
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, List
 
 from ..common import IDENTITY_FACTORY, IS_NOT_CALLABLE, IS_STR, VALUE
-from .action import Action
+from ..services import Scoped
 from .middleware import APPLY_INTO, Context, Middleware, WithMiddlewares
 from .parser import Parser
 
@@ -19,11 +19,14 @@ class Name(Parser, Middleware, WithMiddlewares):
 
         self.simplifications.append((IS_STR, IDENTITY_FACTORY))
 
-    def _init_middleware_types(self):
+    def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
+
+        from .action import Action
+
         self.middleware_types.append(Action)
 
-    def _init_middleware_apply_methods(self):
+    def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.append(APPLY_INTO)
 
@@ -35,7 +38,7 @@ class Name(Parser, Middleware, WithMiddlewares):
             new_value = {middleware_name: value}
             yield middleware_type(new_value)
 
-    def _do_parse(self, value):
+    def _do_parse(self, value: Dict[str, Any]) -> Dict[str, List[Middleware]]:
         self.verify(value)
 
         return {"middlewares": list(self.create_middlewares_from(value))}
@@ -46,7 +49,7 @@ class Name(Parser, Middleware, WithMiddlewares):
 
         return context.scoped.getmagic(VALUE)
 
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         name = await self.get_register_name(context)
 
         context.scoped.setmagic(NAME, name, num_scope_up=1)
