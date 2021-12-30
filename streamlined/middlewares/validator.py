@@ -23,8 +23,9 @@ from ..common import (
 )
 from ..services import Scoped
 from .action import Action
+from .cleanup import Cleanup
 from .log import LOG, Log
-from .middleware import APPLY_INTO, Context, Middleware, WithMiddlewares
+from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
 from .parser import AbstractParser, Parser
 
 
@@ -64,11 +65,11 @@ class ValidatorHandler(Parser, Middleware, WithMiddlewares):
 
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
-        self.middleware_types.extend([Action, Log])
+        self.middleware_types.extend([Action, Log, Cleanup])
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
-        self.middleware_apply_methods.extend([APPLY_INTO, APPLY_INTO])
+        self.middleware_apply_methods.extend([APPLY_INTO, APPLY_INTO, APPLY_ONTO])
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()

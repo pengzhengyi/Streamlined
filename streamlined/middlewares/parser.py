@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, Dict, Iterable, List, Optional, Type
+from typing import Any, Dict
 
 from ..common import IS_DICT
 from ..parsing import Parser as AbstractParser
@@ -18,6 +18,8 @@ class Parser(AbstractParser):
 
     Standardization of data format should be specified in `_init_simplifications`.
     """
+
+    definition: Any
 
     @cached_property
     def name(self) -> str:
@@ -36,15 +38,16 @@ class Parser(AbstractParser):
         """
         pass
 
-    def __init__(self, value) -> None:
+    def __init__(self, value: Any) -> None:
+        self.definition = value
         super().__init__()
         self._init_from_parsed(self.parse(value))
 
-    def _init_from_parsed(self, parsed: Dict):
+    def _init_from_parsed(self, parsed: Dict[str, Any]) -> None:
         for name, value in parsed.items():
             setattr(self, name, value)
 
-    def parse(self, value: Any) -> Dict:
+    def parse(self, value: Any) -> Dict[str, Any]:
         if IS_DICT(value):
             value = value.get(self.name, None)
             return super().parse(value)

@@ -1,4 +1,14 @@
-from .common import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, TYPE, VALUE
+from .common import (
+    ACTION,
+    DEFAULT,
+    HANDLERS,
+    LEVEL,
+    LOGGER,
+    MESSAGE,
+    TYPE,
+    VALUE,
+    SubprocessResult,
+)
 from .execution import SimpleExecutor
 from .middlewares import (
     ACTION,

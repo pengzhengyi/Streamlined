@@ -9,6 +9,7 @@ from ..common import (
     DEFAULT_KEYERROR,
     IDENTITY_FACTORY,
     IS_CALLABLE,
+    IS_LIST,
     IS_NOT_CALLABLE,
     IS_NOT_LIST,
     IS_NOT_LIST_OF_CALLABLE,
@@ -218,10 +219,6 @@ def _TRANSFORM_WHEN_NOT_LIST(value: Callable[..., Any]) -> List[Callable[..., An
     return [value]
 
 
-def _TRANSFORM_WHEN_NOT_LIST_OF_CALLABLE(value: List[Any]) -> List[Callable[..., Any]]:
-    return [value if IS_CALLABLE(value) else IDENTITY_FACTORY(value) for _callable in value]
-
-
 class Action(WithVariants, Parser, Middleware):
     actions: List[Callable[..., Any]]
 
@@ -241,11 +238,9 @@ class Action(WithVariants, Parser, Middleware):
 
         self.simplifications.append((AND(IS_NOT_LIST, IS_NOT_CALLABLE), IDENTITY_FACTORY))
 
-        self.simplifications.append((IS_NOT_LIST, _TRANSFORM_WHEN_NOT_LIST))
+        self.simplifications.append((AND(IS_LIST, IS_NOT_LIST_OF_CALLABLE), IDENTITY_FACTORY))
 
-        self.simplifications.append(
-            (IS_NOT_LIST_OF_CALLABLE, _TRANSFORM_WHEN_NOT_LIST_OF_CALLABLE)
-        )
+        self.simplifications.append((IS_NOT_LIST, _TRANSFORM_WHEN_NOT_LIST))
 
     def _do_parse(self, value: List[Callable[..., Any]]) -> Dict[str, Any]:
         self.verify(value)
