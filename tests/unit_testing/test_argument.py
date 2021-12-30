@@ -2,8 +2,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from streamlined.common import VALUE
+from streamlined.common import TYPE, VALUE
 from streamlined.middlewares import (
+    ARGPARSE,
+    ARGS,
+    ARGTYPE,
     ARGUMENT,
     ARGUMENTS,
     CLEANUP,
@@ -34,6 +37,22 @@ async def test_argument_set_after_action(simple_executor):
     scoped = await argument.apply_into(context)
 
     mock.assert_called_once_with("Alice")
+
+
+@pytest.mark.asyncio
+async def test_argument_argparse(simple_executor):
+
+    context, scoping = Context.new(simple_executor)
+    argument = Argument(
+        {
+            ARGUMENT: {
+                NAME: "num_processors",
+                VALUE: {TYPE: ARGPARSE, NAME: "-p", ARGTYPE: int, ARGS: ["-p", "10"]},
+            }
+        }
+    )
+    scoped = await argument.apply_into(context)
+    assert scoped.get("num_processors") == 10
 
 
 @pytest.mark.asyncio
