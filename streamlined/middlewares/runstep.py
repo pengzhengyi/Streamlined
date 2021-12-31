@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Any, Callable, Dict, List
 
 from ..common import (
     AND,
