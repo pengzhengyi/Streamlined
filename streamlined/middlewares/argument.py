@@ -16,7 +16,6 @@ from .middleware import (
     WithMiddlewares,
 )
 from .name import NAME, Name
-from .parser import Parser
 from .validator import Validator
 
 
@@ -28,7 +27,7 @@ def _MISSING_ARGUMENT_VALUE(value: Dict[str, Any]) -> bool:
     return VALUE not in value
 
 
-class Argument(Parser, Middleware, WithMiddlewares):
+class Argument(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend([Name, Validator, Action, Log, Cleanup])
@@ -88,7 +87,7 @@ def _TRANSFORM_WHEN_ARGUMENTS_IS_DICT(value: Dict[str, Any]) -> List[Dict[str, A
     return [value]
 
 
-class Arguments(Parser, Middleware, StackMiddleware):
+class Arguments(Middleware, StackMiddleware):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)

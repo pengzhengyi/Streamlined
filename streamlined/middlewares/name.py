@@ -3,10 +3,9 @@ from typing import Any, Dict, Iterable, List
 from ..common import IDENTITY_FACTORY, IS_NOT_CALLABLE, IS_STR, VALUE
 from ..services import Scoped
 from .middleware import APPLY_INTO, Context, Middleware, WithMiddlewares
-from .parser import Parser
 
 
-class Name(Parser, Middleware, WithMiddlewares):
+class Name(Middleware, WithMiddlewares):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)

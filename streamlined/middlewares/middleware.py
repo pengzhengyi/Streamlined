@@ -9,7 +9,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Coroutine,
     Dict,
     Iterable,
     Iterator,
@@ -20,11 +19,15 @@ from typing import (
     Union,
 )
 
-from ..common import ASYNC_VOID, IS_ITERABLE, ProxyDictionary
+from ..common import ASYNC_NOOP, ASYNC_VOID, IS_ITERABLE, ProxyDictionary
 from ..services import DependencyInjection, Scoped, Scoping
+from .parser import Parser
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
+
+
+ScopedNext = Callable[[], Awaitable[Optional[Scoped]]]
 
 
 @dataclass
@@ -44,7 +47,7 @@ class Context:
 
     executor: Executor
     scoped: Scoped
-    next: Coroutine[None, None, Optional[Scoped]] = ASYNC_VOID
+    next: ScopedNext = ASYNC_NOOP
 
     @classmethod
     def new(cls, executor: Executor) -> Tuple[Context, Scoping]:
@@ -73,7 +76,7 @@ class Context:
             self.scoped.update(result)
         return result
 
-    def update_scoped(self, scoped: Scoped) -> Scoped:
+    def update_scoped(self, scoped: Optional[Scoped]) -> Scoped:
         """
         Update with another scoped. Updated scoped will be returned.
         """
@@ -97,7 +100,7 @@ APPLY_METHOD = Union[APPLY_INTO, APPLY_ONTO]
 APPLY_METHODS = Union[APPLY_METHOD, Iterable[APPLY_METHOD]]
 
 
-class Middleware:
+class AbstractMiddleware:
     """
     A middleware should specify how it modifies the execution chain
     through the `apply` method.
@@ -165,6 +168,10 @@ class Middleware:
         return await apply(context)
 
 
+class Middleware(Parser, AbstractMiddleware):
+    pass
+
+
 @dataclass
 class _BoundMiddleware:
     middleware: Middleware
@@ -187,7 +194,7 @@ class Middlewares:
     @classmethod
     def apply_middlewares_into(
         cls, context: Context, middlewares: Iterable[Middleware]
-    ) -> Coroutine[None, None, Awaitable[Scoped]]:
+    ) -> ScopedNext:
         """
         Create a coroutine function where each middleware will be applied in order.
         """
@@ -196,7 +203,7 @@ class Middlewares:
     @classmethod
     def apply_middlewares_onto(
         cls, context: Context, middlewares: Iterable[Middleware]
-    ) -> Coroutine[None, None, Awaitable[Scoped]]:
+    ) -> ScopedNext:
         """
         Create a coroutine function where each middleware will be applied in order.
 
@@ -208,7 +215,7 @@ class Middlewares:
     @classmethod
     def apply_middlewares(
         cls, context: Context, middlewares: Iterable[Middleware], apply_methods: APPLY_METHODS
-    ) -> Coroutine[None, None, Awaitable[Scoped]]:
+    ) -> ScopedNext:
         if IS_ITERABLE(middlewares):
             middlewares = iter(middlewares)
 
@@ -223,7 +230,7 @@ class Middlewares:
         context: Context,
         middlewares: Iterator[Middleware],
         apply_methods: Iterator[APPLY_METHOD],
-    ) -> Coroutine[None, None, Awaitable[Scoped]]:
+    ) -> ScopedNext:
         try:
             middleware = next(middlewares)
             apply_method = next(apply_methods)
@@ -262,13 +269,13 @@ class Middlewares:
             with contextlib.suppress(TypeError):
                 yield self.get_middleware_by_type(middleware_type)
 
-    def apply_into(self, context: Context) -> Coroutine[None, None, Scoped]:
+    def apply_into(self, context: Context) -> ScopedNext:
         """
         Transform the registered middlewares to a coroutine function.
         """
         return self.apply_middlewares_into(context, self.middlewares)
 
-    def apply_onto(self, context: Context) -> Coroutine[None, None, Scoped]:
+    def apply_onto(self, context: Context) -> ScopedNext:
         """
         Transform the registered middlewares to a coroutine function.
 
@@ -276,9 +283,7 @@ class Middlewares:
         """
         return self.apply_middlewares_onto(context, self.middlewares)
 
-    def apply(
-        self, context: Context, apply_methods: APPLY_METHODS
-    ) -> Coroutine[None, None, Awaitable[Scoped]]:
+    def apply(self, context: Context, apply_methods: APPLY_METHODS) -> ScopedNext:
         """
         Transform the registered middlewares to a coroutine function.
 
@@ -351,7 +356,7 @@ class WithMiddlewares(Middlewares):
             if middleware_name in value:
                 yield middleware_type(value)
 
-    def apply(self, context: Context) -> Coroutine[None, None, Scoped]:
+    def apply(self, context: Context) -> ScopedNext:
         return super().apply(context, self.apply_methods)
 
 
@@ -401,7 +406,7 @@ class StackMiddleware(WithMiddlewares):
         super()._init_middleware_types()
         self.middleware_types.append(self._stacked_middleware_type)
 
-    def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:
+    def create_middlewares_from(self, value: List[Dict[str, Any]]) -> Iterable[Middleware]:
         for middleware_type, middleware_name in zip(
             self.middleware_types, self.get_middleware_names()
         ):

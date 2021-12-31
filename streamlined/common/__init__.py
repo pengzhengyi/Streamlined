@@ -1,6 +1,7 @@
 from .argparse import ArgparseResult, parse_known_args
 from .callables import AwaitCoroutine, RayAsyncActor, RayRemote, ShellActor
 from .constants import (
+    ASYNC_NOOP,
     ASYNC_VOID,
     CONTRADICTION,
     NOOP,
@@ -30,6 +31,7 @@ from .predicates import (
     IS_ITERABLE,
     IS_LIST,
     IS_LIST_OF_CALLABLE,
+    IS_LIST_OF_DICT,
     IS_NONE,
     IS_NONEMPTY_BOUND_ARGUMENTS,
     IS_NOT_CALLABLE,

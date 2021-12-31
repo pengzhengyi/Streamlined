@@ -36,6 +36,15 @@ repos:
         stages: [commit]
         args: [--markdown-linebreak-ext=md]
 
+  # Remove unused imports
+  - repo: https://github.com/myint/autoflake
+    rev: v1.4
+    hooks:
+      - id: autoflake
+        stages: [commit]
+        args: ["--in-place", "--remove-all-unused-imports", '--ignore-init-module-imports', '--recursive']
+
+
   # Autoformats python code to a single standard
   - repo: https://github.com/psf/black
     rev: 21.12b0

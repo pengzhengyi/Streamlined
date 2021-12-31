@@ -66,6 +66,16 @@ def IS_NOT_LIST_OF_CALLABLE(value: Any) -> bool:
     return not IS_LIST_OF_CALLABLE(value)
 
 
+def IS_LIST_OF_DICT(value: Any) -> bool:
+    if IS_LIST(value):
+        for listitem in value:
+            if IS_NOT_DICT(listitem):
+                return False
+        return True
+    else:
+        return False
+
+
 def IS_NOT_LIST_OF_DICT(value: Any) -> bool:
     if IS_LIST(value):
         for listitem in value:

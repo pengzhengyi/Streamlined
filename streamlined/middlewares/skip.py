@@ -1,4 +1,4 @@
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any, Awaitable, Dict
 
 from ..common import (
     ACTION,
@@ -6,7 +6,6 @@ from ..common import (
     CONTRADICTION,
     DEFAULT_KEYERROR,
     IDENTITY_FACTORY,
-    IS_CALLABLE,
     IS_DICT,
     IS_NONE,
     IS_NOT_CALLABLE,
@@ -18,7 +17,6 @@ from ..common import (
 from ..services import Scoped
 from .action import Action
 from .middleware import Context, Middleware
-from .parser import Parser
 
 
 def _TRANSFORM_WHEN_NOT_DICT(value: Any) -> Dict[str, Any]:
@@ -52,7 +50,7 @@ def _TRANSFORM_WHEN_VALUE_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
     return value
 
 
-class Skip(Parser, Middleware):
+class Skip(Middleware):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)

@@ -26,7 +26,7 @@ from .action import Action
 from .cleanup import Cleanup
 from .log import LOG, Log
 from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
-from .parser import AbstractParser, Parser
+from .parser import AbstractParser
 
 
 class ValidationError(Exception):
@@ -52,7 +52,7 @@ def _TRANSFORM_WHEN_HANDLER_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, A
     return value
 
 
-class ValidatorHandler(Parser, Middleware, WithMiddlewares):
+class ValidatorHandler(Middleware, WithMiddlewares):
     @classmethod
     def verify(self, value: Any) -> None:
         super().verify(value)
@@ -123,7 +123,7 @@ def _TRANSFORM_WHEN_IS_CALLABLE(value: Callable[..., Any]) -> Dict[str, Callable
     return {ACTION: value}
 
 
-class ValidatorStage(Parser, Middleware):
+class ValidatorStage(Middleware):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)
@@ -212,7 +212,7 @@ def _TRANSFORM_WHEN_VALIDATOR_IS_CALLABLE(value: Callable[..., Any]) -> Dict[str
     return {VALIDATOR_AFTER_STAGE: value}
 
 
-class Validator(Parser, Middleware):
+class Validator(Middleware):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)

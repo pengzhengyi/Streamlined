@@ -8,6 +8,7 @@ from streamlined.middlewares import (
     NAME,
     PIPELINE,
     RUNSTAGES,
+    RUNSTEPS,
     Context,
     Pipeline,
 )
@@ -27,7 +28,7 @@ async def test_pipeline_simple(simple_executor):
             PIPELINE: {
                 NAME: "perform add of two numbers",
                 ARGUMENTS: [{NAME: "a", VALUE: 10}, {NAME: "b", VALUE: 20}],
-                RUNSTAGES: add,
+                RUNSTAGES: [{RUNSTEPS: [add]}],
             }
         }
     )

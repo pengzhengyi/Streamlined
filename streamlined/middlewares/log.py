@@ -18,7 +18,6 @@ from ..common import (
 from ..services import Scoped
 from .action import ACTION, Action
 from .middleware import Context, Middleware
-from .parser import Parser
 
 
 def _TRANSFORM_WHEN_IS_STR(value: str) -> Dict[str, Any]:
@@ -77,7 +76,7 @@ def _TRANSFORM_WHEN_LOGGER_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]
 _TRANSFORM_WHEN_IS_CALLABLE = _TRANSFORM_WHEN_IS_STR
 
 
-class Log(Parser, Middleware):
+class Log(Middleware):
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 

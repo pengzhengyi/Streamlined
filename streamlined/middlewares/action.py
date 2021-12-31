@@ -17,7 +17,6 @@ from ..common import (
     IS_NOT_LIST_OF_CALLABLE,
     IS_STR,
     IS_TYPE,
-    OR,
     VALUE,
     ArgparseResult,
     StdinStream,
@@ -30,7 +29,6 @@ from ..common import run as run_
 from ..parsing import Variant, WithVariants
 from .middleware import Context, Middleware
 from .name import NAME
-from .parser import Parser
 
 
 def _TRANSFORM_DICTVALUE_TO_CALLABLE(value: Dict[str, Any], key: str) -> Dict[str, Any]:
@@ -328,7 +326,7 @@ def _TRANSFORM_WHEN_NOT_LIST(value: Callable[..., Any]) -> List[Callable[..., An
     return [value]
 
 
-class Action(WithVariants, Parser, Middleware):
+class Action(WithVariants, Middleware):
     actions: List[Callable[..., Any]]
 
     @classmethod

@@ -1,10 +1,10 @@
-from typing import Any, Callable, Dict, List
+from typing import Any, Dict, List
 
 from ..common import (
     AND,
     DEFAULT_KEYERROR,
-    IS_CALLABLE,
     IS_DICT,
+    IS_LIST,
     IS_NOT_DICT,
     IS_NOT_LIST_OF_DICT,
 )
@@ -12,16 +12,8 @@ from ..services import Scoped
 from .argument import Arguments
 from .cleanup import Cleanup
 from .log import Log
-from .middleware import (
-    APPLY_INTO,
-    APPLY_ONTO,
-    Context,
-    Middleware,
-    StackMiddleware,
-    WithMiddlewares,
-)
+from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
 from .name import NAME, Name
-from .parser import Parser
 from .runstep import (
     _MISSING_RUNSTEP_NAME,
     _TRANSFORM_WHEN_MISSING_NAME,
@@ -40,7 +32,7 @@ def _MISSING_RUNSTAGE_RUNSTEPS(value: Dict[str, Any]) -> bool:
     return RUNSTEPS not in value
 
 
-class Runstage(Parser, Middleware, WithMiddlewares):
+class Runstage(Middleware, WithMiddlewares):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)
@@ -97,34 +89,26 @@ RUNSTAGE = Runstage.get_name()
 _TRANSFORM_WHEN_RUNSTAGES_IS_DICT = _TRANSFORM_WHEN_RUNSTEPS_IS_DICT
 
 
-def _TRANSFORM_WHEN_RUNSTAGES_IS_CALLABLE(value: Callable[..., Any]) -> Dict[str, Any]:
-    return {RUNSTEPS: value}
+def _TRANSFORM_WHEN_RUNSTAGES_IS_LIST_BUT_NOT_LIST_OF_DICT(
+    value: List[Any],
+) -> List[Dict[str, Any]]:
+    return [{RUNSTAGE: runstep_value} for runstep_value in value]
 
 
-class Runstages(Parser, Middleware, StackMiddleware):
-    @classmethod
-    def verify(cls, value: Any) -> None:
-        super().verify(value)
-
-        if IS_NOT_LIST_OF_DICT(value):
-            raise TypeError(f"{value} should be list of dict")
-
+class Runstages(Runsteps):
     def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+        Middleware._init_simplifications(self)
 
-        # `{RUNSTAGES: <callable>}` -> `{RUNSTAGES: {RUNSTEPS: <callable>}}`
-        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_RUNSTAGES_IS_CALLABLE))
-
-        # `{RUNSTAGES: {...}}` -> `{RUNSTAGES: [{...}]}`
+        # `{RUNSTEPS: {...}}` -> `{RUNSTEPS: [{...}]}`
         self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_RUNSTAGES_IS_DICT))
 
-    def _do_parse(self, value: Any) -> Dict[str, Any]:
-        self.verify(value)
-        return {"middlewares": list(self.create_middlewares_from(value))}
-
-    async def _do_apply(self, context: Context) -> Scoped:
-        coroutine = StackMiddleware.apply_onto(self, context)
-        return await coroutine()
+        # `{RUNSTEPS: [<any]}` -> `{RUNSTEPS: [{...}]}`
+        self.simplifications.append(
+            (
+                AND(IS_LIST, IS_NOT_LIST_OF_DICT),
+                _TRANSFORM_WHEN_RUNSTAGES_IS_LIST_BUT_NOT_LIST_OF_DICT,
+            )
+        )
 
 
 RUNSTAGES = Runstages.get_name()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from functools import partial
 from inspect import Parameter
-from typing import Any, Callable, ClassVar, Iterable, List, Mapping, Optional
+from typing import Any, Callable, ClassVar, Dict, Iterable, List, Mapping, Optional
 
 from ..common import IS_EMPTY_BOUND_ARGUMENTS, get_or_default
 from .service import Service
@@ -48,7 +48,7 @@ class DependencyInjection(Service):
         cls, signature: inspect.Signature, providers: Mapping[Any, Any]
     ) -> inspect.BoundArguments:
         args: List[Any] = []
-        kwargs: Mapping[Any, Any] = dict()
+        kwargs: Dict[Any, Any] = dict()
 
         for name, parameter in signature.parameters.items():
             if (

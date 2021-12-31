@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable, Literal
 
 
-def TAUTOLOGY(*args: Any, **kwargs: Any) -> True:
+def TAUTOLOGY(*args: Any, **kwargs: Any) -> Literal[True]:
     return True
 
 
-def CONTRADICTION(*args: Any, **kwargs: Any) -> False:
+def CONTRADICTION(*args: Any, **kwargs: Any) -> Literal[False]:
     return False
 
 
@@ -19,17 +19,21 @@ async def ASYNC_VOID(*args: Any, **kwargs: Any) -> None:
     pass
 
 
-def TAUTOLOGY_FACTORY() -> TAUTOLOGY:
+def TAUTOLOGY_FACTORY() -> Callable[..., Literal[True]]:
     return TAUTOLOGY
 
 
-def NOOP():
+def NOOP() -> None:
     return None
 
 
-def RETURN_TRUE():
+async def ASYNC_NOOP() -> None:
+    return None
+
+
+def RETURN_TRUE() -> Literal[True]:
     return True
 
 
-def RETURN_FALSE():
+def RETURN_FALSE() -> Literal[False]:
     return False

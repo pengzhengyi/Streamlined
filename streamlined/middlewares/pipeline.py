@@ -7,7 +7,6 @@ from .cleanup import Cleanup
 from .log import Log
 from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
 from .name import NAME, Name
-from .parser import Parser
 from .runstage import RUNSTAGES, Runstages
 from .runstep import _MISSING_RUNSTEP_NAME, _TRANSFORM_WHEN_MISSING_NAME
 from .setup import Setup
@@ -21,7 +20,7 @@ def _MISSING_PIPELINE_RUNSTAGES(value: Dict[str, Any]) -> bool:
     return RUNSTAGES not in value
 
 
-class Pipeline(Parser, Middleware, WithMiddlewares):
+class Pipeline(Middleware, WithMiddlewares):
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)
