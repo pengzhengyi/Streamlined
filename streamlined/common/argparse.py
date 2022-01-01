@@ -32,12 +32,20 @@ def parse_known_args(
     metavar: Optional[str] = None,
     dest: Optional[str] = None,
     args: List[str] = sys.argv,
+    add_help: bool = False,
 ) -> ArgparseResult:
     """
     Combine `add_argument` and `parse_known_args` from argparse.
+
+    Parameters
+    ------
+    add_help: bool
+        Whether help argument will be parsed. Default to False to
+        avoid influencing causing system exit and interrupting
+        partial parsing. This should be the expected argument.
     """
     kwargs: Dict[str, Any] = {}
-    parser = ArgumentParser()
+    parser = ArgumentParser(add_help=add_help)
     if IS_STR(name):
         name = [name]
 

@@ -47,7 +47,7 @@ async def test_argument_argparse(simple_executor):
         {
             ARGUMENT: {
                 NAME: "num_processors",
-                VALUE: {TYPE: ARGPARSE, NAME: "-p", ARGTYPE: int, ARGS: ["-p", "10"]},
+                VALUE: {TYPE: ARGPARSE, NAME: "-p", ARGTYPE: int, ARGS: ["-p", "10", "--help"]},
             }
         }
     )
