@@ -19,7 +19,17 @@ from .dictionary import (
     get_or_raise,
     set_if_not_none,
 )
-from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, TYPE, VALUE
+from .names import (
+    ACTION,
+    DEFAULT,
+    HANDLERS,
+    LEVEL,
+    LOGGER,
+    MESSAGE,
+    PIPELINE_ARGUMENT_PARSER,
+    TYPE,
+    VALUE,
+)
 from .predicates import (
     AND,
     IS_CALLABLE,

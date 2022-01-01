@@ -1,4 +1,5 @@
 import sys
+from argparse import ArgumentParser
 from functools import partial
 from subprocess import DEVNULL, PIPE
 from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Type, Union
@@ -17,6 +18,7 @@ from ..common import (
     IS_NOT_LIST_OF_CALLABLE,
     IS_STR,
     IS_TYPE,
+    PIPELINE_ARGUMENT_PARSER,
     VALUE,
     ArgparseResult,
     StdinStream,
@@ -27,6 +29,7 @@ from ..common import (
 )
 from ..common import run as run_
 from ..parsing import Variant, WithVariants
+from ..services import Scoped
 from .middleware import Context, Middleware
 from .name import NAME
 
@@ -223,7 +226,12 @@ def _ARGTYPE_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
     return IS_NOT_CALLABLE(argtype) or IS_TYPE(argtype)
 
 
-def _retrieve_argparse_value(_value_: ArgparseResult) -> Any:
+def _set_argparse_value(_scoped_: Scoped, _value_: ArgparseResult) -> Any:
+    try:
+        _argument_parser_: ArgumentParser = _scoped_.getmagic(PIPELINE_ARGUMENT_PARSER)
+        _argument_parser_.add_argument(*_value_.args, **_value_.kwargs)
+    except KeyError:
+        pass
     return _value_.value
 
 
@@ -282,7 +290,7 @@ class Argparse(Variant):
     def reduce(cls, value: Any) -> Any:
         actions = [value[key] for key in cls.get_keys()]
         actions.append(cls.parse)
-        actions.append(_retrieve_argparse_value)
+        actions.append(_set_argparse_value)
         return actions
 
     @classmethod
@@ -299,7 +307,6 @@ class Argparse(Variant):
         )
 
         for key in self.get_keys()[1:-1]:
-
             MISSING = partial(IS_DICT_MISSING_KEY, key=key)
             TRANSFORM_WHEN_MISSING = partial(_TRANSFORM_DICTVALUE_TO_NONE, key=key)
 
@@ -355,7 +362,7 @@ class Action(WithVariants, Middleware):
 
         return {"actions": value}
 
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         for index, action in enumerate(self.actions):
             result = await context.submit(action)
             context.scoped.setmagic(f"{VALUE}{index}", result)

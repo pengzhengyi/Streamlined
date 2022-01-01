@@ -15,6 +15,9 @@ class ArgparseResult:
     args: List[str]
     kwargs: Dict[str, Any]
 
+    def add_argument(self, argument_parser: ArgumentParser) -> None:
+        argument_parser.add_argument(*self.args, **self.kwargs)
+
 
 def parse_known_args(
     name: Union[str, List[str]],
@@ -52,5 +55,5 @@ def parse_known_args(
     parser.add_argument(*name, **kwargs)
     namespace, remaining_args = parser.parse_known_args(args)
     parsed = vars(namespace)
-    name, value = parsed.popitem()
-    return ArgparseResult(name, value, remaining_args, name, kwargs)
+    argname, argvalue = parsed.popitem()
+    return ArgparseResult(argname, argvalue, remaining_args, name, kwargs)

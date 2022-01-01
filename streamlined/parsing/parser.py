@@ -13,7 +13,7 @@ class Parser(Simplification):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
-    def parse(self, value: Any) -> Dict:
+    def parse(self, value: Any) -> Dict[str, Any]:
         simplified_value = self.simplify(value)
         return self._do_parse(simplified_value)
 
