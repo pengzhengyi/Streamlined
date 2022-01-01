@@ -1,14 +1,17 @@
 from argparse import ArgumentParser
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from ..common import (
     AND,
     DEFAULT_KEYERROR,
     IS_DICT,
     IS_NOT_DICT,
-    PIPELINE_ARGUMENT_PARSER,
+    VALUE,
+    findkey,
+    format_help,
 )
 from ..services import Scoped
+from .action import Argparse
 from .argument import Arguments
 from .cleanup import Cleanup
 from .log import Log
@@ -25,12 +28,6 @@ _MISSING_PIPELINE_NAME = _MISSING_RUNSTEP_NAME
 
 
 class Pipeline(Middleware, WithMiddlewares):
-    def __init__(
-        self, value: Any, argument_parser_kwargs: Optional[Dict[str, Any]] = None
-    ) -> None:
-        self._init_argument_parser(argument_parser_kwargs)
-        super().__init__(value)
-
     @classmethod
     def verify(cls, value: Any) -> None:
         super().verify(value)
@@ -40,15 +37,6 @@ class Pipeline(Middleware, WithMiddlewares):
 
         if _MISSING_PIPELINE_NAME(value):
             raise DEFAULT_KEYERROR(value, NAME)
-
-    def _init_argument_parser(self, argument_parser_kwargs: Optional[Dict[str, Any]]) -> None:
-        setattr(
-            self,
-            PIPELINE_ARGUMENT_PARSER,
-            ArgumentParser()
-            if argument_parser_kwargs is None
-            else ArgumentParser(**argument_parser_kwargs),
-        )
 
     def parse(self, value: Any) -> Dict[str, Any]:
         """
@@ -92,25 +80,27 @@ class Pipeline(Middleware, WithMiddlewares):
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    def _prepare_context(self, context: Context) -> Context:
-        context.scoped.setmagic(PIPELINE_ARGUMENT_PARSER, getattr(self, PIPELINE_ARGUMENT_PARSER))
-        return context
-
     async def _do_apply(self, context: Context) -> Scoped:
-        coroutine = WithMiddlewares.apply(self, self._prepare_context(context))
+        coroutine = WithMiddlewares.apply(self, context)
         return await coroutine()
+
+    def format_help(
+        self, argument_parser: Optional[Union[ArgumentParser, Dict[str, Any]]] = None
+    ) -> str:
+        if argument_parser is None:
+            argument_parser = dict()
+
+        arguments = map(
+            Argparse.to_argument_definition,
+            filter(Argparse.is_variant, findkey(self.declaration, key=VALUE)),
+        )
+
+        return format_help(argument_parser, arguments)
+
+    def print_help(
+        self, argument_parser: Optional[Union[ArgumentParser, Dict[str, Any]]] = None
+    ) -> None:
+        print(self.format_help(argument_parser))
 
 
 PIPELINE = Pipeline.get_name()
-
-
-def SHOW_HELP_IF_REQUESTED(_argument_parser_: ArgumentParser) -> None:
-    """
-    Parse sys.argv and print help message when there is `-h` or
-    `--help`.
-
-    This is suitable to be added after all arguments have been
-    specified, for example, `SETUP` of `PIPELINE` when all command
-    line arguments have been declared in `ARGUMENTS`.
-    """
-    _argument_parser_.parse_known_args()

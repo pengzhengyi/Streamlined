@@ -1,4 +1,4 @@
-from .argparse import ArgparseResult, parse_known_args
+from .argparse import ArgumentDefinition, ParsedArgument, format_help, parse_argument
 from .callables import AwaitCoroutine, RayAsyncActor, RayRemote, ShellActor
 from .constants import (
     ASYNC_NOOP,
@@ -15,21 +15,12 @@ from .data_structures import Bag, BidirectionalIndex
 from .dictionary import (
     DEFAULT_KEYERROR,
     ProxyDictionary,
+    findkey,
     get_or_default,
     get_or_raise,
     set_if_not_none,
 )
-from .names import (
-    ACTION,
-    DEFAULT,
-    HANDLERS,
-    LEVEL,
-    LOGGER,
-    MESSAGE,
-    PIPELINE_ARGUMENT_PARSER,
-    TYPE,
-    VALUE,
-)
+from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, TYPE, VALUE
 from .predicates import (
     AND,
     IS_CALLABLE,

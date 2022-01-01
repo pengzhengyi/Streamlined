@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from functools import cached_property
 from typing import Any, Dict
 
@@ -40,7 +41,7 @@ class Parser(AbstractParser):
         return
 
     def __init__(self, value: Any) -> None:
-        self.declaration = value
+        self.declaration = deepcopy(value)
         super().__init__()
         self.definition = self.parse(value)
         self._init_from_parsed(self.definition)

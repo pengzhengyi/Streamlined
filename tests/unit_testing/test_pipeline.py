@@ -1,4 +1,3 @@
-from argparse import ArgumentParser
 from unittest.mock import Mock
 
 import pytest
@@ -13,7 +12,6 @@ from streamlined.middlewares import (
     NAME,
     RUNSTAGES,
     RUNSTEPS,
-    SETUP,
     Context,
     Pipeline,
 )
@@ -42,13 +40,6 @@ async def test_pipeline_simple(simple_executor):
 
 @pytest.mark.asyncio
 async def test_pipeline_print_help(simple_executor):
-    context, scoping = Context.new(simple_executor)
-    mock = Mock()
-
-    def receive_help(_argument_parser_: ArgumentParser) -> None:
-        mock(helpstr := _argument_parser_.format_help())
-        assert "specify the number of processors" in helpstr
-
     pipeline = Pipeline(
         {
             ARGUMENTS: [
@@ -63,8 +54,7 @@ async def test_pipeline_print_help(simple_executor):
                     },
                 }
             ],
-            SETUP: receive_help,
         },
     )
-    scoped = await pipeline.apply_into(context)
-    mock.assert_called_once()
+    helpstr = pipeline.format_help()
+    assert "specify the number of processors" in helpstr

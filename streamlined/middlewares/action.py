@@ -1,5 +1,4 @@
 import sys
-from argparse import ArgumentParser
 from functools import partial
 from subprocess import DEVNULL, PIPE
 from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Type, Union
@@ -18,14 +17,15 @@ from ..common import (
     IS_NOT_LIST_OF_CALLABLE,
     IS_STR,
     IS_TYPE,
-    PIPELINE_ARGUMENT_PARSER,
+    TYPE,
     VALUE,
-    ArgparseResult,
+    ArgumentDefinition,
+    ParsedArgument,
     StdinStream,
     Stream,
     SubprocessResult,
     get_or_raise,
-    parse_known_args,
+    parse_argument,
 )
 from ..common import run as run_
 from ..parsing import Variant, WithVariants
@@ -226,12 +226,7 @@ def _ARGTYPE_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
     return IS_NOT_CALLABLE(argtype) or IS_TYPE(argtype)
 
 
-def _set_argparse_value(_scoped_: Scoped, _value_: ArgparseResult) -> Any:
-    try:
-        _argument_parser_: ArgumentParser = _scoped_.getmagic(PIPELINE_ARGUMENT_PARSER)
-        _argument_parser_.add_argument(*_value_.args, **_value_.kwargs)
-    except KeyError:
-        pass
+def _get_argparse_value(_value_: ParsedArgument) -> Any:
     return _value_.value
 
 
@@ -252,13 +247,13 @@ class Argparse(Variant):
                 Optional[str],
                 List[str],
             ],
-            ArgparseResult,
+            ParsedArgument,
         ]
     ] = FunctionMaker.create(
         f"parse(_{VALUE}0_: Union[str, List[str]], _{VALUE}1_: Optional[str], _{VALUE}2_: Optional[Union[str, int]], _{VALUE}3_: Optional[Any], _{VALUE}4_: Optional[Any], _{VALUE}5_: Optional[Type], _{VALUE}6_: Optional[Iterable[Any]], _{VALUE}7_: Optional[bool], _{VALUE}8_: Optional[str], _{VALUE}9_: Optional[str], _{VALUE}10_: Optional[str], _{VALUE}11_: List[str])",
-        f"return parse_known_args(_{VALUE}0_, _{VALUE}1_, _{VALUE}2_, _{VALUE}3_, _{VALUE}4_, _{VALUE}5_, _{VALUE}6_, _{VALUE}7_, _{VALUE}8_, _{VALUE}9_, _{VALUE}10_, _{VALUE}11_)",
+        f"return parse_argument(_{VALUE}0_, _{VALUE}1_, _{VALUE}2_, _{VALUE}3_, _{VALUE}4_, _{VALUE}5_, _{VALUE}6_, _{VALUE}7_, _{VALUE}8_, _{VALUE}9_, _{VALUE}10_, _{VALUE}11_)",
         dict(
-            parse_known_args=parse_known_args,
+            parse_argument=parse_argument,
             Union=Union,
             List=List,
             Optional=Optional,
@@ -268,6 +263,12 @@ class Argparse(Variant):
         ),
         addsource=True,
     )
+
+    @staticmethod
+    def to_argument_definition(value: Dict[str, Any]) -> ArgumentDefinition:
+        return ArgumentDefinition.of(
+            **{TYPE if k == ARGTYPE else k: v for k, v in value.items() if k != TYPE and k != ARGS}
+        )
 
     @staticmethod
     def get_keys() -> List[str]:
@@ -290,7 +291,7 @@ class Argparse(Variant):
     def reduce(cls, value: Any) -> Any:
         actions = [value[key] for key in cls.get_keys()]
         actions.append(cls.parse)
-        actions.append(_set_argparse_value)
+        actions.append(_get_argparse_value)
         return actions
 
     @classmethod

@@ -1,5 +1,7 @@
 from collections import UserDict
-from typing import Any, Dict, Mapping, Optional, TypeVar
+from typing import Any, Dict, Iterable, Mapping, Optional, TypeVar
+
+from .predicates import IS_DICT, IS_LIST_OF_DICT
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -54,6 +56,26 @@ class ProxyDictionary(UserDict):
             return super().__getitem__(key)
         except KeyError:
             return self.proxy[key]
+
+
+def findkey(dictionary: Dict[Any, Any], key: Any) -> Iterable[Any]:
+    """
+    Search for value(s) under given key in a dictionary.
+
+    The search will be recursive.
+
+    >>> list(findkey({'a': 1, 'b': [{'a': 3}, {'b': 4}, {'a': 7}]}, key='a'))
+    [1, 3, 7]
+    """
+    for k, v in dictionary.items():
+        if k == key:
+            yield v
+        else:
+            if IS_DICT(v):
+                yield from findkey(dictionary=v, key=key)
+            elif IS_LIST_OF_DICT(v):
+                for new_dict in v:
+                    yield from findkey(new_dict, key)
 
 
 if __name__ == "__main__":

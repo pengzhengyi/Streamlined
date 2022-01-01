@@ -36,7 +36,6 @@ from .middlewares import (
     RUNSTEPS,
     SETUP,
     SHELL,
-    SHOW_HELP_IF_REQUESTED,
     SKIP,
     STDERR,
     STDIN,
