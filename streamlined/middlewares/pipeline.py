@@ -102,3 +102,15 @@ class Pipeline(Middleware, WithMiddlewares):
 
 
 PIPELINE = Pipeline.get_name()
+
+
+def SHOW_HELP_IF_REQUESTED(_argument_parser_: ArgumentParser) -> None:
+    """
+    Parse sys.argv and print help message when there is `-h` or
+    `--help`.
+
+    This is suitable to be added after all arguments have been
+    specified, for example, `SETUP` of `PIPELINE` when all command
+    line arguments have been declared in `ARGUMENTS`.
+    """
+    _argument_parser_.parse_known_args()
