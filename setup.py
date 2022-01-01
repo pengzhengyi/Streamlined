@@ -21,6 +21,7 @@ setup(
         "decorator",
         "wrapt",
         "uuid",
+        "aiorun",
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",
