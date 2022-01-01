@@ -4,11 +4,12 @@ from typing import Any, Callable, Dict, List, Union
 from ..common import (
     AND,
     DEFAULT_KEYERROR,
+    IS_CALLABLE,
     IS_DICT,
     IS_LIST,
     IS_NOT_CALLABLE,
     IS_NOT_DICT,
-    IS_NOT_LIST_OF_DICT,
+    IS_NOT_LIST,
     VALUE,
     VOID,
 )
@@ -42,6 +43,10 @@ def _MISSING_RUNSTEP_ACTION(value: Dict[str, Any]) -> bool:
 def _TRANSFORM_WHEN_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:
     value[ACTION] = VOID
     return value
+
+
+def _TRANSFORM_WHEN_RUNSTEP_IS_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
+    return {ACTION: value}
 
 
 def _TRANSFORM_WHEN_MISSING_NAME(value: Dict[str, Any]) -> Dict[str, Any]:
@@ -87,6 +92,9 @@ class Runstep(Middleware, WithMiddlewares):
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
+        # `{RUNSTEP: <callable>}` -> `{RUNSTEP: {.., ACTION: <callable>}}`
+        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_RUNSTEP_IS_CALLABLE))
+
         # `{RUNSTEP: {...}}` -> `{RUNSTEP: {.., ACTION: VOID}}`
         self.simplifications.append(
             (AND(IS_DICT, _MISSING_RUNSTEP_ACTION), _TRANSFORM_WHEN_MISSING_ACTION)
@@ -113,12 +121,6 @@ def _TRANSFORM_WHEN_RUNSTEPS_IS_DICT(value: Dict[str, Any]) -> List[Dict[str, An
     return [value]
 
 
-def _TRANSFORM_WHEN_RUNSTEPS_IS_LIST_BUT_NOT_LIST_OF_DICT(
-    value: List[Any],
-) -> List[Dict[str, Any]]:
-    return [{RUNSTEP: runstep_value} for runstep_value in value]
-
-
 class Runsteps(Middleware, StackMiddleware):
     middlewares_generator: Action
 
@@ -126,22 +128,14 @@ class Runsteps(Middleware, StackMiddleware):
     def verify(cls, value: Any) -> None:
         super().verify(value)
 
-        if IS_NOT_LIST_OF_DICT(value) and IS_NOT_CALLABLE(value):
-            raise TypeError(f"{value} should be list of dict or a callable returning list of dict")
+        if IS_NOT_LIST(value) and IS_NOT_CALLABLE(value):
+            raise TypeError(f"{value} should be list or a callable returning a list")
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
 
         # `{RUNSTEPS: {...}}` -> `{RUNSTEPS: [{...}]}`
         self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_RUNSTEPS_IS_DICT))
-
-        # `{RUNSTEPS: [<any]}` -> `{RUNSTEPS: [{...}]}`
-        self.simplifications.append(
-            (
-                AND(IS_LIST, IS_NOT_LIST_OF_DICT),
-                _TRANSFORM_WHEN_RUNSTEPS_IS_LIST_BUT_NOT_LIST_OF_DICT,
-            )
-        )
 
     def _do_parse(
         self, value: Union[List[Dict[str, Any]], Callable[..., List[Dict[str, Any]]]]

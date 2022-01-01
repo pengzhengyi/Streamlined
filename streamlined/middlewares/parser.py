@@ -19,6 +19,7 @@ class Parser(AbstractParser):
     Standardization of data format should be specified in `_init_simplifications`.
     """
 
+    declaration: Any
     definition: Any
 
     @cached_property
@@ -36,12 +37,13 @@ class Parser(AbstractParser):
 
         Should return nothing but throw exception for illegal input format.
         """
-        pass
+        return
 
     def __init__(self, value: Any) -> None:
-        self.definition = value
+        self.declaration = value
         super().__init__()
-        self._init_from_parsed(self.parse(value))
+        self.definition = self.parse(value)
+        self._init_from_parsed(self.definition)
 
     def _init_from_parsed(self, parsed: Dict[str, Any]) -> None:
         for name, value in parsed.items():

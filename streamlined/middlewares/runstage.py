@@ -99,10 +99,10 @@ class Runstages(Runsteps):
     def _init_simplifications(self) -> None:
         Middleware._init_simplifications(self)
 
-        # `{RUNSTEPS: {...}}` -> `{RUNSTEPS: [{...}]}`
+        # `{RUNSTAGES: {...}}` -> `{RUNSTAGES: [{...}]}`
         self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_RUNSTAGES_IS_DICT))
 
-        # `{RUNSTEPS: [<any]}` -> `{RUNSTEPS: [{...}]}`
+        # `{RUNSTAGES: [<any]}` -> `{RUNSTAGES: [{RUNSTAGE: <any>}]}`
         self.simplifications.append(
             (
                 AND(IS_LIST, IS_NOT_LIST_OF_DICT),

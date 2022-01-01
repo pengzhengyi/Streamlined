@@ -18,7 +18,7 @@ class Parser(Simplification):
         return self._do_parse(simplified_value)
 
     @staticmethod
-    def parse_with(value: Any, parsers: Iterable[Type[Parser]]) -> Dict:
+    def parse_with(value: Any, parsers: Iterable[Type[Parser]]) -> Dict[str, Any]:
         """
         `parse_with` allows parsing using other Parser derived classes.
 
