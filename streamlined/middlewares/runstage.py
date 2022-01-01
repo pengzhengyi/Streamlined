@@ -1,13 +1,6 @@
 from typing import Any, Dict, List
 
-from ..common import (
-    AND,
-    DEFAULT_KEYERROR,
-    IS_DICT,
-    IS_LIST,
-    IS_NOT_DICT,
-    IS_NOT_LIST_OF_DICT,
-)
+from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT
 from ..services import Scoped
 from .argument import Arguments
 from .cleanup import Cleanup
@@ -17,7 +10,6 @@ from .name import NAME, Name
 from .runstep import (
     _MISSING_RUNSTEP_NAME,
     _TRANSFORM_WHEN_MISSING_NAME,
-    _TRANSFORM_WHEN_RUNSTEPS_IS_DICT,
     RUNSTEPS,
     Runsteps,
 )
@@ -86,29 +78,9 @@ class Runstage(Middleware, WithMiddlewares):
 
 RUNSTAGE = Runstage.get_name()
 
-_TRANSFORM_WHEN_RUNSTAGES_IS_DICT = _TRANSFORM_WHEN_RUNSTEPS_IS_DICT
-
-
-def _TRANSFORM_WHEN_RUNSTAGES_IS_LIST_BUT_NOT_LIST_OF_DICT(
-    value: List[Any],
-) -> List[Dict[str, Any]]:
-    return [{RUNSTAGE: runstep_value} for runstep_value in value]
-
 
 class Runstages(Runsteps):
-    def _init_simplifications(self) -> None:
-        Middleware._init_simplifications(self)
-
-        # `{RUNSTAGES: {...}}` -> `{RUNSTAGES: [{...}]}`
-        self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_RUNSTAGES_IS_DICT))
-
-        # `{RUNSTAGES: [<any]}` -> `{RUNSTAGES: [{RUNSTAGE: <any>}]}`
-        self.simplifications.append(
-            (
-                AND(IS_LIST, IS_NOT_LIST_OF_DICT),
-                _TRANSFORM_WHEN_RUNSTAGES_IS_LIST_BUT_NOT_LIST_OF_DICT,
-            )
-        )
+    pass
 
 
 RUNSTAGES = Runstages.get_name()
