@@ -19,7 +19,7 @@ from typing import (
     Union,
 )
 
-from ..common import ASYNC_NOOP, ASYNC_VOID, IS_ITERABLE, ProxyDictionary
+from ..common import ASYNC_NOOP, ASYNC_VOID, IS_DICT, IS_ITERABLE, ProxyDictionary
 from ..services import DependencyInjection, Scoped, Scoping
 from .parser import Parser
 
@@ -376,6 +376,16 @@ class StackMiddleware(WithMiddlewares):
     in same module name.
     """
 
+    @staticmethod
+    def _create_middleware(
+        middleware_name: str, middleware_type: Type[Middleware], value: Any
+    ) -> Middleware:
+        if IS_DICT(value) and len(value) == 1 and middleware_name in value:
+            config = value
+        else:
+            config = {middleware_name: value}
+        return middleware_type(config)
+
     @classmethod
     def _get_default_stacked_middleware_name(cls) -> str:
         self_name = cls.__name__
@@ -411,5 +421,4 @@ class StackMiddleware(WithMiddlewares):
             self.middleware_types, self.get_middleware_names()
         ):
             for argument_value in value:
-                new_value = {middleware_name: argument_value}
-                yield middleware_type(new_value)
+                yield self._create_middleware(middleware_name, middleware_type, argument_value)
