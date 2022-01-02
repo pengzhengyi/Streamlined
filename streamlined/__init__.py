@@ -1,3 +1,6 @@
+import resource
+import sys
+
 from .common import (
     ACTION,
     DEFAULT,
@@ -60,3 +63,6 @@ from .middlewares import (
     Validator,
 )
 from .services import Scoped, Scoping
+
+resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+sys.setrecursionlimit(10 ** 5)
