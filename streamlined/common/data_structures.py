@@ -4,12 +4,14 @@ from collections import UserDict, defaultdict
 from typing import (
     Callable,
     ClassVar,
+    Dict,
     Generic,
     Iterable,
     Mapping,
     Optional,
     Sequence,
     Set,
+    Type,
     TypeVar,
     Union,
 )
@@ -18,17 +20,19 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-class Bag(UserDict, Generic[K, V]):
+class Bag(UserDict[K, V], Generic[K, V]):
     """
     A bag is essentially a wrapper of `defaultdict(set)` with the following additional functionality:
 
     `self[key] = item` is equivalent to `self[key].add(item)`
     """
 
+    data: Dict[K, Set[V]]
+
     def __init__(self) -> None:
         self.data = defaultdict(set)
 
-    def bag(self) -> Mapping[K, Set[V]]:
+    def bag(self) -> Dict[K, Set[V]]:
         return self.data
 
     def __setitem__(self, key: K, item: V) -> None:
@@ -38,7 +42,7 @@ class Bag(UserDict, Generic[K, V]):
 IndexFactory = Callable[[], Mapping[K, Iterable[V]]]
 
 
-class BidirectionalIndex(UserDict, Generic[K, V]):
+class BidirectionalIndex(UserDict[K, V], Generic[K, V]):
     """
     BidirectionalIndex has two indexing system: forward index and inverted index.
 
@@ -54,21 +58,21 @@ class BidirectionalIndex(UserDict, Generic[K, V]):
     [Inverted Index](https://en.wikipedia.org/wiki/Inverted_index)
     """
 
-    DEFAULT_FORWARD_INDEX_FACTORY: ClassVar[IndexFactory] = Bag
-    DEFAULT_INVERTED_INDEX_FACTORY: ClassVar[IndexFactory] = Bag
+    DEFAULT_FORWARD_INDEX_FACTORY: ClassVar[Type[Bag]] = Bag
+    DEFAULT_INVERTED_INDEX_FACTORY: ClassVar[Type[Bag]] = Bag
 
     def __init__(
         self,
-        forward_index_factory: Optional[IndexFactory] = None,
-        inverted_index_factory: Optional[IndexFactory] = None,
+        forward_index_factory: Optional[IndexFactory[K, V]] = None,
+        inverted_index_factory: Optional[IndexFactory[V, K]] = None,
     ) -> None:
         self.__init_index(forward_index_factory, inverted_index_factory)
 
     def __init_index(
         self,
-        forward_index_factory: Optional[IndexFactory] = None,
-        inverted_index_factory: Optional[IndexFactory] = None,
-    ):
+        forward_index_factory: Optional[IndexFactory[K, V]] = None,
+        inverted_index_factory: Optional[IndexFactory[V, K]] = None,
+    ) -> None:
         if forward_index_factory is None:
             forward_index_factory = self.DEFAULT_FORWARD_INDEX_FACTORY
         if inverted_index_factory is None:

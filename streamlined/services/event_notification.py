@@ -19,7 +19,7 @@ class EventNotification(Service):
     ['Alice', 'Bob']
     """
 
-    listeners: List[Callable]
+    listeners: List[Callable[..., Any]]
 
     def __init__(
         self,
@@ -33,19 +33,19 @@ class EventNotification(Service):
         for listener in self.listeners:
             self.notify(listener, *args, **kwargs)
 
-    def __add__(self, other: Callable) -> EventNotification:
+    def __add__(self, other: Callable[..., Any]) -> EventNotification:
         return self.register(other)
 
-    def __iadd__(self, other: Callable) -> EventNotification:
+    def __iadd__(self, other: Callable[..., Any]) -> EventNotification:
         return self.__add__(other)
 
-    def __sub__(self, other: Callable) -> EventNotification:
+    def __sub__(self, other: Callable[..., Any]) -> EventNotification:
         return self.unregister(other)
 
-    def __isub__(self, other: Callable) -> EventNotification:
+    def __isub__(self, other: Callable[..., Any]) -> EventNotification:
         return self.__sub__(other)
 
-    def register(self, _callable: Callable) -> EventNotification:
+    def register(self, _callable: Callable[..., Any]) -> EventNotification:
         """
         Register an event listener.
 
@@ -54,7 +54,7 @@ class EventNotification(Service):
         self.listeners.append(_callable)
         return self
 
-    def unregister(self, _callable: Callable) -> EventNotification:
+    def unregister(self, _callable: Callable[..., Any]) -> EventNotification:
         """
         Unregister an event listener.
         """
@@ -62,7 +62,7 @@ class EventNotification(Service):
         return self
 
     @contextmanager
-    def registering(self, _callable: Callable):
+    def registering(self, _callable: Callable[..., Any]):
         """
         Create a context manager that registers the event listener at entering and unregisters at exiting.
         Register an event listener
@@ -73,7 +73,7 @@ class EventNotification(Service):
         finally:
             self.unregister(_callable)
 
-    def notify(self, listener: Callable, *args: Any, **kwargs: Any) -> None:
+    def notify(self, listener: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
         listener(*args, **kwargs)
 
 

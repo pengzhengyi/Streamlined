@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, ClassVar, Dict, Iterable, Mapping, Optional
+from typing import Any, Callable, ClassVar, Dict, Iterable, Optional
 
 from .service import Service
 
@@ -23,7 +23,7 @@ class DependencyTracking(Service):
     True
     """
 
-    REQUIREMENTS_FACTORY: ClassVar[Callable[[], Mapping]] = dict
+    REQUIREMENTS_FACTORY: ClassVar[Callable[[], Dict[DependencyTracking, bool]]] = dict
 
     _requirements: Dict[DependencyTracking, bool]
 
@@ -46,9 +46,9 @@ class DependencyTracking(Service):
         **kwargs: Any
     ):
         super().__init__(*args, **kwargs)
-        self.__init_requirements(prerequisites)
+        self._init_requirements(prerequisites)
 
-    def __init_requirements(self, prerequisites: Optional[Iterable[DependencyTracking]]) -> None:
+    def _init_requirements(self, prerequisites: Optional[Iterable[DependencyTracking]]) -> None:
         self._requirements = self.REQUIREMENTS_FACTORY()
 
         if prerequisites:

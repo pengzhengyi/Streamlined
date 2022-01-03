@@ -10,18 +10,18 @@ from ..services import DependencyTracking, EventNotification, Reaction, after, b
 class NotifyNewRequirement(Reaction):
     def when(
         self,
-        execution_requirements: ExecutionRequirements,
+        execution_requirements: Requirements,
         prerequisite: DependencyTracking,
         is_satisfied: bool,
-    ):
+    ) -> bool:
         return prerequisite not in execution_requirements
 
     def react(
         self,
-        execution_requirements: ExecutionRequirements,
+        execution_requirements: Requirements,
         prerequisite: DependencyTracking,
         is_satisfied: bool,
-    ):
+    ) -> None:
         execution_requirements.groups[execution_requirements.DEFAULT_GROUP] = prerequisite
         execution_requirements.on_new_requirement(prerequisite=prerequisite)
 
@@ -32,11 +32,11 @@ NOTIFY_NEW_REQUIREMENT = NotifyNewRequirement()
 class NotifyRequirementsSatisfied(Reaction):
     def when(
         self,
-        execution_requirements: ExecutionRequirements,
+        execution_requirements: Requirements,
         prerequisite: DependencyTracking,
         *args: Any,
         **kwargs: Any,
-    ):
+    ) -> bool:
         # since `is_satisfied` might be modified by condition, check directly
         if execution_requirements[prerequisite]:
             for group in execution_requirements.groups[prerequisite]:
@@ -47,21 +47,21 @@ class NotifyRequirementsSatisfied(Reaction):
 
     def react(
         self,
-        execution_requirements: ExecutionRequirements,
+        execution_requirements: Requirements,
         prerequisite: DependencyTracking,
         is_satisfied: bool,
         *args: Any,
         **kwargs: Any,
-    ):
-        execution_requirements.on_requirements_satisfied(prerequisite)
+    ) -> None:
+        execution_requirements.on_requirements_satisfied()
 
 
 NOTIFY_REQUIREMENTS_SATISFIED = NotifyRequirementsSatisfied()
 
 
-class ExecutionRequirements(OrderedDict):
+class Requirements(OrderedDict[DependencyTracking, bool]):
     """
-    ExecutionRequirements is used to model execution dependencies.
+    Requirements is used to model dependencies.
 
     Examples
     --------
@@ -141,24 +141,27 @@ class ExecutionRequirements(OrderedDict):
     DEFAULT_GROUP: ClassVar[str] = "__DEFAULT__"
 
     conditions: Dict[DependencyTracking, Callable[[], bool]]
-    groups: BidirectionalIndex
+    groups: BidirectionalIndex[DependencyTracking, bool]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.__init_events()
+        self._init_events()
+        self._init_conditions()
+        self._init_groups()
+
+    def _init_conditions(self) -> None:
         self.conditions = defaultdict(TAUTOLOGY_FACTORY)
+
+    def _init_groups(self) -> None:
         self.groups = BidirectionalIndex()
 
-    def __init_events(self):
+    def _init_events(self) -> None:
         self.on_new_requirement = EventNotification()
         self.on_requirements_satisfied = EventNotification()
 
-    def __getitem__(self, prerequisite: DependencyTracking) -> bool:
-        return super().__getitem__(prerequisite)
-
     @NOTIFY_NEW_REQUIREMENT.bind(at=before)
     @NOTIFY_REQUIREMENTS_SATISFIED.bind(at=after)
-    def __setitem__(self, prerequisite: DependencyTracking, is_satisfied: bool):
+    def __setitem__(self, prerequisite: DependencyTracking, is_satisfied: bool) -> None:
         if is_satisfied:
             is_satisfied = self.conditions[prerequisite]()
 
