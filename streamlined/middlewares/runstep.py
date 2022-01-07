@@ -1,31 +1,14 @@
 import uuid
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Dict, List
 
-from ..common import (
-    AND,
-    DEFAULT_KEYERROR,
-    IS_CALLABLE,
-    IS_DICT,
-    IS_LIST,
-    IS_NOT_CALLABLE,
-    IS_NOT_DICT,
-    IS_NOT_LIST,
-    VALUE,
-    VOID,
-)
+from ..common import AND, DEFAULT_KEYERROR, IS_CALLABLE, IS_DICT, IS_NOT_DICT, VOID
 from ..services import Scoped
 from .action import ACTION, Action
 from .argument import Arguments
 from .cleanup import Cleanup
 from .log import Log
-from .middleware import (
-    APPLY_INTO,
-    APPLY_ONTO,
-    Context,
-    Middleware,
-    StackMiddleware,
-    WithMiddlewares,
-)
+from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
+from .middlewares import StackedMiddlewares
 from .name import NAME, Name
 from .setup import Setup
 from .skip import Skip
@@ -117,45 +100,8 @@ class Runstep(Middleware, WithMiddlewares):
 RUNSTEP = Runstep.get_name()
 
 
-def _TRANSFORM_WHEN_RUNSTEPS_IS_DICT(value: Dict[str, Any]) -> List[Dict[str, Any]]:
-    return [value]
-
-
-class Runsteps(Middleware, StackMiddleware):
-    middlewares_generator: Action
-
-    @classmethod
-    def verify(cls, value: Any) -> None:
-        super().verify(value)
-
-        if IS_NOT_LIST(value) and IS_NOT_CALLABLE(value):
-            raise TypeError(f"{value} should be list or a callable returning a list")
-
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
-
-        # `{RUNSTEPS: {...}}` -> `{RUNSTEPS: [{...}]}`
-        self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_RUNSTEPS_IS_DICT))
-
-    def _do_parse(
-        self, value: Union[List[Dict[str, Any]], Callable[..., List[Dict[str, Any]]]]
-    ) -> Dict[str, Any]:
-        self.verify(value)
-        if IS_LIST(value):
-            return {"middlewares": list(self.create_middlewares_from(value))}
-        else:
-            # generate runsteps dynamically
-            action = Action({ACTION: value})
-            return {"middlewares_generator": action}
-
-    async def _do_apply(self, context: Context) -> Scoped:
-        if hasattr(self, "middlewares_generator"):
-            scoped = await self.middlewares_generator.apply_onto(context.replace_with_void_next())
-            runsteps: List[Dict[str, Any]] = scoped.getmagic(VALUE)
-            self.middlewares = list(self.create_middlewares_from(runsteps))
-
-        coroutine = StackMiddleware.apply_onto(self, context)
-        return await coroutine()
+class Runsteps(StackedMiddlewares):
+    pass
 
 
 RUNSTEPS = Runsteps.get_name()

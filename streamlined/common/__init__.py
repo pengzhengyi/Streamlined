@@ -1,4 +1,9 @@
-from .argparse import ArgumentDefinition, ParsedArgument, format_help, parse_argument
+from .argument_parsing import (
+    ArgumentDefinition,
+    ParsedArgument,
+    format_help,
+    parse_argument,
+)
 from .callables import AwaitCoroutine, RayAsyncActor, RayRemote, ShellActor
 from .constants import (
     ASYNC_NOOP,
@@ -15,6 +20,7 @@ from .data_structures import Bag, BidirectionalIndex
 from .dictionary import (
     DEFAULT_KEYERROR,
     ProxyDictionary,
+    chained_get,
     findkey,
     get_or_default,
     get_or_raise,

@@ -1,5 +1,5 @@
 from collections import UserDict
-from typing import Any, Dict, Iterable, Mapping, Optional, TypeVar
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple, TypeVar
 
 from .predicates import IS_DICT, IS_LIST_OF_DICT
 
@@ -76,6 +76,29 @@ def findkey(dictionary: Dict[Any, Any], key: Any) -> Iterable[Any]:
             elif IS_LIST_OF_DICT(v):
                 for new_dict in v:
                     yield from findkey(new_dict, key)
+
+
+def chained_get(
+    dictionary: Dict[K, V], *keys: K, criterion: Callable[[V], bool] = bool, default: Any = None
+) -> Optional[Tuple[K, V]]:
+    """
+    Try getting with each key until one value is found
+    matching provided criterion, return that key value pair
+    in this case. If no such key is found, return the default
+    value if provided.
+
+    >>> d = {'a': 10, 'c': -1}
+    >>> chained_get(d, 'b', 'c', 'a', criterion=lambda v: v > 0)
+    ('a', 10)
+    """
+    for key in keys:
+        try:
+            value = dictionary[key]
+            if criterion(value):
+                return (key, value)
+        except KeyError:
+            continue
+    return default
 
 
 if __name__ == "__main__":

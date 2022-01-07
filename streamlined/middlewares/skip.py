@@ -89,7 +89,7 @@ class Skip(Middleware):
             (AND(IS_DICT, _VALUE_NOT_CALLABLE), _TRANSFORM_WHEN_VALUE_NOT_CALLABLE)
         )
 
-    def _do_parse(self, value):
+    def _do_parse(self, value: Dict[str, Any]) -> Dict[str, Middleware]:
         self.verify(value)
 
         return {"_should_skip": Action({ACTION: value[VALUE]}), "_when_skip": Action(value)}
@@ -104,7 +104,7 @@ class Skip(Middleware):
         scoped: Scoped = await Middleware.apply_into(self._when_skip, context)
         return scoped.getmagic(VALUE)
 
-    async def _do_apply(self, context: Context):
+    async def _do_apply(self, context: Context) -> Scoped:
         if await self.should_skip(context.replace_with_void_next()):
             await self.when_skip(context.replace_with_void_next())
         else:

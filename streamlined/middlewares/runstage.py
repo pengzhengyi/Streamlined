@@ -6,6 +6,7 @@ from .argument import Arguments
 from .cleanup import Cleanup
 from .log import Log
 from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
+from .middlewares import StackedMiddlewares
 from .name import NAME, Name
 from .runstep import (
     _MISSING_RUNSTEP_NAME,
@@ -79,7 +80,7 @@ class Runstage(Middleware, WithMiddlewares):
 RUNSTAGE = Runstage.get_name()
 
 
-class Runstages(Runsteps):
+class Runstages(StackedMiddlewares):
     pass
 
 

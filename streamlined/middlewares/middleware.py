@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import importlib
 import itertools
 from dataclasses import dataclass, replace
 from typing import (
@@ -97,7 +96,6 @@ class Context:
 APPLY_INTO = "apply_into"
 APPLY_ONTO = "apply_onto"
 APPLY_METHOD = Union[APPLY_INTO, APPLY_ONTO]
-APPLY_METHODS = Union[APPLY_METHOD, Iterable[APPLY_METHOD]]
 
 
 class AbstractMiddleware:
@@ -169,7 +167,16 @@ class AbstractMiddleware:
 
 
 class Middleware(Parser, AbstractMiddleware):
-    pass
+    @classmethod
+    def of(cls, value: Any, name: Optional[str] = None) -> AbstractMiddleware:
+        if name is None:
+            name = cls.get_name()
+
+        if IS_DICT(value) and len(value) == 1 and name in value:
+            config = value
+        else:
+            config = {name: value}
+        return cls(config)
 
 
 @dataclass
@@ -214,7 +221,10 @@ class Middlewares:
 
     @classmethod
     def apply_middlewares(
-        cls, context: Context, middlewares: Iterable[Middleware], apply_methods: APPLY_METHODS
+        cls,
+        context: Context,
+        middlewares: Iterable[Middleware],
+        apply_methods: Union[APPLY_METHOD, Iterable[APPLY_METHOD]],
     ) -> ScopedNext:
         if IS_ITERABLE(middlewares):
             middlewares = iter(middlewares)
@@ -283,7 +293,9 @@ class Middlewares:
         """
         return self.apply_middlewares_onto(context, self.middlewares)
 
-    def apply(self, context: Context, apply_methods: APPLY_METHODS) -> ScopedNext:
+    def apply(
+        self, context: Context, apply_methods: Union[APPLY_METHOD, Iterable[APPLY_METHOD]]
+    ) -> ScopedNext:
         """
         Transform the registered middlewares to a coroutine function.
 
@@ -311,22 +323,25 @@ class WithMiddlewares(Middlewares):
         """
         Get apply methods for registered middlewares.
         """
-        if not self.middleware_apply_methods:
-            return itertools.repeat(APPLY_INTO)
-        elif isinstance(self.middleware_apply_methods, str):
-            return itertools.repeat(self.middleware_apply_methods)
-
         try:
-            middleware_iter = iter(self.middlewares)
-            middleware = next(middleware_iter)
-            for middleware_type, middleware_apply_method in zip(
-                self.middleware_types, self.middleware_apply_methods
-            ):
-                if isinstance(middleware, middleware_type):
-                    yield middleware_apply_method
-                    middleware = next(middleware_iter)
-        except StopIteration:
-            return
+            middleware_apply_methods = self.middleware_apply_methods
+        except AttributeError:
+            middleware_apply_methods = APPLY_INTO
+
+        if isinstance(middleware_apply_methods, str):
+            yield from itertools.repeat(middleware_apply_methods)
+        else:
+            try:
+                middleware_iter = iter(self.middlewares)
+                middleware = next(middleware_iter)
+                for middleware_type, middleware_apply_method in zip(
+                    self.middleware_types, middleware_apply_methods
+                ):
+                    if isinstance(middleware, middleware_type):
+                        yield middleware_apply_method
+                        middleware = next(middleware_iter)
+            except StopIteration:
+                return
 
     def __init__(self) -> None:
         super().__init__()
@@ -358,67 +373,3 @@ class WithMiddlewares(Middlewares):
 
     def apply(self, context: Context) -> ScopedNext:
         return super().apply(context, self.apply_methods)
-
-
-class StackMiddleware(WithMiddlewares):
-    """
-    StackMiddleware means middleware of same type is stacked --
-    multiple instances of this middleware type is initialized.
-
-    The value to parse should be a list of dictionary where each
-    dictionary is parseable by that middleware type.
-
-    At its application, the initialized instances will be applied in list order.
-
-    When `_init_stacked_middleware_type` is not overridden, the
-    default typename will be current class name without ending 's'
-    and type will be resolved dynamically by looking at class defined
-    in same module name.
-    """
-
-    @staticmethod
-    def _create_middleware(
-        middleware_name: str, middleware_type: Type[Middleware], value: Any
-    ) -> Middleware:
-        if IS_DICT(value) and len(value) == 1 and middleware_name in value:
-            config = value
-        else:
-            config = {middleware_name: value}
-        return middleware_type(config)
-
-    @classmethod
-    def _get_default_stacked_middleware_name(cls) -> str:
-        self_name = cls.__name__
-
-        if self_name.endswith("s"):
-            return self_name[:-1]
-
-        raise ValueError("Cannot infer middleware name to stack")
-
-    def __init__(self) -> None:
-        self._init_stacked_middleware_type()
-        super().__init__()
-
-    def _init_stacked_middleware_type(self) -> None:
-        self._stacked_middleware_typename = self._get_default_stacked_middleware_name()
-
-        self._stacked_middleware_type = self._convert_middleware_typename_to_type(
-            self._stacked_middleware_typename
-        )
-
-    def _convert_middleware_typename_to_type(self, name: str) -> Type[Middleware]:
-        current_module_path = __name__
-        parent_module_path = current_module_path[: current_module_path.rindex(".")]
-        module = importlib.import_module(f".{name.lower()}", parent_module_path)
-        return getattr(module, name)
-
-    def _init_middleware_types(self) -> None:
-        super()._init_middleware_types()
-        self.middleware_types.append(self._stacked_middleware_type)
-
-    def create_middlewares_from(self, value: List[Dict[str, Any]]) -> Iterable[Middleware]:
-        for middleware_type, middleware_name in zip(
-            self.middleware_types, self.get_middleware_names()
-        ):
-            for argument_value in value:
-                yield self._create_middleware(middleware_name, middleware_type, argument_value)

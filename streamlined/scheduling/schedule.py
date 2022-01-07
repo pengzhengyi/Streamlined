@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from asyncio import Queue as AsyncQueue
+from asyncio.queues import QueueEmpty
+from asyncio.tasks import FIRST_COMPLETED, Task
 from contextlib import contextmanager
 from functools import partial
 from typing import (
@@ -9,16 +12,23 @@ from typing import (
     Awaitable,
     Callable,
     ClassVar,
+    Dict,
     Iterable,
+    List,
     Optional,
+    Set,
     Type,
+    TypeVar,
 )
 
 import networkx as nx
+from networkx.classes.digraph import DiGraph
 from ray.util.queue import Queue
 
 from ..services import EventNotification
 from .unit import Unit
+
+T = TypeVar("T")
 
 
 @contextmanager
@@ -32,7 +42,7 @@ def closing(thing: Any) -> Any:
             return
 
 
-class Scheduling:
+class Schedule:
     """
     Scheduling can be seen as a Graph of Unit.
 
@@ -53,6 +63,8 @@ class Scheduling:
 
     _ATTRIBUTE_NAME_FOR_SOURCE: ClassVar[str] = "source"
     _ATTRIBUTE_NAME_FOR_SINK: ClassVar[str] = "sink"
+
+    graph: DiGraph
 
     @property
     def _source(self) -> Unit:
@@ -77,18 +89,24 @@ class Scheduling:
         self._init_events()
         self._init_graph()
 
-    def __add__(self, other: Any) -> Scheduling:
+    def __add__(self, other: Any) -> Schedule:
         if not isinstance(other, Unit):
             other = Unit(other)
 
         self.push(other)
         return self
 
-    def __iadd__(self, other: Any) -> Scheduling:
+    def __iadd__(self, other: Any) -> Schedule:
         return self.__add__(other)
 
     def __iter__(self) -> Iterable[Unit]:
         yield from self.walk()
+
+    def __getstate__(self) -> DiGraph:
+        return self.graph
+
+    def __setstate__(self, state: DiGraph) -> None:
+        self.graph = state
 
     async def __aiter__(self) -> AsyncIterable[Unit]:
         async for unit in self.walk_async():
@@ -236,6 +254,60 @@ class Scheduling:
                 with self.on_complete.registering(queue_task_done):
                     while (unit := await dequeue()) != self._sink:
                         yield unit
+
+    async def walk_greedy(self) -> AsyncIterable[List[Unit]]:
+        """
+        Different from `walk_async`, `walk_greedy` will return all
+        units available for execution at each yield.
+
+        While yielding control, the caller should be responsible for
+        `notify` the schedule about completed units.
+
+        When no units are available, `walk_greedy` will yield empty list.
+        """
+        queue: AsyncQueue[Unit] = AsyncQueue()
+
+        def queue_task_done(*args: Any, **kwargs: Any) -> None:
+            queue.task_done()
+
+        with closing(queue):
+            with self.on_requirements_satisfied.registering(queue.put_nowait):
+                self.notify(self._source)
+
+                with self.on_complete.registering(queue_task_done):
+                    while True:
+                        units: List[Unit] = []
+                        try:
+                            while True:
+                                unit = queue.get_nowait()
+                                if unit == self._sink:
+                                    return
+                                units.append(unit)
+                        except QueueEmpty:
+                            yield units
+
+    async def work_greedy(self, task_generator: Callable[[Unit], Task[T]]) -> AsyncIterable[T]:
+        """
+        Similar to `walk_greedy`, `work_greedy` will put all
+        available tasks (generated from units) to work and
+        yield once a result is ready.
+        """
+        task_to_unit: Dict[Task[T]] = dict()
+        done: Set[Task[T]] = set()
+        ongoing: Set[Task[T]] = set()
+
+        async for units in self.walk_greedy():
+            for unit in units:
+                task = task_generator(unit)
+                task_to_unit[task] = unit
+                ongoing.add(task)
+
+            if ongoing:
+                done_tasks, ongoing = await asyncio.wait(ongoing, return_when=FIRST_COMPLETED)
+                for done_task in done_tasks:
+                    done.add(done_task)
+                    yield done_task.result()
+                    self.notify(task_to_unit[done_task])
 
 
 if __name__ == "__main__":

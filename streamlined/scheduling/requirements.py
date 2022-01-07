@@ -1,25 +1,28 @@
 from __future__ import annotations
 
 from collections import OrderedDict, defaultdict
-from typing import Any, Callable, ClassVar, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, ClassVar, Dict, Generic, Iterable, Optional, TypeVar
 
 from ..common import TAUTOLOGY_FACTORY, BidirectionalIndex
-from ..services import DependencyTracking, EventNotification, Reaction, after, before
+from ..services import EventNotification, Reaction, after, before
+
+T = TypeVar("T")
 
 
 class NotifyNewRequirement(Reaction):
     def when(
         self,
-        execution_requirements: Requirements,
-        prerequisite: DependencyTracking,
+        execution_requirements: Requirements[T],
+        prerequisite: T,
         is_satisfied: bool,
     ) -> bool:
         return prerequisite not in execution_requirements
 
     def react(
         self,
-        execution_requirements: Requirements,
-        prerequisite: DependencyTracking,
+        execution_requirements: Requirements[T],
+        prerequisite: T,
         is_satisfied: bool,
     ) -> None:
         execution_requirements.groups[execution_requirements.DEFAULT_GROUP] = prerequisite
@@ -32,8 +35,8 @@ NOTIFY_NEW_REQUIREMENT = NotifyNewRequirement()
 class NotifyRequirementsSatisfied(Reaction):
     def when(
         self,
-        execution_requirements: Requirements,
-        prerequisite: DependencyTracking,
+        execution_requirements: Requirements[T],
+        prerequisite: T,
         *args: Any,
         **kwargs: Any,
     ) -> bool:
@@ -47,8 +50,8 @@ class NotifyRequirementsSatisfied(Reaction):
 
     def react(
         self,
-        execution_requirements: Requirements,
-        prerequisite: DependencyTracking,
+        execution_requirements: Requirements[T],
+        prerequisite: T,
         is_satisfied: bool,
         *args: Any,
         **kwargs: Any,
@@ -59,7 +62,25 @@ class NotifyRequirementsSatisfied(Reaction):
 NOTIFY_REQUIREMENTS_SATISFIED = NotifyRequirementsSatisfied()
 
 
-class Requirements(OrderedDict[DependencyTracking, bool]):
+@dataclass
+class Prerequisite(Generic[T]):
+    prerequisite: T
+    condition: Optional[Callable[[], bool]] = None
+    group: Any = None
+
+
+@dataclass
+class Dependency(Generic[T]):
+    prerequisite: T
+    dependent: T
+    condition: Optional[Callable[[], bool]] = None
+    group: Any = None
+
+    def to_prerequisite(self) -> Prerequisite[T]:
+        return Prerequisite(self.prerequisite, self.condition, self.group)
+
+
+class Requirements(Generic[T], OrderedDict[T, bool]):
     """
     Requirements is used to model dependencies.
 
@@ -77,13 +98,13 @@ class Requirements(OrderedDict[DependencyTracking, bool]):
     ```
     reqs_for_x = ExecutionRequirements()
     reqs_for_x[y] = False
-    reqs_for_x.conditions[y] = version > Vy
+    reqs_for_x.conditions[y] = version ≥ Vy
     reqs_for_x[z] = False
-    reqs_for_x.conditions[z] = version > Vz
+    reqs_for_x.conditions[z] = version ≥ Vz
     ```
 
     This can become more complicated when there are different set of
-    prerequisite that satisfy the requirements. For example, `x` can be
+    prerequisite that satisfy the requirements. For example, `x` can also be
     installed when `α` has version at least `Vα`.
 
     y ─── version ≥ Vy ──┬── x
@@ -140,8 +161,16 @@ class Requirements(OrderedDict[DependencyTracking, bool]):
 
     DEFAULT_GROUP: ClassVar[str] = "__DEFAULT__"
 
-    conditions: Dict[DependencyTracking, Callable[[], bool]]
-    groups: BidirectionalIndex[DependencyTracking, bool]
+    conditions: Dict[T, Callable[[], bool]]
+    groups: BidirectionalIndex[Any, T]
+
+    @property
+    def prerequisites(self) -> Iterable[Prerequisite[T]]:
+        for prerequisite in self:
+            condition = self.conditions[prerequisite]
+            groups = self.groups[prerequisite]
+            for group in groups:
+                yield Prerequisite(prerequisite, condition, group)
 
     def __init__(self) -> None:
         super().__init__()
@@ -161,7 +190,7 @@ class Requirements(OrderedDict[DependencyTracking, bool]):
 
     @NOTIFY_NEW_REQUIREMENT.bind(at=before)
     @NOTIFY_REQUIREMENTS_SATISFIED.bind(at=after)
-    def __setitem__(self, prerequisite: DependencyTracking, is_satisfied: bool) -> None:
+    def __setitem__(self, prerequisite: T, is_satisfied: bool) -> None:
         if is_satisfied:
             is_satisfied = self.conditions[prerequisite]()
 

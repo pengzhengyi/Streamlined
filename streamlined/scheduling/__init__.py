@@ -1,3 +1,3 @@
-from .requirements import Requirements
-from .scheduling import Scheduling
+from .requirements import Dependency, Prerequisite, Requirements
+from .schedule import Schedule
 from .unit import Unit

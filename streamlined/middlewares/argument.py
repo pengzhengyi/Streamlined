@@ -1,20 +1,14 @@
 from dataclasses import replace
 from functools import partial
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable
 
-from ..common import DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT, IS_NOT_LIST_OF_DICT, VALUE
+from ..common import DEFAULT_KEYERROR, IS_NOT_DICT, VALUE
 from ..services import Scoped
 from .action import Action
 from .cleanup import Cleanup
 from .log import Log
-from .middleware import (
-    APPLY_INTO,
-    APPLY_ONTO,
-    Context,
-    Middleware,
-    StackMiddleware,
-    WithMiddlewares,
-)
+from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
+from .middlewares import StackedMiddlewares
 from .name import NAME, Name
 from .validator import Validator
 
@@ -83,31 +77,8 @@ class Argument(Middleware, WithMiddlewares):
 ARGUMENT = Argument.get_name()
 
 
-def _TRANSFORM_WHEN_ARGUMENTS_IS_DICT(value: Dict[str, Any]) -> List[Dict[str, Any]]:
-    return [value]
-
-
-class Arguments(Middleware, StackMiddleware):
-    @classmethod
-    def verify(cls, value: Any) -> None:
-        super().verify(value)
-
-        if IS_NOT_LIST_OF_DICT(value):
-            raise TypeError(f"{value} should be list of dict")
-
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
-
-        # `{ARGUMENTS: {...}}` -> `{ARGUMENTS: [{...}]}`
-        self.simplifications.append((IS_DICT, _TRANSFORM_WHEN_ARGUMENTS_IS_DICT))
-
-    def _do_parse(self, value: Any) -> Dict[str, Any]:
-        self.verify(value)
-        return {"middlewares": list(self.create_middlewares_from(value))}
-
-    async def _do_apply(self, context: Context) -> Scoped:
-        coroutine = StackMiddleware.apply_onto(self, context)
-        return await coroutine()
+class Arguments(StackedMiddlewares):
+    pass
 
 
 ARGUMENTS = Arguments.get_name()

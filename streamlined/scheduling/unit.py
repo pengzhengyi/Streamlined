@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Callable, ClassVar, Iterable, Optional, Type, Union
 
 from ..services import DependencyTracking, EventNotification
-from .requirements import Requirements
+from .requirements import Dependency, Requirements
 
 Predicate = Callable[[], bool]
 
@@ -13,13 +13,20 @@ class Unit(DependencyTracking):
     Provides EventNotification when all prerequisites are satisfied and when execution completed.
     """
 
-    REQUIREMENTS_FACTORY: ClassVar[Type[Requirements]] = Requirements
-    _requirements: Requirements
+    REQUIREMENTS_FACTORY: ClassVar[Type[Requirements[Unit]]] = Requirements
+    _requirements: Requirements[Unit]
     value: Any
 
     @classmethod
     def empty(cls) -> Unit:
         return cls(None)
+
+    @property
+    def dependencies(self) -> Iterable[Dependency[Unit]]:
+        for prerequisite in self._requirements.prerequisites:
+            yield Dependency(
+                prerequisite.prerequisite, self, prerequisite.condition, prerequisite.condition
+            )
 
     def __init__(self, value: Any):
         super().__init__()
@@ -27,6 +34,9 @@ class Unit(DependencyTracking):
 
     def __repr__(self) -> str:
         return f"Unit({repr(self.value)})"
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.value, name)
 
     def require(
         self,

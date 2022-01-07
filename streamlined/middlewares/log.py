@@ -125,7 +125,7 @@ class Log(Middleware):
         if _MISSING_MESSAGE(value):
             raise DEFAULT_KEYERROR(value, MESSAGE)
 
-    def _do_parse(self, value: Dict[str, Any]) -> Dict:
+    def _do_parse(self, value: Dict[str, Any]) -> Dict[str, Middleware]:
         self.verify(value)
 
         parsed = dict()
