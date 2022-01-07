@@ -20,7 +20,7 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-class Bag(UserDict[K, V], Generic[K, V]):
+class Bag(UserDict, Generic[K, V]):
     """
     A bag is essentially a wrapper of `defaultdict(set)` with the following additional functionality:
 
@@ -42,7 +42,7 @@ class Bag(UserDict[K, V], Generic[K, V]):
 IndexFactory = Callable[[], Mapping[K, Iterable[V]]]
 
 
-class BidirectionalIndex(UserDict[K, V], Generic[K, V]):
+class BidirectionalIndex(UserDict, Generic[K, V]):
     """
     BidirectionalIndex has two indexing system: forward index and inverted index.
 

@@ -80,7 +80,7 @@ class Dependency(Generic[T]):
         return Prerequisite(self.prerequisite, self.condition, self.group)
 
 
-class Requirements(Generic[T], OrderedDict[T, bool]):
+class Requirements(Generic[T], OrderedDict):
     """
     Requirements is used to model dependencies.
 
