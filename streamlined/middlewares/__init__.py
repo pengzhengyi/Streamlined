@@ -22,7 +22,13 @@ from .argument import ARGUMENT, ARGUMENTS, Argument, Arguments
 from .cleanup import CLEANUP, Cleanup
 from .log import LOG, Log
 from .middleware import Context, Middleware, Middlewares
-from .middlewares import ScheduledMiddlewares, StackedMiddlewares
+from .middlewares import (
+    PARALLEL,
+    SCHEDULING,
+    SEQUENTIAL,
+    ScheduledMiddlewares,
+    StackedMiddlewares,
+)
 from .name import NAME, Name
 from .pipeline import PIPELINE, Pipeline
 from .runstage import RUNSTAGE, RUNSTAGES, Runstage, Runstages
