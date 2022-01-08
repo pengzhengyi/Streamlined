@@ -1,10 +1,8 @@
-from dataclasses import replace
-from functools import partial
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Tuple
 
 from ..common import DEFAULT_KEYERROR, IS_NOT_DICT, VALUE
 from ..services import Scoped
-from .action import Action
+from .action import AbstractAction, Action
 from .cleanup import Cleanup
 from .log import Log
 from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
@@ -21,15 +19,27 @@ def _MISSING_ARGUMENT_VALUE(value: Dict[str, Any]) -> bool:
     return VALUE not in value
 
 
+def _set_argument_value(_scoped_: Scoped) -> Tuple[Any, Any]:
+    name = _scoped_.getmagic("name")
+    value = _scoped_.getmagic("value")
+    _scoped_.set(name, value, 2)
+    return (name, value)
+
+
+class SetArgument(AbstractAction):
+    def parse(self, value: Any) -> Dict[str, Any]:
+        return super().parse(value)
+
+
 class Argument(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
-        self.middleware_types.extend([Name, Validator, Action, Log, Cleanup])
+        self.middleware_types.extend([Name, Validator, Action, SetArgument, Log, Cleanup])
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
-            [APPLY_ONTO, APPLY_ONTO, APPLY_INTO, APPLY_ONTO, APPLY_ONTO]
+            [APPLY_ONTO, APPLY_ONTO, APPLY_INTO, APPLY_ONTO, APPLY_ONTO, APPLY_ONTO]
         )
 
     def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:
@@ -38,6 +48,9 @@ class Argument(Middleware, WithMiddlewares):
         ):
             if middleware_type is Action:
                 new_value = {middleware_name: value[VALUE]}
+                yield middleware_type(new_value)
+            elif middleware_type is SetArgument:
+                new_value = {middleware_name: _set_argument_value}
                 yield middleware_type(new_value)
             elif middleware_name in value:
                 yield middleware_type(value)
@@ -59,15 +72,8 @@ class Argument(Middleware, WithMiddlewares):
         self.verify(value)
         return {"middlewares": list(self.create_middlewares_from(value))}
 
-    async def _set_value(self, scoped: Scoped) -> Scoped:
-        name = scoped.getmagic("name")
-        value = scoped.getmagic("value")
-        scoped.set(name, value, 1)
-        return scoped
-
     async def _do_apply(self, context: Context) -> Scoped:
-        next_function = partial(self._set_value, scoped=context.scoped)
-        coroutine = WithMiddlewares.apply(self, replace(context, next=next_function))
+        coroutine = WithMiddlewares.apply(self, context.replace_with_void_next())
         await coroutine()
 
         await context.next()

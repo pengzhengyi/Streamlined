@@ -58,8 +58,8 @@ class BidirectionalIndex(UserDict, Generic[K, V]):
     [Inverted Index](https://en.wikipedia.org/wiki/Inverted_index)
     """
 
-    DEFAULT_FORWARD_INDEX_FACTORY: ClassVar[Type[Bag]] = Bag
-    DEFAULT_INVERTED_INDEX_FACTORY: ClassVar[Type[Bag]] = Bag
+    DEFAULT_FORWARD_INDEX_FACTORY: ClassVar[Type[Bag[K, V]]] = Bag
+    DEFAULT_INVERTED_INDEX_FACTORY: ClassVar[Type[Bag[K, V]]] = Bag
 
     def __init__(
         self,

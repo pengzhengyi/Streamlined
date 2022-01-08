@@ -337,7 +337,7 @@ class ScheduledMiddlewares(Middleware, WithMiddlewares):
     async def _do_apply(self, context: Context) -> Scoped:
         await self._init_schedule(context)
 
-        def create_task(unit: Unit) -> Task[Scoped]:
+        def create_task(unit: Unit) -> "Task[Scoped]":
             return asyncio.create_task(
                 Middleware.apply(
                     unit.middleware,

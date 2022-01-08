@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Dict, Generic, Iterable, Optional, TypeVar
+from typing import Any, Callable, ClassVar, Dict, Generic, Iterable, Optional
+from typing import OrderedDict as TOrderedDict
+from typing import TypeVar
 
 from ..common import TAUTOLOGY_FACTORY, BidirectionalIndex
 from ..services import EventNotification, Reaction, after, before
@@ -80,7 +82,7 @@ class Dependency(Generic[T]):
         return Prerequisite(self.prerequisite, self.condition, self.group)
 
 
-class Requirements(Generic[T], OrderedDict):
+class Requirements(Generic[T], TOrderedDict[T, bool]):
     """
     Requirements is used to model dependencies.
 

@@ -22,6 +22,8 @@ setup(
         "wrapt",
         "uuid",
         "aiorun",
+        "uvloop",
+        "aiofile",
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",

@@ -1,6 +1,9 @@
 import resource
 import sys
 
+import nest_asyncio
+import uvloop
+
 from .common import (
     ACTION,
     DEFAULT,
@@ -69,3 +72,8 @@ from .services import Scoped, Scoping
 
 resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
 sys.setrecursionlimit(10 ** 5)
+
+# Patching asyncio
+nest_asyncio.apply()
+
+uvloop.install()

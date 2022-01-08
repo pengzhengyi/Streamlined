@@ -1,3 +1,4 @@
+aiofile
 aiorun
 bandit
 black
@@ -16,4 +17,5 @@ ray[default]
 treelib
 types-requests
 uuid
+uvloop
 wrapt

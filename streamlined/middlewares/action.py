@@ -334,7 +334,7 @@ def _TRANSFORM_WHEN_NOT_LIST(value: Callable[..., Any]) -> List[Callable[..., An
     return [value]
 
 
-class Action(WithVariants, Middleware):
+class AbstractAction(Middleware):
     actions: List[Callable[..., Any]]
 
     @classmethod
@@ -343,11 +343,6 @@ class Action(WithVariants, Middleware):
 
         if IS_NOT_LIST_OF_CALLABLE(value):
             raise TypeError(f"{value} should be a callable or a list of callable")
-
-    def _init_variants(self) -> None:
-        super()._init_variants()
-
-        self.variants.extend([Shell(), Argparse()])
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
@@ -371,6 +366,13 @@ class Action(WithVariants, Middleware):
 
         await context.next()
         return context.scoped
+
+
+class Action(AbstractAction, WithVariants):
+    def _init_variants(self) -> None:
+        super()._init_variants()
+
+        self.variants.extend([Shell(), Argparse()])
 
 
 ACTION = Action.get_name()

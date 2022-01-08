@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import Any, Awaitable, Dict, Optional
+from typing import Any, Dict
 
 from ..common import (
     AND,
@@ -160,7 +160,7 @@ class Log(Middleware):
         context.scoped.setmagic(MESSAGE, message)
         return message
 
-    async def _do_apply(self, context: Context) -> Awaitable[Optional[Scoped]]:
+    async def _do_apply(self, context: Context) -> Scoped:
         message = await self.get_message(context)
 
         level = await self.get_log_level(context)
