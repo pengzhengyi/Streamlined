@@ -24,6 +24,7 @@ setup(
         "aiorun",
         "uvloop",
         "aiofile",
+        "aiofiles",
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",

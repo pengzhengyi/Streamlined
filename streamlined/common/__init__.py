@@ -56,5 +56,5 @@ from .predicates import (
     Predicate,
 )
 from .subprocess import StdinStream, Stream, SubprocessResult, run
-from .transforms import IDENTITY_FACTORY, Transform
+from .transforms import IDENTITY, IDENTITY_FACTORY, Transform
 from .tree import update

@@ -218,12 +218,12 @@ SOURCE_DIR_ARGUMENT: Dict[str, Any] = {
 }
 
 
-def report_source_filesize_output_filepath(_value_: str) -> str:
-    return f"源文件大小报告将保存在{_value_}"
+def report_source_filesize_output_filepath(source_filesize_output_filepath: str) -> str:
+    return f"源文件大小报告将保存在{source_filesize_output_filepath}"
 
 
-def report_source_filehash_output_filepath(_value_: str) -> str:
-    return f"源文件md5报告将保存在{_value_}"
+def report_source_filehash_output_filepath(source_filehash_output_filepath: str) -> str:
+    return f"源文件md5报告将保存在{source_filehash_output_filepath}"
 
 
 WRITE_SOURCE_FILESIZES_ARGUMENT: Dict[str, Any] = {
@@ -289,12 +289,12 @@ TARGET_DIR_ARGUMENT: Dict[str, Any] = {
 }
 
 
-def report_target_filesize_output_filepath(_value_: str) -> str:
-    return f"目标文件大小报告将保存在{_value_}"
+def report_target_filesize_output_filepath(target_filesize_output_filepath: str) -> str:
+    return f"目标文件大小报告将保存在{target_filesize_output_filepath}"
 
 
-def report_target_filehash_output_filepath(_value_: str) -> str:
-    return f"目标文件md5报告将保存在{_value_}"
+def report_target_filehash_output_filepath(target_filehash_output_filepath: str) -> str:
+    return f"目标文件md5报告将保存在{target_filehash_output_filepath}"
 
 
 WRITE_TARGET_FILESIZES_ARGUMENT: Dict[str, Any] = {
@@ -333,8 +333,8 @@ class Operation(str, Enum):
 ALL_OPERATIONS = Operation.get_all_operations()
 
 
-def report_operations(_value_: List[str]) -> str:
-    return f'将执行操作包括「{", ".join(_value_)}」'
+def report_operations(operations: List[str]) -> str:
+    return f'将执行操作包括「{", ".join(operations)}」'
 
 
 OPERATION_ARGUMENT: Dict[str, Any] = {
@@ -358,15 +358,15 @@ def should_get_source_filehashes(operations: List[str], source_dir: str) -> bool
     return bool(source_dir) and Operation.Checksum in operations
 
 
-def report_get_source_filesizes(_value_: bool) -> str:
-    if _value_:
+def report_get_source_filesizes(get_source_filesizes: bool) -> str:
+    if get_source_filesizes:
         return "会统计源文件夹文件大小"
     else:
         return "不会统计源文件夹文件大小"
 
 
-def report_get_source_filehashes(_value_: bool) -> str:
-    if _value_:
+def report_get_source_filehashes(get_source_filehashes: bool) -> str:
+    if get_source_filehashes:
         return "会统计源文件夹文件md5"
     else:
         return "不会统计源文件夹文件md5"
@@ -393,15 +393,15 @@ def should_get_target_filehashes(operations: List[str], target_dir: str) -> bool
     return bool(target_dir) and Operation.Checksum in operations
 
 
-def report_get_target_filesizes(_value_: bool) -> str:
-    if _value_:
+def report_get_target_filesizes(get_target_filesizes: bool) -> str:
+    if get_target_filesizes:
         return "会统计目标文件夹文件大小"
     else:
         return "不会统计目标文件夹文件大小"
 
 
-def report_get_target_filehashes(_value_: bool) -> str:
-    if _value_:
+def report_get_target_filehashes(get_target_filehashes: bool) -> str:
+    if get_target_filehashes:
         return "会统计目标文件夹文件md5"
     else:
         return "不会统计目标文件夹文件md5"

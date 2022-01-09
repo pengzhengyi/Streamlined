@@ -26,3 +26,11 @@ async def md5(filepath: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> str:
             file_hash.update(chunk)
 
     return file_hash.hexdigest()
+
+
+async def copy(source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> int:
+    bytes_count = 0
+    async with async_open(source, "rb") as reader, async_open(dest, "rb") as writer:
+        async for chunk in reader.iter_chunked(chunk_size):
+            bytes_count += await writer.write(chunk)
+    return bytes_count
