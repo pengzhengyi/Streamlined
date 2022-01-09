@@ -56,6 +56,22 @@ async def test_argument_argparse(simple_executor):
 
 
 @pytest.mark.asyncio
+async def test_argument_argparse_parsed_argument_not_present(simple_executor):
+
+    context, scoping = Context.new(simple_executor)
+    argument = Argument(
+        {
+            ARGUMENT: {
+                NAME: "num_processors",
+                VALUE: {TYPE: ARGPARSE, NAME: "-p", ARGTYPE: int, ARGS: ["--foo"]},
+            }
+        }
+    )
+    scoped = await argument.apply_into(context)
+    assert scoped.get("num_processors") is None
+
+
+@pytest.mark.asyncio
 async def test_arguments_set_in_scope(simple_executor):
     context, scoping = Context.new(simple_executor)
     arguments = Arguments(
