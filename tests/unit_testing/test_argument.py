@@ -11,6 +11,7 @@ from streamlined.middlewares import (
     ARGUMENTS,
     CLEANUP,
     NAME,
+    SKIP,
     Argument,
     Arguments,
     Context,
@@ -23,6 +24,16 @@ async def test_argument_set_in_scope(simple_executor):
     argument = Argument({ARGUMENT: {NAME: "first_name", VALUE: "Alice"}})
     scoped = await argument.apply_into(context)
     assert scoped["first_name"] == "Alice"
+
+
+@pytest.mark.asyncio
+async def test_argument_skip(simple_executor):
+    context, scoping = Context.new(simple_executor)
+    argument = Argument({ARGUMENT: {NAME: "first_name", VALUE: "Alice", SKIP: True}})
+    scoped = await argument.apply_into(context)
+
+    with pytest.raises(KeyError):
+        scoped["first_name"]
 
 
 @pytest.mark.asyncio

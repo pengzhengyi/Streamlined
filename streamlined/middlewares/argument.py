@@ -8,6 +8,7 @@ from .log import Log
 from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlewares
 from .middlewares import StackedMiddlewares
 from .name import NAME, Name
+from .skip import Skip
 from .validator import Validator
 
 
@@ -34,12 +35,12 @@ class SetArgument(AbstractAction):
 class Argument(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
-        self.middleware_types.extend([Name, Validator, Action, SetArgument, Log, Cleanup])
+        self.middleware_types.extend([Name, Skip, Validator, Action, SetArgument, Log, Cleanup])
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
-            [APPLY_ONTO, APPLY_ONTO, APPLY_INTO, APPLY_ONTO, APPLY_ONTO, APPLY_ONTO]
+            [APPLY_ONTO, APPLY_ONTO, APPLY_ONTO, APPLY_INTO, APPLY_ONTO, APPLY_ONTO, APPLY_ONTO]
         )
 
     def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:
