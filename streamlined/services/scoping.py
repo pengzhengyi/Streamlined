@@ -19,7 +19,7 @@ def to_magic_naming(name: str) -> str:
     return f"_{name}_"
 
 
-class Scope(UserDict[str, Any]):
+class Scope(UserDict):
     """
     Scope stores mappings from name to value.
     """

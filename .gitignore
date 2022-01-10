@@ -132,4 +132,4 @@ dmypy.json
 coverages/
 
 # Hide some samples
-samples/hidden/
+**/samples/hidden/
