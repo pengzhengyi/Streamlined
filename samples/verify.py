@@ -55,7 +55,7 @@ from streamlined import (
     Scoped,
     SimpleExecutor,
 )
-from streamlined.utils import getsize, md5, walk
+from streamlined.utils import crash, getsize, md5, walk
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -197,10 +197,6 @@ class FileHashReport(AbstractReport[str, str]):
 # Common
 
 
-def crash(reason: Union[str, int] = 1) -> None:
-    sys.exit(reason)
-
-
 # Arguments
 
 
@@ -274,7 +270,7 @@ def create_help_for_dir(logname: str) -> str:
     return f"请提供操作的{logname}文件夹"
 
 
-SOURCE_DIR_ARGUMENT: Dict[str, Any] = {
+SOURCE_DIR_ARGUMENT = {
     NAME: "source_dir",
     VALUE: {TYPE: ARGPARSE, NAME: ["--src"], HELP: create_help_for_dir(SOURCE_LOGNAME)},
     VALIDATOR: {
@@ -337,7 +333,7 @@ def crash_when_filehash_filepath_is_dir(logname: str) -> None:
     crash(reason)
 
 
-SOURCE_FILESIZE_FILEPATH_ARGUMENT: Dict[str, Any] = {
+SOURCE_FILESIZE_FILEPATH_ARGUMENT = {
     NAME: SOURCE_FILESIZE_FILEPATH,
     VALUE: {
         TYPE: ARGPARSE,
@@ -395,7 +391,7 @@ def is_source_filehash_filepath_not_dir(source_filehash_filepath: str) -> bool:
     return is_not_dir(source_filehash_filepath)
 
 
-SOURCE_FILEHASH_FILEPATH_ARGUMENT: Dict[str, Any] = {
+SOURCE_FILEHASH_FILEPATH_ARGUMENT = {
     NAME: SOURCE_FILEHASH_FILEPATH,
     VALUE: {
         TYPE: ARGPARSE,
@@ -447,7 +443,7 @@ def report_nonexisting_target_dir(target_dir: str) -> str:
     return report_nonexisting_dirpath(target_dir, TARGET_LOGNAME)
 
 
-TARGET_DIR_ARGUMENT: Dict[str, Any] = {
+TARGET_DIR_ARGUMENT = {
     NAME: TARGET_DIR,
     VALUE: {TYPE: ARGPARSE, NAME: ["--target"], HELP: create_help_for_dir(TARGET_LOGNAME)},
     VALIDATOR: {
@@ -863,13 +859,6 @@ def create_runstages(
     return runstages
 
 
-def PRINT_HELP_IF_REQUESTED(pipeline: Pipeline) -> None:
-    args = sys.argv
-    if "-h" in args or "--help" in args:
-        pipeline.print_help()
-        sys.exit(0)
-
-
 PIPELINE = {
     ARGUMENTS: [
         SOURCE_DIR_ARGUMENT,
@@ -893,7 +882,7 @@ async def main() -> None:
 
     pipeline = Pipeline(PIPELINE)
 
-    PRINT_HELP_IF_REQUESTED(pipeline)
+    pipeline.print_help()
     scoped = await pipeline.apply_into(context)
 
     # Display scoping tree

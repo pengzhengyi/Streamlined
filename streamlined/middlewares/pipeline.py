@@ -1,5 +1,6 @@
+import sys
 from argparse import ArgumentParser
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from ..common import (
     AND,
@@ -25,6 +26,11 @@ from .skip import Skip
 from .validator import Validator
 
 _MISSING_PIPELINE_NAME = _MISSING_RUNSTEP_NAME
+
+
+def _HELP_ARG_SPECIFIED() -> bool:
+    args = sys.argv
+    return "-h" in args or "--help" in args
 
 
 class Pipeline(Middleware, WithMiddlewares):
@@ -98,9 +104,13 @@ class Pipeline(Middleware, WithMiddlewares):
         return format_help(argument_parser, arguments)
 
     def print_help(
-        self, argument_parser: Optional[Union[ArgumentParser, Dict[str, Any]]] = None
+        self,
+        argument_parser: Optional[Union[ArgumentParser, Dict[str, Any]]] = None,
+        condition: Callable[[], bool] = _HELP_ARG_SPECIFIED,
     ) -> None:
-        print(self.format_help(argument_parser))
+        if condition():
+            print(self.format_help(argument_parser))
+            sys.exit(0)
 
 
 PIPELINE = Pipeline.get_name()
