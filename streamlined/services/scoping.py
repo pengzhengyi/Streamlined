@@ -19,7 +19,7 @@ def to_magic_naming(name: str) -> str:
     return f"_{name}_"
 
 
-class Scope(UserDict):
+class Scope(UserDict[str, Any]):
     """
     Scope stores mappings from name to value.
     """
@@ -134,7 +134,7 @@ class Scoping:
     def _get_node(self, scope: Scope) -> Node:
         return self._tree[scope]
 
-    def get(self, name: Any, scope: Scope):
+    def get(self, name: Any, scope: Scope) -> Any:
         for scope in self.enclosing_scopes(scope):
             try:
                 return scope[name]

@@ -30,7 +30,7 @@ class ArgumentDefinition:
         nargs: Optional[Union[str, int]] = None,
         const: Optional[Any] = None,
         default: Optional[Any] = None,
-        type: Optional[Type] = str,
+        type: Optional[Type[Any]] = str,
         choices: Optional[Iterable[Any]] = None,
         required: Optional[bool] = None,
         help: Optional[str] = None,
@@ -63,7 +63,7 @@ def parse_argument(
     nargs: Optional[Union[str, int]] = None,
     const: Optional[Any] = None,
     default: Optional[Any] = None,
-    type: Optional[Type] = str,
+    type: Optional[Type[Any]] = str,
     choices: Optional[Iterable[Any]] = None,
     required: Optional[bool] = None,
     help: Optional[str] = None,
@@ -71,6 +71,7 @@ def parse_argument(
     dest: Optional[str] = None,
     args: List[str] = sys.argv,
     add_help: bool = False,
+    allow_abbrev: bool = False,
 ) -> ParsedArgument:
     """
     Combine `add_argument` and `parse_known_args` from argparse.
@@ -81,9 +82,13 @@ def parse_argument(
         Whether help argument will be parsed. Default to False to
         avoid influencing causing system exit and interrupting
         partial parsing. This should be the expected argument.
+    allow_abbrev: bool
+        Normally, when you pass an argument list to the parse_args() method of an ArgumentParser, it recognizes abbreviations of long options.
+
+        This feature can be disabled by setting allow_abbrev to False.
     """
 
-    parser = ArgumentParser(add_help=add_help)
+    parser = ArgumentParser(add_help=add_help, allow_abbrev=allow_abbrev)
     argument_definition = ArgumentDefinition.of(
         name, action, nargs, const, default, type, choices, required, help, metavar, dest
     )

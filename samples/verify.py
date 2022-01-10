@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 from enum import Enum, auto
+from functools import partial
 from pathlib import Path
 from typing import (
     Any,
@@ -19,6 +20,7 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    MutableMapping,
     Optional,
     Tuple,
     TypeVar,
@@ -39,6 +41,7 @@ from streamlined import (
     MESSAGE,
     NAME,
     PARALLEL,
+    REQUIRED,
     RUNSTAGES,
     RUNSTEP,
     RUNSTEPS,
@@ -64,7 +67,14 @@ HAS_TARGET_DIR = "has_target_dir"
 SOURCE_FILEPATHS = "source_filepaths"
 TARGET_FILEPATHS = "target_filepaths"
 SOURCE_FILESIZE_FILEPATH = "source_filesize_filepath"
+SOURCE_FILEHASH_FILEPATH = "source_filehash_filepath"
 TARGET_FILESIZE_FILEPATH = "target_filesize_filepath"
+TARGET_FILEHASH_FILEPATH = "target_filehash_filepath"
+SOURCE_FILESIZE_REPORT = "source_filesize_report"
+SOURCE_FILEHASH_REPORT = "source_filehash_report"
+TARGET_FILESIZE_REPORT = "target_filesize_report"
+TARGET_FILEHASH_REPORT = "target_filehash_report"
+
 
 SOURCE_DIR = "source_dir"
 TARGET_DIR = "target_dir"
@@ -113,6 +123,12 @@ class AbstractReport(Generic[K, V], Mapping[K, V]):
     def __setitem__(self, key: K, value: V) -> None:
         self.report[key] = value
 
+    def __len__(self) -> int:
+        return len(self.report)
+
+    def __iter__(self):
+        yield from self.report.items()
+
     def __str__(self) -> str:
         return "\n".join(":".join(str(part) for part in line) for line in self.to_list())
 
@@ -134,6 +150,9 @@ class AbstractReport(Generic[K, V], Mapping[K, V]):
                 writer.writerow({self.KEY_NAME: key, self.VALUE_NAME: value})
 
     def load(self, filepath: str, key_first: bool = True) -> None:
+        if not os.path.isfile(filepath):
+            raise FileNotFoundError(f"cannot find project to load {filepath}")
+
         if key_first:
             fieldnames = self.FIELD_NAMES
         else:
@@ -175,11 +194,14 @@ class FileHashReport(AbstractReport[str, str]):
         return FILEHASH
 
 
-# Arguments
+# Common
 
 
 def crash(reason: Union[str, int] = 1) -> None:
     sys.exit(reason)
+
+
+# Arguments
 
 
 class ReportCreationType(Enum):
@@ -203,7 +225,7 @@ def is_dir(dirpath: Optional[str]) -> bool:
 
 
 def check_and_set_dir_exists(
-    dirpath: Optional[str], name: str, dictionary: Dict[str, Any]
+    dirpath: Optional[str], name: str, dictionary: MutableMapping[str, Any]
 ) -> bool:
     dir_exists = is_dir(dirpath)
     dictionary[name] = dir_exists
@@ -220,7 +242,7 @@ def listfiles(directory: Path) -> Iterable[str]:
             yield str(filepath)
 
 
-def set_dirfiles(dirpath: str, name: str, dictionary: Dict[str, Any]) -> List[str]:
+def set_dirfiles(dirpath: str, name: str, dictionary: MutableMapping[str, Any]) -> List[str]:
     filepaths = list(listfiles(Path(dirpath)))
     dictionary[name] = filepaths
     return filepaths
@@ -254,7 +276,7 @@ def create_help_for_dir(logname: str) -> str:
 
 SOURCE_DIR_ARGUMENT: Dict[str, Any] = {
     NAME: "source_dir",
-    VALUE: {TYPE: ARGPARSE, NAME: ["-s", "--src"], HELP: create_help_for_dir(SOURCE_LOGNAME)},
+    VALUE: {TYPE: ARGPARSE, NAME: ["--src"], HELP: create_help_for_dir(SOURCE_LOGNAME)},
     VALIDATOR: {
         VALIDATOR_AFTER_STAGE: {
             ACTION: check_source_dir_exists,
@@ -295,14 +317,47 @@ def create_help_for_filesize_filepath(dirname: str, logname: str) -> str:
     return f"请提供{logname}文件大小报告储存位置。当提供{dirname}时，报告会被写入此位置；当{dirname}未提供时，报告会从此位置读取。"
 
 
+def is_not_dir(filepath: str) -> bool:
+    if not filepath:
+        return True
+    return not os.path.isdir(filepath)
+
+
+def is_source_filesize_filepath_not_dir(source_filesize_filepath: str) -> bool:
+    return is_not_dir(source_filesize_filepath)
+
+
+def crash_when_filesize_filepath_is_dir(logname: str) -> None:
+    reason = f"{logname}文件大小报告储存位置不应该为文件夹"
+    crash(reason)
+
+
+def crash_when_filehash_filepath_is_dir(logname: str) -> None:
+    reason = f"{logname}文件md5报告储存位置不应该为文件夹"
+    crash(reason)
+
+
 SOURCE_FILESIZE_FILEPATH_ARGUMENT: Dict[str, Any] = {
     NAME: SOURCE_FILESIZE_FILEPATH,
     VALUE: {
         TYPE: ARGPARSE,
-        NAME: ["-ss", "--source-filesize"],
+        NAME: ["--ss", "--source-filesize"],
         HELP: create_help_for_filesize_filepath(SOURCE_DIR, SOURCE_LOGNAME),
     },
-    LOG: {LEVEL: logging.INFO, MESSAGE: report_source_filesize_filepath},
+    VALIDATOR: {
+        VALIDATOR_AFTER_STAGE: {
+            ACTION: is_source_filesize_filepath_not_dir,
+            HANDLERS: {
+                True: {
+                    LOG: {
+                        LEVEL: logging.INFO,
+                        MESSAGE: report_source_filesize_filepath,
+                    },
+                },
+                False: {ACTION: partial(crash_when_filesize_filepath_is_dir, SOURCE_LOGNAME)},
+            },
+        }
+    },
 }
 
 
@@ -336,14 +391,31 @@ def create_help_for_filehash_filepath(dirname: str, logname: str) -> str:
     return f"请提供{logname}文件md5报告储存位置。当提供{dirname}时，报告会被写入此位置；当{dirname}未提供时，报告会从此位置读取。"
 
 
+def is_source_filehash_filepath_not_dir(source_filehash_filepath: str) -> bool:
+    return is_not_dir(source_filehash_filepath)
+
+
 SOURCE_FILEHASH_FILEPATH_ARGUMENT: Dict[str, Any] = {
-    NAME: "source_filehash_filepath",
+    NAME: SOURCE_FILEHASH_FILEPATH,
     VALUE: {
         TYPE: ARGPARSE,
-        NAME: ["-sh", "--source-filehash"],
+        NAME: ["--sh", "--source-filehash"],
         HELP: create_help_for_filehash_filepath(SOURCE_DIR, SOURCE_LOGNAME),
     },
-    LOG: {LEVEL: logging.INFO, MESSAGE: report_source_filehash_filepath},
+    VALIDATOR: {
+        VALIDATOR_AFTER_STAGE: {
+            ACTION: is_source_filehash_filepath_not_dir,
+            HANDLERS: {
+                True: {
+                    LOG: {
+                        LEVEL: logging.INFO,
+                        MESSAGE: report_source_filehash_filepath,
+                    },
+                },
+                False: {ACTION: partial(crash_when_filehash_filepath_is_dir, SOURCE_LOGNAME)},
+            },
+        }
+    },
 }
 
 
@@ -372,12 +444,12 @@ def report_target_dir(target_dir: str) -> str:
 
 
 def report_nonexisting_target_dir(target_dir: str) -> str:
-    return report_nonexisting_dirpath(target_dir, SOURCE_LOGNAME)
+    return report_nonexisting_dirpath(target_dir, TARGET_LOGNAME)
 
 
 TARGET_DIR_ARGUMENT: Dict[str, Any] = {
-    NAME: "target_dir",
-    VALUE: {TYPE: ARGPARSE, NAME: ["-t", "--target"], HELP: create_help_for_dir(TARGET_LOGNAME)},
+    NAME: TARGET_DIR,
+    VALUE: {TYPE: ARGPARSE, NAME: ["--target"], HELP: create_help_for_dir(TARGET_LOGNAME)},
     VALIDATOR: {
         VALIDATOR_AFTER_STAGE: {
             ACTION: check_target_dir_exists,
@@ -399,21 +471,38 @@ def report_target_filesize_filepath(has_target_dir: bool, target_filesize_filepa
     return report_filesize_filepath(has_target_dir, target_filesize_filepath, TARGET_LOGNAME)
 
 
+def is_target_filesize_filepath_not_dir(target_filesize_filepath: str) -> bool:
+    return is_not_dir(target_filesize_filepath)
+
+
 TARGET_FILESIZE_FILEPATH_ARGUMENT: Dict[str, Any] = {
-    NAME: "target_filesize_filepath",
+    NAME: TARGET_FILESIZE_FILEPATH,
     VALUE: {
         TYPE: ARGPARSE,
-        NAME: ["-ts", "--target-filesize"],
+        NAME: ["--ts", "--target-filesize"],
         HELP: create_help_for_filesize_filepath(TARGET_DIR, TARGET_LOGNAME),
     },
-    LOG: {LEVEL: logging.INFO, MESSAGE: report_target_filesize_filepath},
+    VALIDATOR: {
+        VALIDATOR_AFTER_STAGE: {
+            ACTION: is_target_filesize_filepath_not_dir,
+            HANDLERS: {
+                True: {
+                    LOG: {
+                        LEVEL: logging.INFO,
+                        MESSAGE: report_target_filesize_filepath,
+                    },
+                },
+                False: {ACTION: partial(crash_when_filesize_filepath_is_dir, TARGET_LOGNAME)},
+            },
+        }
+    },
 }
 
 
 def determine_target_filesize_report_type(
-    has_source_dir: bool, target_filesize_report_type: str
+    has_target_dir: bool, target_filesize_filepath: str
 ) -> ReportCreationType:
-    return ReportCreationType.determine_report_type(has_source_dir, target_filesize_report_type)
+    return ReportCreationType.determine_report_type(has_target_dir, target_filesize_filepath)
 
 
 TARGET_FILESIZE_REPORT_TYPE: Dict[str, Any] = {
@@ -426,21 +515,38 @@ def report_target_filehash_filepath(has_target_dir: bool, target_filehash_filepa
     return report_filehash_filepath(has_target_dir, target_filehash_filepath, TARGET_LOGNAME)
 
 
+def is_target_filehash_filepath_not_dir(target_filehash_filepath: str) -> bool:
+    return is_not_dir(target_filehash_filepath)
+
+
 TARGET_FILEHASH_FILEPATH_ARGUMENT: Dict[str, Any] = {
-    NAME: "target_filehash_filepath",
+    NAME: TARGET_FILEHASH_FILEPATH,
     VALUE: {
         TYPE: ARGPARSE,
-        NAME: ["-th", "--target-filehash"],
+        NAME: ["--th", "--target-filehash"],
         HELP: create_help_for_filehash_filepath(TARGET_DIR, TARGET_LOGNAME),
     },
-    LOG: {LEVEL: logging.INFO, MESSAGE: report_target_filehash_filepath},
+    VALIDATOR: {
+        VALIDATOR_AFTER_STAGE: {
+            ACTION: is_target_filehash_filepath_not_dir,
+            HANDLERS: {
+                True: {
+                    LOG: {
+                        LEVEL: logging.INFO,
+                        MESSAGE: report_target_filehash_filepath,
+                    },
+                },
+                False: {ACTION: partial(crash_when_filehash_filepath_is_dir, TARGET_LOGNAME)},
+            },
+        }
+    },
 }
 
 
 def determine_target_filehash_report_type(
-    has_source_dir: bool, target_filehash_report_type: str
+    has_target_dir: bool, target_filehash_filepath: str
 ) -> ReportCreationType:
-    return ReportCreationType.determine_report_type(has_source_dir, target_filehash_report_type)
+    return ReportCreationType.determine_report_type(has_target_dir, target_filehash_filepath)
 
 
 TARGET_FILEHASH_REPORT_TYPE: Dict[str, Any] = {
@@ -473,7 +579,8 @@ OPERATION_ARGUMENT: Dict[str, Any] = {
     NAME: "operations",
     VALUE: {
         TYPE: ARGPARSE,
-        NAME: ["-op", "--operation"],
+        NAME: ["--op", "--operation"],
+        REQUIRED: True,
         ACTION: "append",
         CHOICES: ALL_OPERATIONS,
         HELP: "对源文件夹与目标文件夹的操作",
@@ -545,21 +652,51 @@ def log_filehash_report(filehash_report: FileHashReport) -> str:
     return log_report(filehash_report)
 
 
+def save_report(
+    report: AbstractReport[K, V],
+    filepath: Optional[str],
+    dictionary: MutableMapping[str, Any],
+    keyname: str,
+    key_first: bool = False,
+) -> None:
+    if filepath is not None:
+        report.write(filepath, key_first=key_first)
+    dictionary[keyname] = report
+
+
+def load_report(
+    report: AbstractReport[K, V],
+    filepath: str,
+    dictionary: MutableMapping[str, Any],
+    keyname: str,
+    key_first: bool = False,
+) -> AbstractReport[K, V]:
+    report.load(filepath, key_first=key_first)
+    dictionary[keyname] = report
+    return report
+
+
 def get_source_filepaths(source_filepaths: List[str]) -> List[str]:
     return source_filepaths
 
 
 def save_source_filesize_report(
-    _scoped_: Scoped, filesize_report: FileSizeReport, source_filesize_filepath: str
+    _scoped_: Scoped, filesize_report: FileSizeReport, source_filesize_filepath: Optional[str]
 ) -> None:
-    filesize_report.write(source_filesize_filepath)
-    _scoped_.global_scope["source_filesize_report"] = filesize_report
+    return save_report(
+        filesize_report, source_filesize_filepath, _scoped_.global_scope, SOURCE_FILESIZE_REPORT
+    )
 
 
-def read_source_filesize_report(_scoped_: Scoped, source_filesize_filepath: str) -> FileSizeReport:
-    source_filesize_report = FileSizeReport.load(source_filesize_filepath)
-    _scoped_.global_scope["source_filesize_report"] = source_filesize_report
-    return source_filesize_report
+def load_source_filesize_report(
+    _scoped_: Scoped, source_filesize_filepath: str
+) -> AbstractReport[str, int]:
+    return load_report(
+        FileSizeReport.empty(),
+        source_filesize_filepath,
+        _scoped_.global_scope,
+        SOURCE_FILESIZE_REPORT,
+    )
 
 
 GENERATE_SOURCE_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
@@ -574,15 +711,16 @@ GENERATE_SOURCE_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
 }
 
 LOAD_SOURCE_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: read_source_filesize_report}]
+    RUNSTEPS: [{ACTION: load_source_filesize_report}]
 }
 
 
 def save_source_filehash_report(
-    _scoped_: Scoped, filehash_report: FileHashReport, source_filehash_filepath: str
+    _scoped_: Scoped, filehash_report: FileHashReport, source_filehash_filepath: Optional[str]
 ) -> None:
-    filehash_report.write(source_filehash_filepath)
-    _scoped_.global_scope["source_filehash_report"] = filehash_report
+    return save_report(
+        filehash_report, source_filehash_filepath, _scoped_.global_scope, SOURCE_FILEHASH_REPORT
+    )
 
 
 GENERATE_SOURCE_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
@@ -597,14 +735,19 @@ GENERATE_SOURCE_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
 }
 
 
-def read_source_filehash_report(_scoped_: Scoped, source_filehash_filepath: str) -> FileHashReport:
-    source_filehash_report = FileHashReport.load(source_filehash_filepath)
-    _scoped_.global_scope["source_filehash_report"] = source_filehash_report
-    return source_filehash_report
+def load_source_filehash_report(
+    _scoped_: Scoped, source_filehash_filepath: str
+) -> AbstractReport[str, str]:
+    return load_report(
+        FileHashReport.empty(),
+        source_filehash_filepath,
+        _scoped_.global_scope,
+        SOURCE_FILEHASH_REPORT,
+    )
 
 
 LOAD_SOURCE_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: read_source_filehash_report}]
+    RUNSTEPS: [{ACTION: load_source_filehash_report}]
 }
 
 
@@ -613,10 +756,11 @@ def get_target_filepaths(target_filepaths: List[str]) -> List[str]:
 
 
 def save_target_filesize_report(
-    _scoped_: Scoped, filesize_report: FileSizeReport, target_filesize_filepath: str
+    _scoped_: Scoped, filesize_report: FileSizeReport, target_filesize_filepath: Optional[str]
 ) -> None:
-    filesize_report.write(target_filesize_filepath)
-    _scoped_.global_scope["target_filesize_report"] = filesize_report
+    return save_report(
+        filesize_report, target_filesize_filepath, _scoped_.global_scope, TARGET_FILESIZE_REPORT
+    )
 
 
 GENERATE_TARGET_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
@@ -631,22 +775,28 @@ GENERATE_TARGET_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
 }
 
 
-def read_target_filesize_report(_scoped_: Scoped, target_filesize_filepath: str) -> FileSizeReport:
-    target_filesize_report = FileSizeReport.load(target_filesize_filepath)
-    _scoped_.global_scope["target_filesize_report"] = target_filesize_report
-    return target_filesize_report
+def load_target_filesize_report(
+    _scoped_: Scoped, target_filesize_filepath: str
+) -> AbstractReport[str, int]:
+    return load_report(
+        FileSizeReport.empty(),
+        target_filesize_filepath,
+        _scoped_.global_scope,
+        SOURCE_FILESIZE_REPORT,
+    )
 
 
 LOAD_TARGET_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: read_target_filesize_report}]
+    RUNSTEPS: [{ACTION: load_target_filesize_report}]
 }
 
 
 def save_target_filehash_report(
-    _scoped_: Scoped, filehash_report: FileHashReport, target_filehash_filepath: str
+    _scoped_: Scoped, filehash_report: FileHashReport, target_filehash_filepath: Optional[str]
 ) -> None:
-    filehash_report.write(target_filehash_filepath)
-    _scoped_.global_scope["target_filehash_report"] = filehash_report
+    return save_report(
+        filehash_report, target_filehash_filepath, _scoped_.global_scope, TARGET_FILEHASH_REPORT
+    )
 
 
 GENERATE_TARGET_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
@@ -661,14 +811,19 @@ GENERATE_TARGET_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
 }
 
 
-def read_target_filehash_report(_scoped_: Scoped, target_filehash_filepath: str) -> FileHashReport:
-    target_filehash_report = FileHashReport.load(target_filehash_filepath)
-    _scoped_.global_scope["target_filehash_report"] = target_filehash_report
-    return target_filehash_report
+def load_target_filehash_report(
+    _scoped_: Scoped, target_filehash_filepath: str
+) -> AbstractReport[str, str]:
+    return load_report(
+        FileHashReport.empty(),
+        target_filehash_filepath,
+        _scoped_.global_scope,
+        TARGET_FILESIZE_REPORT,
+    )
 
 
 LOAD_TARGET_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: read_target_filehash_report}]
+    RUNSTEPS: [{ACTION: load_target_filehash_report}]
 }
 # Pipeline
 
@@ -721,12 +876,12 @@ PIPELINE = {
         SOURCE_FILESIZE_FILEPATH_ARGUMENT,
         SOURCE_FILESIZE_REPORT_TYPE,
         SOURCE_FILEHASH_FILEPATH_ARGUMENT,
-        SOURCE_FILEHASH_FILEPATH_ARGUMENT,
+        SOURCE_FILEHASH_REPORT_TYPE,
         TARGET_DIR_ARGUMENT,
         TARGET_FILESIZE_FILEPATH_ARGUMENT,
         TARGET_FILESIZE_REPORT_TYPE,
         TARGET_FILEHASH_FILEPATH_ARGUMENT,
-        TARGET_FILEHASH_FILEPATH_ARGUMENT,
+        TARGET_FILEHASH_REPORT_TYPE,
         OPERATION_ARGUMENT,
     ],
     RUNSTAGES: {VALUE: create_runstages},

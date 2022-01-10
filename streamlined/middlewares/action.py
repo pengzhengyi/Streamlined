@@ -239,7 +239,7 @@ class Argparse(Variant):
                 Optional[Union[str, int]],
                 Optional[Any],
                 Optional[Any],
-                Optional[Type],
+                Optional[Type[Any]],
                 Optional[Iterable[Any]],
                 Optional[bool],
                 Optional[str],
@@ -250,7 +250,7 @@ class Argparse(Variant):
             ParsedArgument,
         ]
     ] = FunctionMaker.create(
-        f"parse(_{VALUE}0_: Union[str, List[str]], _{VALUE}1_: Optional[str], _{VALUE}2_: Optional[Union[str, int]], _{VALUE}3_: Optional[Any], _{VALUE}4_: Optional[Any], _{VALUE}5_: Optional[Type], _{VALUE}6_: Optional[Iterable[Any]], _{VALUE}7_: Optional[bool], _{VALUE}8_: Optional[str], _{VALUE}9_: Optional[str], _{VALUE}10_: Optional[str], _{VALUE}11_: List[str])",
+        f"parse(_{VALUE}0_: Union[str, List[str]], _{VALUE}1_: Optional[str], _{VALUE}2_: Optional[Union[str, int]], _{VALUE}3_: Optional[Any], _{VALUE}4_: Optional[Any], _{VALUE}5_: Optional[Type[Any]], _{VALUE}6_: Optional[Iterable[Any]], _{VALUE}7_: Optional[bool], _{VALUE}8_: Optional[str], _{VALUE}9_: Optional[str], _{VALUE}10_: Optional[str], _{VALUE}11_: List[str])",
         f"return parse_argument(_{VALUE}0_, _{VALUE}1_, _{VALUE}2_, _{VALUE}3_, _{VALUE}4_, _{VALUE}5_, _{VALUE}6_, _{VALUE}7_, _{VALUE}8_, _{VALUE}9_, _{VALUE}10_, _{VALUE}11_)",
         dict(
             parse_argument=parse_argument,

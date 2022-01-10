@@ -76,7 +76,11 @@ class DependencyInjection(Service):
         cls, _callable: Callable[..., Any], providers: Mapping[Any, Any]
     ) -> inspect.BoundArguments:
         signature = inspect.signature(_callable)
-        return cls.inject_signature(signature, providers)
+        try:
+            return cls.inject_signature(signature, providers)
+        except KeyError as keyerror:
+            # assist debugging
+            raise KeyError(f"cannot resolve arguments for {_callable}") from keyerror
 
     @classmethod
     def prepare(
