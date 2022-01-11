@@ -1,16 +1,42 @@
 from __future__ import annotations
 
+from enum import Enum, auto
 from inspect import Parameter, _ParameterKind
-from typing import Any, ClassVar, Dict, Iterable, Mapping, Optional, Tuple
+from typing import Any, ClassVar, Dict, Iterable, Mapping, Optional, Tuple, Union
 
+from .dictionary import update_with_callable
 from .predicates import IS_DICT, IS_SEQUENCE
+
+
+class TemplateParameterDefault(Enum):
+    EMPTY = Parameter.empty
+    USE_NAME = auto()
+    USE_DEFAULT = auto()
+
+    @classmethod
+    def of(cls, value: Any) -> TemplateParameterDefault:
+        if isinstance(value, cls):
+            return value
+        else:
+            return TemplateParameterDefault.USE_DEFAULT
+
+    def evaluate(self, **kwargs: Any) -> Any:
+        if self is TemplateParameterDefault.EMPTY:
+            return self.value
+        elif self is TemplateParameterDefault.USE_NAME:
+            return kwargs["name"]
+        else:
+            return kwargs["default"]
 
 
 class TemplateParameter:
     kind: ClassVar[_ParameterKind] = Parameter.POSITIONAL_OR_KEYWORD
 
     def __init__(
-        self, name: str, default: Any = Parameter.empty, annotation: Any = Parameter.empty
+        self,
+        name: str,
+        default: Union[Any, TemplateParameterDefault] = TemplateParameterDefault.EMPTY,
+        annotation: Any = Parameter.empty,
     ) -> None:
         self.name = name
         self.default = default
@@ -21,23 +47,35 @@ class TemplateParameter:
             return self.name
         return self.name.format_map(substitutions)
 
+    def to_parameter(self, **overrides: Any) -> Parameter:
+        parameter_kwargs = dict(
+            name=self.name, kind=self.kind, default=self.default, annotation=self.annotation
+        )
+        parameter_kwargs.update(overrides)
+
+        update_with_callable(
+            parameter_kwargs,
+            "default",
+            lambda parameter_default: TemplateParameterDefault.of(parameter_default).evaluate(
+                **parameter_kwargs
+            ),
+        )
+
+        return Parameter(**parameter_kwargs)
+
     def substitute(
         self, value: Any, name_substitutions: Optional[Mapping[str, Any]]
     ) -> Tuple[Parameter, Any]:
         substituted_name = self.substitute_name(name_substitutions)
-        parameter = Parameter(
-            name=substituted_name, kind=self.kind, default=self.default, annotation=self.annotation
-        )
+        parameter = self.to_parameter(name=substituted_name)
         return (parameter, value)
 
     def substitute_from(
         self, values: Mapping[str, Any], name_substitutions: Optional[Mapping[str, Any]]
     ) -> Tuple[Parameter, Any]:
         substituted_name = self.substitute_name(name_substitutions)
-        parameter = Parameter(
-            name=substituted_name, kind=self.kind, default=self.default, annotation=self.annotation
-        )
-        value = values[substituted_name]
+        parameter = self.to_parameter(name=substituted_name)
+        value = values.get(substituted_name, parameter.default)
         return (parameter, value)
 
 
@@ -103,9 +141,12 @@ class Template:
 
     def substitute(
         self,
-        values: Mapping[Any, Any],
+        values: Optional[Mapping[str, Any]] = None,
         name_substitutions: Optional[Mapping[str, Any]] = None,
     ) -> Template:
+        if values is None:
+            values = dict()
+
         parameters = self.get_parameters(self.template)
         parameter_substitutions = self.substitute_parameters(
             parameters, values, name_substitutions

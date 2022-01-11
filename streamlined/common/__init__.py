@@ -26,6 +26,7 @@ from .dictionary import (
     get_or_default,
     get_or_raise,
     set_if_not_none,
+    update_with_callable,
 )
 from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, TYPE, VALUE
 from .predicates import (
@@ -57,6 +58,6 @@ from .predicates import (
     Predicate,
 )
 from .subprocess import StdinStream, Stream, SubprocessResult, run
-from .template import Template, TemplateParameter
+from .template import Template, TemplateParameter, TemplateParameterDefault
 from .transforms import IDENTITY, IDENTITY_FACTORY, Transform
 from .tree import update

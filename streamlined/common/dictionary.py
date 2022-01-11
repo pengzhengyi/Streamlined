@@ -36,6 +36,19 @@ def set_if_not_none(dictionary: Dict[Any, Any], key: Any, value: Any) -> bool:
     return False
 
 
+def update_with_callable(dictionary: Dict[K, V], key: K, value_updater: Callable[[V], V]) -> bool:
+    """
+    Update existing value under specified key by transforming it through a callable.
+    Return whether value of specified key is updated.
+    """
+    try:
+        new_value = value_updater(dictionary[key])
+        dictionary[key] = new_value
+        return True
+    except KeyError:
+        return False
+
+
 class ProxyDictionary(UserDict):
     """
     A proxy dictionary is intended to provide some more key value

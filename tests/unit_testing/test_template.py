@@ -1,4 +1,4 @@
-from streamlined import Template, TemplateParameter
+from streamlined import Template, TemplateParameter, TemplateParameterDefault
 
 
 def test_template_with_formatstr_names():
@@ -20,3 +20,21 @@ def test_template_with_formatstr_names():
         name_substitutions={"language": "english"},
     )
     assert english_result["Jay Chou"] == "singing"
+
+
+def test_template_with_explicit_default():
+    template = Template(TemplateParameter(name="profit_for_{thing}s", default=0, annotation=str))
+    with_value = template.substitute({"profit_for_toys": 100}, name_substitutions={"thing": "toy"})
+    assert with_value == 100
+    without_value = template.substitute(name_substitutions={"thing": "toy"})
+    assert without_value == 0
+
+
+def test_template_with_name_as_default():
+    template = Template(
+        TemplateParameter(
+            name="{thing}s", default=TemplateParameterDefault.USE_NAME, annotation=str
+        )
+    )
+    value = template.substitute(name_substitutions={"thing": "toy"})
+    assert value == "toys"
