@@ -1,7 +1,8 @@
 import hashlib
-from io import DEFAULT_BUFFER_SIZE
 
 from aiofile import async_open
+
+DEFAULT_BUFFER_SIZE = 10 * 1024 * 1024
 
 
 async def getsize(filepath: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> int:
