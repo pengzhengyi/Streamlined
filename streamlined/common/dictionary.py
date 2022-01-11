@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from collections import UserDict
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple, TypeVar
 
-from .predicates import IS_DICT, IS_LIST_OF_DICT
+from .predicates import IS_DICT, IS_SEQUENCE
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -58,24 +60,43 @@ class ProxyDictionary(UserDict):
             return self.proxy[key]
 
 
-def findkey(dictionary: Dict[Any, Any], key: Any) -> Iterable[Any]:
+def findkey(source: Any, predicate: Callable[[Any], bool]) -> Iterable[Any]:
     """
     Search for value(s) under given key in a dictionary.
 
     The search will be recursive.
 
-    >>> list(findkey({'a': 1, 'b': [{'a': 3}, {'b': 4}, {'a': 7}]}, key='a'))
+    >>> list(findkey({'a': 1, 'b': [{'a': 3}, {'b': 4}, {'a': 7}]}, lambda key: key == 'a'))
     [1, 3, 7]
     """
-    for k, v in dictionary.items():
-        if k == key:
-            yield v
-        else:
-            if IS_DICT(v):
-                yield from findkey(dictionary=v, key=key)
-            elif IS_LIST_OF_DICT(v):
-                for new_dict in v:
-                    yield from findkey(new_dict, key)
+    if IS_DICT(source):
+        for k, v in source.items():
+            if predicate(k):
+                yield v
+            yield from findkey(v, predicate)
+    elif IS_SEQUENCE(source):
+        for item in source:
+            yield from findkey(item, predicate)
+
+
+def findvalue(source: Any, predicate: Callable[[Any], bool]) -> Iterable[Any]:
+    """
+    Search for value(s) matching a condition in a dictionary.
+
+    The search will be recursive.
+
+    >>> list(findvalue({'a': 1, 'b': [{'a': 3}, {'b': 4}, {'a': 7}]}, lambda value: isinstance(value, int) and value > 3))
+    [4, 7]
+    """
+    if predicate(source):
+        yield source
+
+    if IS_DICT(source):
+        for v in source.values():
+            yield from findvalue(v, predicate)
+    elif IS_SEQUENCE(source):
+        for item in source:
+            yield from findvalue(item, predicate)
 
 
 def chained_get(

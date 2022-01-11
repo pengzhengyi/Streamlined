@@ -22,6 +22,7 @@ from .dictionary import (
     ProxyDictionary,
     chained_get,
     findkey,
+    findvalue,
     get_or_default,
     get_or_raise,
     set_if_not_none,
@@ -56,5 +57,6 @@ from .predicates import (
     Predicate,
 )
 from .subprocess import StdinStream, Stream, SubprocessResult, run
+from .template import Template, TemplateParameter
 from .transforms import IDENTITY, IDENTITY_FACTORY, Transform
 from .tree import update

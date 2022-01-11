@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Any, Callable, Dict, Iterable, List, Tuple
+from typing import Any, Callable, Iterable, List, Tuple
 
 from ..common import AND, IS_DICT, NOT, OR, TYPE, Predicate, Transform
 from .simplification import Simplification
@@ -30,7 +30,6 @@ class Variant(Simplification):
 
         Should raise exception when not compliant.
         """
-        pass
 
     @classmethod
     def reduce(cls, value: Any) -> Any:
@@ -43,7 +42,7 @@ class Variant(Simplification):
 
     @classmethod
     def is_variant(cls, value: Any) -> bool:
-        return IS_DICT(value) and value[TYPE] == cls.get_name()
+        return IS_DICT(value) and TYPE in value and value[TYPE] == cls.get_name()
 
     @cached_property
     def is_simplified_variant(self) -> Callable[[Any], bool]:

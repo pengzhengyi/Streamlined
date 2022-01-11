@@ -14,6 +14,8 @@ from .common import (
     TYPE,
     VALUE,
     SubprocessResult,
+    Template,
+    TemplateParameter,
 )
 from .execution import SimpleExecutor
 from .middlewares import (

@@ -2,15 +2,7 @@ import sys
 from argparse import ArgumentParser
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from ..common import (
-    AND,
-    DEFAULT_KEYERROR,
-    IS_DICT,
-    IS_NOT_DICT,
-    VALUE,
-    findkey,
-    format_help,
-)
+from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT, findvalue, format_help
 from ..services import Scoped
 from .action import Argparse
 from .argument import Arguments
@@ -98,7 +90,7 @@ class Pipeline(Middleware, WithMiddlewares):
 
         arguments = map(
             Argparse.to_argument_definition,
-            filter(Argparse.is_variant, findkey(self.declaration, key=VALUE)),
+            findvalue(self.declaration, Argparse.is_variant),
         )
 
         return format_help(argument_parser, arguments)

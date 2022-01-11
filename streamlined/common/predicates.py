@@ -1,5 +1,5 @@
 import operator
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from functools import partial
 from inspect import BoundArguments
 from typing import Any, Callable, Dict
@@ -128,3 +128,9 @@ def IS_NONEMPTY_BOUND_ARGUMENTS(bound_arguments: BoundArguments) -> bool:
 
 def IS_EMPTY_BOUND_ARGUMENTS(bound_arguments: BoundArguments) -> bool:
     return not IS_NONEMPTY_BOUND_ARGUMENTS(bound_arguments)
+
+
+def IS_SEQUENCE(value: Any):
+    if IS_STR(value):
+        return False
+    return isinstance(value, Sequence)
