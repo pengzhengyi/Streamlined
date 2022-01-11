@@ -6,15 +6,7 @@ from logging.handlers import BufferingHandler
 import pytest
 from faker import Faker
 
-from streamlined.manager import (
-    ExecutionWithDependencyInjection,
-    Logging,
-    NameTracking,
-    ResultCollection,
-    Scoping,
-    TagGrouping,
-)
-from streamlined.manager.manager import create_manager
+from streamlined.execution import SimpleExecutor
 
 
 @pytest.fixture(scope="session")
@@ -37,19 +29,11 @@ def buffering_logger(faker, buffering_handler):
     return logger
 
 
-@pytest.fixture
-def minimum_manager():
-    services = [
-        NameTracking,
-        ResultCollection,
-        ExecutionWithDependencyInjection,
-        Scoping,
-        Logging,
-        TagGrouping,
-    ]
-    return create_manager(*services)()
-
-
 @pytest.fixture(scope="session")
 def get_buffering_logger_message():
     return lambda logger, index: logger.handlers[0].buffer[index].msg
+
+
+@pytest.fixture(scope="session")
+def simple_executor():
+    return SimpleExecutor()
