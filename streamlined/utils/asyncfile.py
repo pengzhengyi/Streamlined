@@ -35,3 +35,11 @@ async def copy(source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE) ->
         async for chunk in reader.iter_chunked(chunk_size):
             bytes_count += await writer.write(chunk)
     return bytes_count
+
+
+async def linecount(filepath: str) -> int:
+    count = 0
+    async with async_open(filepath, "r") as reader:
+        async for _ in reader:
+            count += 1
+    return count
