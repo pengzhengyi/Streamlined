@@ -1,7 +1,6 @@
 import resource
 import sys
 
-import nest_asyncio
 import uvloop
 
 from .common import (
