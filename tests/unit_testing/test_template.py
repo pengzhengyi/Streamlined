@@ -3,11 +3,7 @@ from streamlined import Template, TemplateParameter, TemplateParameterDefault
 
 def test_template_with_formatstr_names():
     template = Template(
-        {
-            TemplateParameter(name="{language}_name", annotation=str): TemplateParameter(
-                name="hobby", annotation=str
-            )
-        }
+        {TemplateParameter(name="{language}_name"): TemplateParameter(name="hobby")}
     )
 
     chinese_result = template.substitute(
@@ -23,7 +19,7 @@ def test_template_with_formatstr_names():
 
 
 def test_template_with_explicit_default():
-    template = Template(TemplateParameter(name="profit_for_{thing}s", default=0, annotation=str))
+    template = Template(TemplateParameter(name="profit_for_{thing}s", default=0))
     with_value = template.substitute({"profit_for_toys": 100}, name_substitutions={"thing": "toy"})
     assert with_value == 100
     without_value = template.substitute(name_substitutions={"thing": "toy"})
@@ -32,9 +28,7 @@ def test_template_with_explicit_default():
 
 def test_template_with_name_as_default():
     template = Template(
-        TemplateParameter(
-            name="{thing}s", default=TemplateParameterDefault.USE_NAME, annotation=str
-        )
+        TemplateParameter(name="{thing}s", default=TemplateParameterDefault.USE_NAME)
     )
     value = template.substitute(name_substitutions={"thing": "toy"})
     assert value == "toys"

@@ -1,11 +1,25 @@
 from __future__ import annotations
 
 from enum import Enum, auto
+from functools import partial
 from inspect import Parameter, _ParameterKind
-from typing import Any, ClassVar, Dict, Iterable, Mapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    Generic,
+    Iterable,
+    Mapping,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from .dictionary import update_with_callable
 from .predicates import IS_DICT, IS_SEQUENCE
+
+T = TypeVar("T")
 
 
 class TemplateParameterDefault(Enum):
@@ -42,50 +56,57 @@ class TemplateParameter:
         self.default = default
         self.annotation = annotation
 
-    def substitute_name(self, substitutions: Optional[Mapping[str, Any]]) -> str:
+    @staticmethod
+    def resolve_name(name: str, substitutions: Optional[Mapping[str, Any]] = None) -> str:
         if substitutions is None:
-            return self.name
-        return self.name.format_map(substitutions)
+            return name
+        return name.format_map(substitutions)
 
-    def to_parameter(self, **overrides: Any) -> Parameter:
-        parameter_kwargs = dict(
-            name=self.name, kind=self.kind, default=self.default, annotation=self.annotation
-        )
-        parameter_kwargs.update(overrides)
+    @staticmethod
+    def resolve_default(default: Any, substitutions: Optional[Mapping[str, Any]] = None) -> Any:
+        if substitutions is None:
+            substitutions = dict()
+        return TemplateParameterDefault.of(default).evaluate(**substitutions)
 
+    def as_parameter(self) -> Parameter:
+        return Parameter(self.name, self.kind, default=self.default, annotation=self.annotation)
+
+    def resolve_value(self, dictionary: Mapping[str, Any]) -> Any:
+        return dictionary.get(self.name, self.default)
+
+    def replace(self, **changes: Any) -> TemplateParameter:
+        fields = {"name": self.name, "default": self.default}
+
+        fields.update(changes)
         update_with_callable(
-            parameter_kwargs,
+            fields,
             "default",
-            lambda parameter_default: TemplateParameterDefault.of(parameter_default).evaluate(
-                **parameter_kwargs
-            ),
+            partial(self.resolve_default, substitutions=fields),
         )
 
-        return Parameter(**parameter_kwargs)
+        return TemplateParameter(**fields)
 
-    def substitute(
-        self, value: Any, name_substitutions: Optional[Mapping[str, Any]]
-    ) -> Tuple[Parameter, Any]:
-        substituted_name = self.substitute_name(name_substitutions)
-        parameter = self.to_parameter(name=substituted_name)
-        return (parameter, value)
+    def replace_with_substitutions(
+        self, substitutions: Optional[Mapping[str, Any]] = None
+    ) -> TemplateParameter:
+        if substitutions:
+            substituted_name = self.resolve_name(self.name, substitutions)
+            return self.replace(name=substituted_name)
 
-    def substitute_from(
-        self, values: Mapping[str, Any], name_substitutions: Optional[Mapping[str, Any]]
-    ) -> Tuple[Parameter, Any]:
-        substituted_name = self.substitute_name(name_substitutions)
-        parameter = self.to_parameter(name=substituted_name)
-        value = values.get(substituted_name, parameter.default)
-        return (parameter, value)
+    def resolve(
+        self, values: Mapping[str, Any], substitutions: Optional[Mapping[str, Any]]
+    ) -> Tuple[TemplateParameter, Any]:
+        updated_template = self.replace_with_substitutions(substitutions)
+        return updated_template, updated_template.resolve_value(values)
 
 
-class Template:
+class Template(Generic[T]):
     @staticmethod
     def is_parameter(value: Any) -> bool:
         return isinstance(value, TemplateParameter)
 
     @staticmethod
-    def substitute_parameters(
+    def _substitute_parameters(
         parameters: Iterable[TemplateParameter],
         values: Mapping[Any, Any],
         name_substitutions: Optional[Mapping[str, Any]] = None,
@@ -94,7 +115,7 @@ class Template:
 
         for parameter in parameters:
             try:
-                _, value = parameter.substitute_from(values, name_substitutions)
+                updated_parameter, value = parameter.resolve(values, name_substitutions)
             except (KeyError, ValueError):
                 value = parameter
             substituted_parameters[parameter] = value
@@ -114,25 +135,25 @@ class Template:
             yield template
 
     @classmethod
-    def substitute_template(
+    def _substitute_template(
         cls, template: Any, parameter_substitutions: Mapping[TemplateParameter, Any]
     ) -> Any:
         if IS_DICT(template):
             return {
-                cls.substitute_template(k, parameter_substitutions): cls.substitute_template(
+                cls._substitute_template(k, parameter_substitutions): cls._substitute_template(
                     v, parameter_substitutions
                 )
                 for k, v in template.items()
             }
         elif IS_SEQUENCE(template):
-            return [cls.substitute_template(item, parameter_substitutions) for item in template]
+            return [cls._substitute_template(item, parameter_substitutions) for item in template]
         else:
             return parameter_substitutions.get(template, template)
 
-    def __init__(self, template: Any) -> None:
+    def __init__(self, template: T) -> None:
         self._init_template(template)
 
-    def _init_template(self, template: Any) -> None:
+    def _init_template(self, template: T) -> None:
         self.template = template
         self._init_parameters()
 
@@ -143,12 +164,12 @@ class Template:
         self,
         values: Optional[Mapping[str, Any]] = None,
         name_substitutions: Optional[Mapping[str, Any]] = None,
-    ) -> Template:
+    ) -> T:
         if values is None:
             values = dict()
 
         parameters = self.get_parameters(self.template)
-        parameter_substitutions = self.substitute_parameters(
+        parameter_substitutions = self._substitute_parameters(
             parameters, values, name_substitutions
         )
-        return self.substitute_template(self.template, parameter_substitutions)
+        return self._substitute_template(self.template, parameter_substitutions)

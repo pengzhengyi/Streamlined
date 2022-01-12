@@ -54,6 +54,9 @@ from streamlined import (
     Pipeline,
     Scoped,
     SimpleExecutor,
+    Template,
+    TemplateParameter,
+    TemplateParameterDefault,
 )
 from streamlined.utils import crash, getsize, md5, walk
 
@@ -74,6 +77,9 @@ SOURCE_FILESIZE_REPORT = "source_filesize_report"
 SOURCE_FILEHASH_REPORT = "source_filehash_report"
 TARGET_FILESIZE_REPORT = "target_filesize_report"
 TARGET_FILEHASH_REPORT = "target_filehash_report"
+
+SOURCE = "source"
+TARGET = "target"
 
 
 SOURCE_DIR = "source_dir"
@@ -269,6 +275,37 @@ def report_nonexisting_source_dir(source_dir: Optional[str]) -> str:
 def create_help_for_dir(logname: str) -> str:
     return f"请提供操作的{logname}文件夹"
 
+
+DIR_ARGUMENT_TEMPLATE = Template(
+    {
+        NAME: TemplateParameter("{type}_dir", default=TemplateParameterDefault.USE_NAME),
+        VALUE: {
+            TYPE: ARGPARSE,
+            NAME: [TemplateParameter("--{arg}", default=TemplateParameterDefault.USE_NAME)],
+            HELP: create_help_for_dir(TemplateParameter("{logname}")),
+        },
+        VALIDATOR: {
+            VALIDATOR_AFTER_STAGE: {
+                ACTION: TemplateParameter("check_{origin}_dir_exists"),
+                HANDLERS: {
+                    True: {
+                        LOG: {
+                            LEVEL: logging.INFO,
+                            MESSAGE: TemplateParameter("report_{origin}_dir"),
+                        },
+                        ACTION: TemplateParameter("set_{origin}_filepaths"),
+                    },
+                    False: {
+                        LOG: {
+                            LEVEL: logging.WARNING,
+                            MESSAGE: TemplateParameter("report_nonexisting_{origin}_dir"),
+                        },
+                    },
+                },
+            }
+        },
+    }
+)
 
 SOURCE_DIR_ARGUMENT = {
     NAME: "source_dir",
@@ -672,18 +709,6 @@ def load_report(
     return report
 
 
-def get_source_filepaths(source_filepaths: List[str]) -> List[str]:
-    return source_filepaths
-
-
-def save_source_filesize_report(
-    _scoped_: Scoped, filesize_report: FileSizeReport, source_filesize_filepath: Optional[str]
-) -> None:
-    return save_report(
-        filesize_report, source_filesize_filepath, _scoped_.global_scope, SOURCE_FILESIZE_REPORT
-    )
-
-
 def load_source_filesize_report(
     _scoped_: Scoped, source_filesize_filepath: str
 ) -> AbstractReport[str, int]:
@@ -695,20 +720,58 @@ def load_source_filesize_report(
     )
 
 
-GENERATE_SOURCE_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
-    NAME: "create filesize report for source files",
-    ARGUMENTS: [
-        {NAME: "filesize_report", VALUE: FileSizeReport.empty},
-        {NAME: "filepaths", VALUE: get_source_filepaths},
-    ],
-    RUNSTEPS: {VALUE: create_filesize_report_runsteps, SCHEDULING: PARALLEL},
-    LOG: {LEVEL: logging.DEBUG, MESSAGE: log_filesize_report},
-    CLEANUP: save_source_filesize_report,
-}
+GENERATE_REPORT_TEMPLATE = Template(
+    {
+        NAME: TemplateParameter(
+            name="create {type} report for {origin} files",
+            default=TemplateParameterDefault.USE_NAME,
+        ),
+        ARGUMENTS: [
+            {
+                NAME: TemplateParameter(
+                    name="{type}_report",
+                    default=TemplateParameterDefault.USE_NAME,
+                ),
+                VALUE: FileSizeReport.empty,
+            },
+            {
+                NAME: "filepaths",
+                VALUE: TemplateParameter(name="get_{origin}_filepaths"),
+            },
+        ],
+        RUNSTEPS: {
+            VALUE: TemplateParameter(
+                name="create_{type}_report_runsteps",
+            ),
+            SCHEDULING: PARALLEL,
+        },
+        LOG: {
+            LEVEL: logging.DEBUG,
+            MESSAGE: TemplateParameter(
+                name="log_{type}_report",
+            ),
+        },
+        CLEANUP: TemplateParameter(
+            name="save_{origin}_{type}_report",
+        ),
+    }
+)
 
-LOAD_SOURCE_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: load_source_filesize_report}]
-}
+
+def get_source_filepaths(source_filepaths: List[str]) -> List[str]:
+    return source_filepaths
+
+
+def get_target_filepaths(target_filepaths: List[str]) -> List[str]:
+    return target_filepaths
+
+
+def save_source_filesize_report(
+    _scoped_: Scoped, filesize_report: FileSizeReport, source_filesize_filepath: Optional[str]
+) -> None:
+    return save_report(
+        filesize_report, source_filesize_filepath, _scoped_.global_scope, SOURCE_FILESIZE_REPORT
+    )
 
 
 def save_source_filehash_report(
@@ -719,15 +782,54 @@ def save_source_filehash_report(
     )
 
 
-GENERATE_SOURCE_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
-    NAME: "create filehash report for source files",
-    ARGUMENTS: [
-        {NAME: "filehash_report", VALUE: FileHashReport.empty},
-        {NAME: "filepaths", VALUE: get_source_filepaths},
-    ],
-    RUNSTEPS: {VALUE: create_filehash_report_runsteps, SCHEDULING: PARALLEL},
-    LOG: {LEVEL: logging.DEBUG, MESSAGE: log_filehash_report},
-    CLEANUP: save_source_filehash_report,
+def save_target_filesize_report(
+    _scoped_: Scoped, filesize_report: FileSizeReport, target_filesize_filepath: Optional[str]
+) -> None:
+    return save_report(
+        filesize_report, target_filesize_filepath, _scoped_.global_scope, TARGET_FILESIZE_REPORT
+    )
+
+
+def save_target_filehash_report(
+    _scoped_: Scoped, filehash_report: FileHashReport, target_filehash_filepath: Optional[str]
+) -> None:
+    return save_report(
+        filehash_report, target_filehash_filepath, _scoped_.global_scope, TARGET_FILEHASH_REPORT
+    )
+
+
+GENERATE_REPORT_VALUES = {
+    "get_source_filepaths": get_source_filepaths,
+    "get_target_filepaths": get_target_filepaths,
+    "create_filesize_report_runsteps": create_filesize_report_runsteps,
+    "create_filehash_report_runsteps": create_filehash_report_runsteps,
+    "log_filesize_report": log_filesize_report,
+    "log_filehash_report": log_filehash_report,
+    "save_source_filesize_report": save_source_filesize_report,
+    "save_source_filehash_report": save_source_filehash_report,
+    "save_target_filesize_report": save_target_filesize_report,
+    "save_target_filehash_report": save_target_filehash_report,
+}
+GENERATE_SOURCE_FILESIZE_REPORT_RUNSTAGE = GENERATE_REPORT_TEMPLATE.substitute(
+    GENERATE_REPORT_VALUES,
+    name_substitutions={"type": FILESIZE, "origin": SOURCE},
+)
+
+GENERATE_SOURCE_FILEHASH_REPORT_RUNSTAGE = GENERATE_REPORT_TEMPLATE.substitute(
+    GENERATE_REPORT_VALUES,
+    name_substitutions={"type": FILEHASH, "origin": SOURCE},
+)
+GENERATE_TARGET_FILESIZE_REPORT_RUNSTAGE = GENERATE_REPORT_TEMPLATE.substitute(
+    GENERATE_REPORT_VALUES,
+    name_substitutions={"type": FILESIZE, "origin": TARGET},
+)
+GENERATE_TARGET_FILEHASH_REPORT_RUNSTAGE = GENERATE_REPORT_TEMPLATE.substitute(
+    GENERATE_REPORT_VALUES,
+    name_substitutions={"type": FILEHASH, "origin": TARGET},
+)
+
+LOAD_SOURCE_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
+    RUNSTEPS: [{ACTION: load_source_filesize_report}]
 }
 
 
@@ -747,30 +849,6 @@ LOAD_SOURCE_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
 }
 
 
-def get_target_filepaths(target_filepaths: List[str]) -> List[str]:
-    return target_filepaths
-
-
-def save_target_filesize_report(
-    _scoped_: Scoped, filesize_report: FileSizeReport, target_filesize_filepath: Optional[str]
-) -> None:
-    return save_report(
-        filesize_report, target_filesize_filepath, _scoped_.global_scope, TARGET_FILESIZE_REPORT
-    )
-
-
-GENERATE_TARGET_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
-    NAME: "create filesize report for target files",
-    ARGUMENTS: [
-        {NAME: "filesize_report", VALUE: FileSizeReport.empty},
-        {NAME: "filepaths", VALUE: get_target_filepaths},
-    ],
-    RUNSTEPS: {VALUE: create_filesize_report_runsteps, SCHEDULING: PARALLEL},
-    LOG: {LEVEL: logging.DEBUG, MESSAGE: log_filesize_report},
-    CLEANUP: save_target_filesize_report,
-}
-
-
 def load_target_filesize_report(
     _scoped_: Scoped, target_filesize_filepath: str
 ) -> AbstractReport[str, int]:
@@ -784,26 +862,6 @@ def load_target_filesize_report(
 
 LOAD_TARGET_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
     RUNSTEPS: [{ACTION: load_target_filesize_report}]
-}
-
-
-def save_target_filehash_report(
-    _scoped_: Scoped, filehash_report: FileHashReport, target_filehash_filepath: Optional[str]
-) -> None:
-    return save_report(
-        filehash_report, target_filehash_filepath, _scoped_.global_scope, TARGET_FILEHASH_REPORT
-    )
-
-
-GENERATE_TARGET_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
-    NAME: "create filehash report for target files",
-    ARGUMENTS: [
-        {NAME: "filehash_report", VALUE: FileHashReport.empty},
-        {NAME: "filepaths", VALUE: get_target_filepaths},
-    ],
-    RUNSTEPS: {VALUE: create_filehash_report_runsteps, SCHEDULING: PARALLEL},
-    LOG: {LEVEL: logging.DEBUG, MESSAGE: log_filehash_report},
-    CLEANUP: save_target_filehash_report,
 }
 
 
