@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="streamlined",
-    version="0.2.2",
+    version="0.2.3",
     author="Zhengyi Peng",
     author_email="pengzhengyipengzhengyi@gmail.com",
     description="Make ML or generic pipeline more streamlined",
@@ -25,6 +25,7 @@ setup(
         "uvloop",
         "aiofile",
         "aiofiles",
+        "nest_asyncio",
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",
