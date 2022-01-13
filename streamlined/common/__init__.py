@@ -28,6 +28,7 @@ from .dictionary import (
     set_if_not_none,
     update_with_callable,
 )
+from .functionmaker import create_identity_function, rewrite_function_parameters
 from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, TYPE, VALUE
 from .predicates import (
     AND,

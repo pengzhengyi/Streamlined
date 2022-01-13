@@ -16,6 +16,8 @@ from .common import (
     Template,
     TemplateParameter,
     TemplateParameterDefault,
+    create_identity_function,
+    rewrite_function_parameters,
 )
 from .execution import SimpleExecutor
 from .middlewares import (
