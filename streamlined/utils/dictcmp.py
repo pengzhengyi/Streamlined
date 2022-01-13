@@ -10,10 +10,10 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-MISSING_IN_SOURCE_FORMATTER = Callable[[K, V], str]
-MISSING_IN_TARGET_FORMATTER = Callable[[K, V], str]
-EQUAL_VALUE_FORMATTER = Callable[[K, V, K, V], str]
-UNEQUAL_VALUE_FORMATTER = Callable[[K, V, K, V], str]
+MissingInSourceFormatter = Callable[[K, V], str]
+MissingInTargetFormatter = Callable[[K, V], str]
+EqualValueFormatter = Callable[[K, V, K, V], str]
+UnequalValueFormatter = Callable[[K, V, K, V], str]
 
 
 @dataclass
@@ -24,7 +24,7 @@ class ItemPair(Generic[K, V]):
 
     @staticmethod
     def DEFAULT_MISSING_IN_TARGET_FORMATTER(source_key: K, source_value: V) -> str:
-        return f"{source_key} is only present in target with value {source_value}"
+        return f"{source_key} is only present in source with value {source_value}"
 
     @staticmethod
     def DEFAULT_EQUAL_VALUE_FORMATTER(
@@ -63,10 +63,10 @@ class ItemPair(Generic[K, V]):
 
     def format(
         self,
-        missing_in_source_formatter: Optional[MISSING_IN_SOURCE_FORMATTER[K, V]] = None,
-        missing_in_target_formatter: Optional[MISSING_IN_TARGET_FORMATTER[K, V]] = None,
-        unequal_value_formatter: Optional[UNEQUAL_VALUE_FORMATTER[K, V]] = None,
-        equal_value_formatter: Optional[EQUAL_VALUE_FORMATTER[K, V]] = None,
+        missing_in_source_formatter: Optional[MissingInSourceFormatter[K, V]] = None,
+        missing_in_target_formatter: Optional[MissingInTargetFormatter[K, V]] = None,
+        unequal_value_formatter: Optional[UnequalValueFormatter[K, V]] = None,
+        equal_value_formatter: Optional[EqualValueFormatter[K, V]] = None,
     ) -> str:
         if missing_in_source_formatter is None:
             missing_in_source_formatter = self.DEFAULT_MISSING_IN_SOURCE_FORMATTER

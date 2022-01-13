@@ -18,6 +18,7 @@ from typing import (
     Dict,
     Generic,
     Iterable,
+    Iterator,
     List,
     Mapping,
     MutableMapping,
@@ -36,6 +37,7 @@ from streamlined import (
     CLEANUP,
     HANDLERS,
     HELP,
+    IDENTITY_FACTORY,
     LEVEL,
     LOG,
     MESSAGE,
@@ -58,7 +60,18 @@ from streamlined import (
     TemplateParameter,
     TemplateParameterDefault,
 )
-from streamlined.utils import crash, getsize, md5, walk
+from streamlined.utils import (
+    EqualValueFormatter,
+    ItemPair,
+    MissingInSourceFormatter,
+    MissingInTargetFormatter,
+    UnequalValueFormatter,
+    crash,
+    dict_cmp,
+    getsize,
+    md5,
+    walk,
+)
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -132,8 +145,8 @@ class AbstractReport(Generic[K, V], Mapping[K, V]):
     def __len__(self) -> int:
         return len(self.report)
 
-    def __iter__(self):
-        yield from self.report.items()
+    def __iter__(self) -> Iterator[K]:
+        yield from self.report.keys()
 
     def __str__(self) -> str:
         return "\n".join(":".join(str(part) for part in line) for line in self.to_list())
@@ -276,37 +289,6 @@ def create_help_for_dir(logname: str) -> str:
     return f"请提供操作的{logname}文件夹"
 
 
-DIR_ARGUMENT_TEMPLATE = Template(
-    {
-        NAME: TemplateParameter("{type}_dir", default=TemplateParameterDefault.USE_NAME),
-        VALUE: {
-            TYPE: ARGPARSE,
-            NAME: [TemplateParameter("--{arg}", default=TemplateParameterDefault.USE_NAME)],
-            HELP: create_help_for_dir(TemplateParameter("{logname}")),
-        },
-        VALIDATOR: {
-            VALIDATOR_AFTER_STAGE: {
-                ACTION: TemplateParameter("check_{origin}_dir_exists"),
-                HANDLERS: {
-                    True: {
-                        LOG: {
-                            LEVEL: logging.INFO,
-                            MESSAGE: TemplateParameter("report_{origin}_dir"),
-                        },
-                        ACTION: TemplateParameter("set_{origin}_filepaths"),
-                    },
-                    False: {
-                        LOG: {
-                            LEVEL: logging.WARNING,
-                            MESSAGE: TemplateParameter("report_nonexisting_{origin}_dir"),
-                        },
-                    },
-                },
-            }
-        },
-    }
-)
-
 SOURCE_DIR_ARGUMENT = {
     NAME: "source_dir",
     VALUE: {TYPE: ARGPARSE, NAME: ["--src"], HELP: create_help_for_dir(SOURCE_LOGNAME)},
@@ -400,7 +382,7 @@ def determine_source_filesize_report_type(
     return ReportCreationType.determine_report_type(has_source_dir, source_filesize_filepath)
 
 
-SOURCE_FILESIZE_REPORT_TYPE: Dict[str, Any] = {
+SOURCE_FILESIZE_REPORT_TYPE = {
     NAME: "source_filesize_report_type",
     VALUE: determine_source_filesize_report_type,
 }
@@ -458,7 +440,7 @@ def determine_source_filehash_report_type(
     return ReportCreationType.determine_report_type(has_source_dir, source_filehash_filepath)
 
 
-SOURCE_FILEHASH_REPORT_TYPE: Dict[str, Any] = {
+SOURCE_FILEHASH_REPORT_TYPE = {
     NAME: "source_filehash_report_type",
     VALUE: determine_source_filehash_report_type,
 }
@@ -508,7 +490,7 @@ def is_target_filesize_filepath_not_dir(target_filesize_filepath: str) -> bool:
     return is_not_dir(target_filesize_filepath)
 
 
-TARGET_FILESIZE_FILEPATH_ARGUMENT: Dict[str, Any] = {
+TARGET_FILESIZE_FILEPATH_ARGUMENT = {
     NAME: TARGET_FILESIZE_FILEPATH,
     VALUE: {
         TYPE: ARGPARSE,
@@ -538,7 +520,7 @@ def determine_target_filesize_report_type(
     return ReportCreationType.determine_report_type(has_target_dir, target_filesize_filepath)
 
 
-TARGET_FILESIZE_REPORT_TYPE: Dict[str, Any] = {
+TARGET_FILESIZE_REPORT_TYPE = {
     NAME: "target_filesize_report_type",
     VALUE: determine_target_filesize_report_type,
 }
@@ -552,7 +534,7 @@ def is_target_filehash_filepath_not_dir(target_filehash_filepath: str) -> bool:
     return is_not_dir(target_filehash_filepath)
 
 
-TARGET_FILEHASH_FILEPATH_ARGUMENT: Dict[str, Any] = {
+TARGET_FILEHASH_FILEPATH_ARGUMENT = {
     NAME: TARGET_FILEHASH_FILEPATH,
     VALUE: {
         TYPE: ARGPARSE,
@@ -582,7 +564,7 @@ def determine_target_filehash_report_type(
     return ReportCreationType.determine_report_type(has_target_dir, target_filehash_filepath)
 
 
-TARGET_FILEHASH_REPORT_TYPE: Dict[str, Any] = {
+TARGET_FILEHASH_REPORT_TYPE = {
     NAME: "target_filehash_report_type",
     VALUE: determine_target_filehash_report_type,
 }
@@ -608,7 +590,7 @@ def report_operations(operations: List[str], _scoped_: Scoped) -> str:
     return f'将执行操作包括「{", ".join(operations)}」'
 
 
-OPERATION_ARGUMENT: Dict[str, Any] = {
+OPERATION_ARGUMENT = {
     NAME: "operations",
     VALUE: {
         TYPE: ARGPARSE,
@@ -828,9 +810,7 @@ GENERATE_TARGET_FILEHASH_REPORT_RUNSTAGE = GENERATE_REPORT_TEMPLATE.substitute(
     name_substitutions={"type": FILEHASH, "origin": TARGET},
 )
 
-LOAD_SOURCE_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: load_source_filesize_report}]
-}
+LOAD_SOURCE_FILESIZE_REPORT_RUNSTAGE = {RUNSTEPS: [{ACTION: load_source_filesize_report}]}
 
 
 def load_source_filehash_report(
@@ -844,9 +824,7 @@ def load_source_filehash_report(
     )
 
 
-LOAD_SOURCE_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: load_source_filehash_report}]
-}
+LOAD_SOURCE_FILEHASH_REPORT_RUNSTAGE = {RUNSTEPS: [{ACTION: load_source_filehash_report}]}
 
 
 def load_target_filesize_report(
@@ -860,9 +838,7 @@ def load_target_filesize_report(
     )
 
 
-LOAD_TARGET_FILESIZE_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: load_target_filesize_report}]
-}
+LOAD_TARGET_FILESIZE_REPORT_RUNSTAGE = {RUNSTEPS: [{ACTION: load_target_filesize_report}]}
 
 
 def load_target_filehash_report(
@@ -876,9 +852,133 @@ def load_target_filehash_report(
     )
 
 
-LOAD_TARGET_FILEHASH_REPORT_RUNSTAGE: Dict[str, Any] = {
-    RUNSTEPS: [{ACTION: load_target_filehash_report}]
+LOAD_TARGET_FILEHASH_REPORT_RUNSTAGE = {RUNSTEPS: [{ACTION: load_target_filehash_report}]}
+
+
+def compare_filesize_report(
+    source_filesize_report: FileSizeReport, target_filesize_report: FileSizeReport
+) -> List[ItemPair[str, int]]:
+    return list(dict_cmp(source_filesize_report.report, target_filesize_report.report))
+
+
+def filesize_missing_in_source_formatter(filename: str, filesize: int) -> str:
+    return f"[错误] {filename}只存在于{TARGET_LOGNAME}文件夹"
+
+
+def filesize_missing_in_target_formatter(filename: str, filesize: int) -> str:
+    return f"[错误] {filename}只存在于{SOURCE_LOGNAME}文件夹"
+
+
+def filesize_equal_value_formatter(
+    source_filename: str, source_filesize: int, target_filename: str, target_filesize: int
+) -> str:
+    return f"[正确] {source_filename}和{target_filename}文件大小均为{source_filesize}"
+
+
+def filesize_unequal_value_formatter(
+    source_filename: str, source_filesize: int, target_filename: str, target_filesize: int
+) -> str:
+    return f"[错误] {source_filename}文件大小为{source_filesize}而{target_filename}文件大小为{target_filesize}"
+
+
+def create_report_diff(
+    itempairs: List[ItemPair[str, int]],
+    missing_in_source_formatter: MissingInSourceFormatter[str, int],
+    missing_in_target_formatter: MissingInTargetFormatter[str, int],
+    unequal_value_formatter: UnequalValueFormatter[str, int],
+    equal_value_formatter: EqualValueFormatter[str, int],
+) -> List[str]:
+    return [
+        itempair.format(
+            missing_in_source_formatter,
+            missing_in_target_formatter,
+            unequal_value_formatter,
+            equal_value_formatter,
+        )
+        for itempair in itempairs
+    ]
+
+
+def create_logdiff_runstep(diff: List[str]) -> List[Dict[str, Any]]:
+    return [
+        {LOG: {LEVEL: logging.INFO if "正确" in diff_item else logging.ERROR, VALUE: diff_item}}
+        for diff_item in diff
+    ]
+
+
+FILESIZE_DIFF = "filesize_diff"
+COMPARE_FILESIZE_REPORT_RUNSTAGE = {
+    ARGUMENTS: [
+        {
+            NAME: "missing_in_source_formatter",
+            VALUE: IDENTITY_FACTORY(filesize_missing_in_source_formatter),
+        },
+        {
+            NAME: "missing_in_target_formatter",
+            VALUE: IDENTITY_FACTORY(filesize_missing_in_target_formatter),
+        },
+        {
+            NAME: "unequal_value_formatter",
+            VALUE: IDENTITY_FACTORY(filesize_unequal_value_formatter),
+        },
+        {NAME: "equal_value_formatter", VALUE: IDENTITY_FACTORY(filesize_equal_value_formatter)},
+        {NAME: "itempairs", VALUE: compare_filesize_report},
+        {NAME: "diff", VALUE: create_report_diff},
+    ],
+    RUNSTEPS: create_logdiff_runstep,
 }
+
+
+def compare_filehash_report(
+    source_filehash_report: FileHashReport, target_filehash_report: FileHashReport
+) -> List[ItemPair[str, str]]:
+    return list(dict_cmp(source_filehash_report.report, target_filehash_report.report))
+
+
+def filehash_missing_in_source_formatter(filename: str, filehash: int) -> str:
+    return f"[错误] {filename}只存在于{TARGET_LOGNAME}文件夹"
+
+
+def filehash_missing_in_target_formatter(filename: str, filehash: int) -> str:
+    return f"[错误] {filename}只存在于{SOURCE_LOGNAME}文件夹"
+
+
+def filehash_equal_value_formatter(
+    source_filename: str, source_filehash: int, target_filename: str, target_filehash: int
+) -> str:
+    return f"[正确] {source_filename}和{target_filename}文件md5均为{source_filehash}"
+
+
+def filehash_unequal_value_formatter(
+    source_filename: str, source_filehash: int, target_filename: str, target_filehash: int
+) -> str:
+    return (
+        f"[错误] {source_filename}文件md5为{source_filehash}而{target_filename}文件md5为{target_filehash}"
+    )
+
+
+FILEHASH_DIFF = "filehash_diff"
+COMPARE_FILEHASH_REPORT_RUNSTAGE = {
+    ARGUMENTS: [
+        {
+            NAME: "missing_in_source_formatter",
+            VALUE: IDENTITY_FACTORY(filehash_missing_in_source_formatter),
+        },
+        {
+            NAME: "missing_in_target_formatter",
+            VALUE: IDENTITY_FACTORY(filehash_missing_in_target_formatter),
+        },
+        {
+            NAME: "unequal_value_formatter",
+            VALUE: IDENTITY_FACTORY(filehash_unequal_value_formatter),
+        },
+        {NAME: "equal_value_formatter", VALUE: IDENTITY_FACTORY(filehash_equal_value_formatter)},
+        {NAME: "itempairs", VALUE: compare_filehash_report},
+        {NAME: "diff", VALUE: create_report_diff},
+    ],
+    RUNSTEPS: create_logdiff_runstep,
+}
+
 # Pipeline
 
 
@@ -890,29 +990,47 @@ def create_runstages(
     source_filehash_report_type: ReportCreationType,
     target_filehash_report_type: ReportCreationType,
 ) -> List[Dict[str, Any]]:
-    runstages = []
+    runstages: List[Dict[str, Any]] = []
 
     if will_checksize:
+        has_source_filesize_report = True
         if source_filesize_report_type is ReportCreationType.Generate:
             runstages.append(GENERATE_SOURCE_FILESIZE_REPORT_RUNSTAGE)
         elif source_filesize_report_type is ReportCreationType.Load:
             runstages.append(LOAD_SOURCE_FILESIZE_REPORT_RUNSTAGE)
+        else:
+            has_source_filesize_report = False
 
+        has_target_filesize_report = True
         if target_filesize_report_type is ReportCreationType.Generate:
             runstages.append(GENERATE_TARGET_FILESIZE_REPORT_RUNSTAGE)
         elif target_filesize_report_type is ReportCreationType.Load:
             runstages.append(LOAD_TARGET_FILESIZE_REPORT_RUNSTAGE)
+        else:
+            has_target_filesize_report = False
+
+        if has_source_filesize_report and has_target_filesize_report:
+            runstages.append(COMPARE_FILESIZE_REPORT_RUNSTAGE)
 
     if will_checksum:
+        has_source_filehash_report = True
         if source_filehash_report_type is ReportCreationType.Generate:
             runstages.append(GENERATE_SOURCE_FILEHASH_REPORT_RUNSTAGE)
         elif source_filehash_report_type is ReportCreationType.Load:
             runstages.append(LOAD_SOURCE_FILEHASH_REPORT_RUNSTAGE)
+        else:
+            has_source_filehash_report = False
 
+        has_target_filehash_report = True
         if target_filehash_report_type is ReportCreationType.Generate:
             runstages.append(GENERATE_TARGET_FILEHASH_REPORT_RUNSTAGE)
         elif target_filehash_report_type is ReportCreationType.Load:
             runstages.append(LOAD_TARGET_FILEHASH_REPORT_RUNSTAGE)
+        else:
+            has_target_filehash_report = False
+
+        if has_source_filehash_report and has_target_filehash_report:
+            runstages.append(COMPARE_FILEHASH_REPORT_RUNSTAGE)
 
     return runstages
 
