@@ -3,11 +3,8 @@ from functools import partial
 from subprocess import DEVNULL, PIPE
 from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Type, Union
 
-from decorator import FunctionMaker
-
 from ..common import (
     AND,
-    ASYNC_VOID,
     IDENTITY_FACTORY,
     IS_DICT_MISSING_KEY,
     IS_DICTVALUE_NOT_CALLABLE,
@@ -26,6 +23,7 @@ from ..common import (
     SubprocessResult,
     get_or_raise,
     parse_argument,
+    rewrite_function_parameters,
 )
 from ..common import run as run_
 from ..parsing import Variant, WithVariants
@@ -132,18 +130,8 @@ _TRANSFORM_WHEN_KWARGS_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, 
 class Shell(Variant):
     run: ClassVar[
         Callable[[str, StdinStream, Stream, Stream, Dict[str, Any]], SubprocessResult]
-    ] = FunctionMaker.create(
-        f"run(_{VALUE}0_: str, _{VALUE}1_: StdinStream, _{VALUE}2_: Stream, _{VALUE}3_: Stream, _{VALUE}4_: Dict[str, Any])",
-        f"return run_(_{VALUE}0_, _{VALUE}1_, _{VALUE}2_, _{VALUE}3_, _{VALUE}4_)",
-        dict(
-            run_=run_,
-            Stream=Stream,
-            StdinStream=StdinStream,
-            Dict=Dict,
-            Any=Any,
-            _call_=ASYNC_VOID,
-        ),
-        addsource=True,
+    ] = rewrite_function_parameters(
+        run_, "run", f"_{VALUE}0_", f"_{VALUE}1_", f"_{VALUE}2_", f"_{VALUE}3_", f"_{VALUE}4_"
     )
 
     @classmethod
@@ -249,19 +237,21 @@ class Argparse(Variant):
             ],
             ParsedArgument,
         ]
-    ] = FunctionMaker.create(
-        f"parse(_{VALUE}0_: Union[str, List[str]], _{VALUE}1_: Optional[str], _{VALUE}2_: Optional[Union[str, int]], _{VALUE}3_: Optional[Any], _{VALUE}4_: Optional[Any], _{VALUE}5_: Optional[Type[Any]], _{VALUE}6_: Optional[Iterable[Any]], _{VALUE}7_: Optional[bool], _{VALUE}8_: Optional[str], _{VALUE}9_: Optional[str], _{VALUE}10_: Optional[str], _{VALUE}11_: List[str])",
-        f"return parse_argument(_{VALUE}0_, _{VALUE}1_, _{VALUE}2_, _{VALUE}3_, _{VALUE}4_, _{VALUE}5_, _{VALUE}6_, _{VALUE}7_, _{VALUE}8_, _{VALUE}9_, _{VALUE}10_, _{VALUE}11_)",
-        dict(
-            parse_argument=parse_argument,
-            Union=Union,
-            List=List,
-            Optional=Optional,
-            Type=Type,
-            Any=Any,
-            Iterable=Iterable,
-        ),
-        addsource=True,
+    ] = rewrite_function_parameters(
+        parse_argument,
+        "parse",
+        f"_{VALUE}0_",
+        f"_{VALUE}1_",
+        f"_{VALUE}2_",
+        f"_{VALUE}3_",
+        f"_{VALUE}4_",
+        f"_{VALUE}5_",
+        f"_{VALUE}6_",
+        f"_{VALUE}7_",
+        f"_{VALUE}8_",
+        f"_{VALUE}9_",
+        f"_{VALUE}10_",
+        f"_{VALUE}11_",
     )
 
     @staticmethod
