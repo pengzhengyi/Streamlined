@@ -19,6 +19,7 @@ from typing import (
 )
 
 from ..common import ASYNC_NOOP, ASYNC_VOID, IS_DICT, IS_ITERABLE, ProxyDictionary
+from ..execution import SimpleExecutor
 from ..services import DependencyInjection, Scoped, Scoping
 from .parser import Parser
 
@@ -164,6 +165,33 @@ class AbstractMiddleware:
         """
         apply = getattr(self, apply_method)
         return await apply(context)
+
+    async def run(self, executor: Optional[Executor] = None, **kwargs: Any) -> Scoped:
+        """
+        Run current middleware in an executor.
+
+        Parameters
+        ------
+        executor
+        If executor is not specified, then a  `SimpledExecutor` will be used.
+        kwargs
+        Provided arguments will be used to initialize global scope.
+
+        Return
+        ------
+        The execution scoping tree.
+        """
+        if executor is None:
+            executor = SimpleExecutor()
+
+        context, scoping = Context.new(executor)
+        for name, value in kwargs.items():
+            scoping.global_scope[name] = value
+
+        scoped = await self.apply_onto(context)
+
+        scoping.update(scoped)
+        return scoped
 
 
 class Middleware(Parser, AbstractMiddleware):

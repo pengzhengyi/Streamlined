@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from streamlined.common import ACTION, HANDLERS, RETURN_TRUE
-from streamlined.middlewares import VALIDATOR, VALIDATOR_AFTER_STAGE, Context, Validator
+from streamlined.middlewares import VALIDATOR, VALIDATOR_AFTER_STAGE, Validator
 
 
 @pytest.mark.asyncio
@@ -21,8 +21,7 @@ async def test_validator_handler(simple_executor):
         }
     )
 
-    context, scoping = Context.new(simple_executor)
-    scoped = await validator.apply_into(context)
+    scoped = await validator.run(simple_executor)
 
     true_handler_mock.assert_awaited_once()
     false_handler_mock.assert_not_awaited()

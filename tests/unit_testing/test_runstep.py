@@ -13,7 +13,6 @@ from streamlined.middlewares import (
     RUNSTEP,
     RUNSTEPS,
     SCHEDULING,
-    Context,
     Runstep,
     Runsteps,
 )
@@ -22,7 +21,7 @@ from streamlined.middlewares.argument import ARGUMENTS
 
 @pytest.mark.asyncio
 async def test_runstep_action_requires_arguments(simple_executor):
-    context, scoping = Context.new(simple_executor)
+
     mock = Mock()
 
     def add(a, b):
@@ -39,14 +38,14 @@ async def test_runstep_action_requires_arguments(simple_executor):
         }
     )
 
-    scoped = await runstep.apply_into(context)
+    scoped = await runstep.run()
     mock.assert_called_once_with(10, 20)
     assert scoped.getmagic(VALUE) == 30
 
 
 @pytest.mark.asyncio
 async def test_runstep_parallel(simple_executor):
-    context, scoping = Context.new(simple_executor)
+
     mock = Mock()
 
     async def sleep_and_do():
@@ -68,5 +67,5 @@ async def test_runstep_parallel(simple_executor):
 
     runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, SCHEDULING: PARALLEL}})
 
-    scoped = await runstep.apply_into(context)
+    scoped = await runstep.run(simple_executor)
     assert mock.call_count == NUM_RUNSTEPS
