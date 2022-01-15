@@ -65,7 +65,7 @@ async def _copy(
 
 
 async def copy(source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> bool:
-    return await _copy(source, dest, chunk_sizewrite_mode="wb")
+    return await _copy(source, dest, chunk_size, write_mode="wb")
 
 
 async def append(source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> bool:

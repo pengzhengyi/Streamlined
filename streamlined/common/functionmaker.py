@@ -42,9 +42,7 @@ def rewrite_function_parameters(
     return FunctionMaker.create(
         f"{function_newname}({parameters})",
         f"return function({arguments})",
-        dict(
-            function=function,
-        ),
+        dict(function=function, _call_=function),
         addsource=True,
     )
 
