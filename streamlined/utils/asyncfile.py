@@ -59,7 +59,7 @@ async def _copy(
     written_bytes_count = 0
     async with async_open(source, "rb") as reader, async_open(dest, write_mode) as writer:
         async for chunk in reader.iter_chunked(chunk_size):
-            source_bytes_count += len(chunk_size)
+            source_bytes_count += len(chunk)
             written_bytes_count += await writer.write(chunk)
     return written_bytes_count == source_bytes_count
 
