@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, MutableMapping, Optional
 
+from aiofiles import os as aio
+
 from streamlined import (
     ACTION,
     ARGPARSE,
@@ -30,7 +32,7 @@ from streamlined import (
     Scoped,
     SimpleExecutor,
 )
-from streamlined.utils import copy, crash, getsize, walk
+from streamlined.utils import copy, crash, samecontent, walk
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 SOURCE_DIR = "source_dir"
@@ -185,14 +187,10 @@ def get_corresponding_filepath(source: str, source_dir: str, target_dir: str) ->
 
 
 async def copyfile(source: str, dest: str) -> bool:
-    source_filesize = await getsize(source)
-    if os.path.isfile(dest):
-        dest_filesize = await getsize(dest)
-        if source_filesize == dest_filesize:
-            return True
+    if await aio.path.isfile(dest) and await samecontent(source, dest):
+        return True
 
-    copied_size = await copy(source, dest)
-    return copied_size == source_filesize
+    return await copy(source, dest)
 
 
 def get_copy_log_level(_value_: bool) -> int:
