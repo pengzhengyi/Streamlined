@@ -27,10 +27,8 @@ from streamlined import (
     VALIDATOR,
     VALIDATOR_AFTER_STAGE,
     VALUE,
-    Context,
     Pipeline,
     Scoped,
-    SimpleExecutor,
 )
 from streamlined.utils import copy, crash, samecontent, walk
 
@@ -233,16 +231,10 @@ PIPELINE = {
 
 
 async def main() -> None:
-    context, scoping = Context.new(SimpleExecutor())
-
     pipeline = Pipeline(PIPELINE)
 
     pipeline.print_help()
-    scoped = await pipeline.apply_into(context)
-
-    # Display scoping tree
-    scoping.update(scoped)
-    # scoping._tree.show()
+    scoping = pipeline.run()
 
 
 if __name__ == "__main__":

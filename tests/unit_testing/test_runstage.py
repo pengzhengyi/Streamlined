@@ -10,7 +10,6 @@ from streamlined.middlewares import (
     NAME,
     RUNSTAGE,
     RUNSTEPS,
-    Context,
     Runstage,
 )
 from streamlined.services import Scoped
@@ -18,7 +17,7 @@ from streamlined.services import Scoped
 
 @pytest.mark.asyncio
 async def test_runstage_with_name_example(simple_executor):
-    context, scoping = Context.new(simple_executor)
+
     us_convention_mock = Mock()
     chinese_convention_mock = Mock()
 
@@ -60,7 +59,7 @@ async def test_runstage_with_name_example(simple_executor):
         }
     )
 
-    scoped = await runstage.apply_into(context)
+    scoped = await runstage.run(simple_executor)
 
     us_convention_mock.assert_called_once_with("Alan", "Turing")
     chinese_convention_mock.assert_called_once_with("Alan", "Turing")
@@ -71,7 +70,7 @@ async def test_runstage_with_name_example(simple_executor):
 
 @pytest.mark.asyncio
 async def test_runstage_with_dynamic_generated_runsteps(simple_executor):
-    context, scoping = Context.new(simple_executor)
+
     us_convention_mock = Mock()
     chinese_convention_mock = Mock()
 
@@ -117,8 +116,7 @@ async def test_runstage_with_dynamic_generated_runsteps(simple_executor):
         }
     )
 
-    # breakpoint()
-    scoped = await runstage.apply_into(context)
+    scoped = await runstage.run(simple_executor)
 
     us_convention_mock.assert_called_once_with("Alan", "Turing")
     chinese_convention_mock.assert_called_once_with("Alan", "Turing")

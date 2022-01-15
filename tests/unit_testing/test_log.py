@@ -1,13 +1,10 @@
-import contextlib
-import io
 import logging
-import sys
 from unittest.mock import Mock
 
 import pytest
 
 from streamlined.common import LEVEL, LOGGER, MESSAGE
-from streamlined.middlewares import LOG, Context, Log
+from streamlined.middlewares import LOG, Log
 
 
 @pytest.mark.asyncio
@@ -16,7 +13,6 @@ async def test_log_log_message(simple_executor):
 
     log = Log({LOG: {LEVEL: logging.WARNING, MESSAGE: "Hello World", LOGGER: mock_logger}})
 
-    context, scoping = Context.new(simple_executor)
-    scoped = await log.apply_into(context)
+    scoped = await log.run(simple_executor)
 
     mock_logger.assert_called_once()

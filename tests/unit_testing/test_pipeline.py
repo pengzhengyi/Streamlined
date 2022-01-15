@@ -13,14 +13,12 @@ from streamlined.middlewares import (
     RUNSTAGE,
     RUNSTAGES,
     RUNSTEPS,
-    Context,
     Pipeline,
 )
 
 
 @pytest.mark.asyncio
 async def test_pipeline_simple(simple_executor):
-    context, scoping = Context.new(simple_executor)
     mock = Mock()
 
     def add(a, b):
@@ -35,7 +33,7 @@ async def test_pipeline_simple(simple_executor):
         }
     )
 
-    scoped = await pipeline.apply_into(context)
+    scoped = await pipeline.run(simple_executor)
     mock.assert_called_once_with(10, 20)
 
 
