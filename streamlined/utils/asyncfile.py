@@ -52,14 +52,24 @@ async def md5(filepath: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> str:
     return await _md5_by_reading(filepath, chunk_size)
 
 
-async def copy(source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> bool:
+async def _copy(
+    source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE, write_mode: str = "wb"
+) -> bool:
     source_bytes_count = 0
     written_bytes_count = 0
-    async with async_open(source, "rb") as reader, async_open(dest, "wb") as writer:
+    async with async_open(source, "rb") as reader, async_open(dest, write_mode) as writer:
         async for chunk in reader.iter_chunked(chunk_size):
             source_bytes_count += len(chunk_size)
             written_bytes_count += await writer.write(chunk)
     return written_bytes_count == source_bytes_count
+
+
+async def copy(source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> bool:
+    return await _copy(source, dest, chunk_sizewrite_mode="wb")
+
+
+async def append(source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> bool:
+    return await _copy(source, dest, chunk_size, write_mode="ab")
 
 
 async def _linecount_by_reading(filepath: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> int:
