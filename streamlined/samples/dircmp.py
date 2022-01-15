@@ -834,7 +834,7 @@ def load_target_filesize_report(
         FileSizeReport.empty(),
         target_filesize_filepath,
         _scoped_.global_scope,
-        SOURCE_FILESIZE_REPORT,
+        TARGET_FILESIZE_REPORT,
     )
 
 
@@ -848,7 +848,7 @@ def load_target_filehash_report(
         FileHashReport.empty(),
         target_filehash_filepath,
         _scoped_.global_scope,
-        TARGET_FILESIZE_REPORT,
+        TARGET_FILEHASH_REPORT,
     )
 
 
