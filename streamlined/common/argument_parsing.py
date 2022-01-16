@@ -30,7 +30,7 @@ class ArgumentDefinition:
         nargs: Optional[Union[str, int]] = None,
         const: Optional[Any] = None,
         default: Optional[Any] = None,
-        type: Optional[Type[Any]] = str,
+        type: Optional[Type[Any]] = None,
         choices: Optional[Iterable[Any]] = None,
         required: Optional[bool] = None,
         help: Optional[str] = None,
