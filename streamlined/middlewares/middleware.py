@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import itertools
+from argparse import ArgumentParser
 from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
@@ -18,7 +19,15 @@ from typing import (
     Union,
 )
 
-from ..common import ASYNC_NOOP, ASYNC_VOID, IS_DICT, IS_ITERABLE, ProxyDictionary
+from ..common import (
+    ASYNC_NOOP,
+    ASYNC_VOID,
+    IS_DICT,
+    IS_ITERABLE,
+    ProxyDictionary,
+    findvalue,
+    format_help,
+)
 from ..execution import SimpleExecutor
 from ..services import DependencyInjection, Scoped, Scoping
 from .parser import Parser
@@ -205,6 +214,21 @@ class Middleware(Parser, AbstractMiddleware):
         else:
             config = {name: value}
         return cls(config)
+
+    def format_help(
+        self, argument_parser: Optional[Union[ArgumentParser, Dict[str, Any]]] = None
+    ) -> str:
+        from .action import Argparse
+
+        if argument_parser is None:
+            argument_parser = dict()
+
+        arguments = map(
+            Argparse.to_argument_definition,
+            findvalue(self.declaration, Argparse.is_variant),
+        )
+
+        return format_help(argument_parser, arguments)
 
 
 @dataclass

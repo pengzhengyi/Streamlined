@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import uuid
 from collections import UserDict, deque
-from typing import Any, Deque, Iterable, Optional
+from typing import Any, Deque, Iterable, Mapping, Optional, TypeVar
 
 from treelib import Node, Tree
 
 from ..common import update as tree_update
+
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 def to_magic_naming(name: str) -> str:
@@ -19,7 +22,7 @@ def to_magic_naming(name: str) -> str:
     return f"_{name}_"
 
 
-class Scope(UserDict):
+class Scope(UserDict, Mapping[str, Any]):
     """
     Scope stores mappings from name to value.
     """
