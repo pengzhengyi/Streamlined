@@ -15,6 +15,7 @@ pytest
 pytest-asyncio
 pytest-cov
 ray[default]
+rich
 treelib
 types-requests
 uuid

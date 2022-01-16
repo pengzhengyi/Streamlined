@@ -65,6 +65,12 @@ async def _copy(
 
 
 async def copy(source: str, dest: str, chunk_size: int = DEFAULT_BUFFER_SIZE) -> bool:
+    try:
+        result = await run(["cp", source, dest])
+        if result.returncode == 0:
+            return True
+    except Exception:
+        pass
     return await _copy(source, dest, chunk_size, write_mode="wb")
 
 
