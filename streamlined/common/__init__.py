@@ -29,6 +29,7 @@ from .dictionary import (
     update_with_callable,
 )
 from .functionmaker import create_identity_function, rewrite_function_parameters
+from .logging import get_default_handler, use_basic_logging_config
 from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, TYPE, VALUE
 from .predicates import (
     AND,
