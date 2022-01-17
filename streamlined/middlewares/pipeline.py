@@ -2,6 +2,8 @@ import sys
 from argparse import ArgumentParser
 from typing import Any, Callable, Dict, List, Optional, Union
 
+from rich import print
+
 from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT, findvalue, format_help
 from ..services import Scoped
 from .action import Argparse
