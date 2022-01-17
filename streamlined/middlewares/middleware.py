@@ -19,6 +19,8 @@ from typing import (
     Union,
 )
 
+from aiorun import run
+
 from ..common import (
     ASYNC_NOOP,
     ASYNC_VOID,
@@ -201,6 +203,18 @@ class AbstractMiddleware:
 
         scoping.update(scoped)
         return scoped
+
+    def run_as_main(self, executor: Optional[Executor] = None, **kwargs: Any) -> None:
+        """
+        Await completion of middleware in provided executor. This method can be
+        used as main method.
+
+        Differences from `self.run`
+        ------
+        + `run_as_main` will block main thread until the middleware has finished.
+        + the execution scope will not be returned.
+        """
+        return run(self.run(executor, **kwargs), use_uvloop=True, stop_on_unhandled_errors=True)
 
 
 class Middleware(Parser, AbstractMiddleware):
