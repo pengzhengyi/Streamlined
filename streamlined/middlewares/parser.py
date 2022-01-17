@@ -52,7 +52,7 @@ class Parser(AbstractParser):
 
     def parse(self, value: Any) -> Dict[str, Any]:
         if IS_DICT(value):
-            value = value.get(self.name, None)
+            value = value.get(self.name, value)
             return super().parse(value)
         else:
             raise TypeError(f"Expect {value} to be a Dictionary")
