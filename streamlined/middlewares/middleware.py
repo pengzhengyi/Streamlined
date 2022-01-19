@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import itertools
+import logging
 from argparse import ArgumentParser
+from asyncio.events import AbstractEventLoop
 from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
@@ -13,6 +16,7 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Mapping,
     Optional,
     Tuple,
     Type,
@@ -204,6 +208,10 @@ class AbstractMiddleware:
         scoping.update(scoped)
         return scoped
 
+    async def __run_and_stop(self, executor: Optional[Executor] = None, **kwargs: Any) -> None:
+        await self.run(executor, **kwargs)
+        asyncio.get_running_loop().stop()
+
     def run_as_main(self, executor: Optional[Executor] = None, **kwargs: Any) -> None:
         """
         Await completion of middleware in provided executor. This method can be
@@ -214,7 +222,20 @@ class AbstractMiddleware:
         + `run_as_main` will block main thread until the middleware has finished.
         + the execution scope will not be returned.
         """
-        return run(self.run(executor, **kwargs), use_uvloop=True, stop_on_unhandled_errors=True)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.create_task(self.__run_and_stop(executor, **kwargs))
+
+        def handler(loop: AbstractEventLoop, context: Mapping[str, Any]) -> None:
+            try:
+                raise Exception("Premature termination") from context["exception"]
+            except Exception:
+                logging.exception(context["message"])
+                loop.stop()
+
+        loop.set_exception_handler(handler)
+
+        return run(loop=loop)
 
 
 class Middleware(Parser, AbstractMiddleware):
