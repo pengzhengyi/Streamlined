@@ -1,6 +1,7 @@
+from functools import partial
 from typing import Any, Dict, List
 
-from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT
+from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_DICT_MISSING_KEY, IS_NOT_DICT
 from ..services import Scoped
 from .argument import Arguments
 from .cleanup import Cleanup
@@ -16,13 +17,13 @@ from .runstep import (
 )
 from .setup import Setup
 from .skip import Skip
+from .suppress import Suppress
 from .validator import Validator
 
 _MISSING_RUNSTAGE_NAME = _MISSING_RUNSTEP_NAME
 
 
-def _MISSING_RUNSTAGE_RUNSTEPS(value: Dict[str, Any]) -> bool:
-    return RUNSTEPS not in value
+_MISSING_RUNSTAGE_RUNSTEPS = partial(IS_DICT_MISSING_KEY, key=RUNSTEPS)
 
 
 class Runstage(Middleware, WithMiddlewares):
@@ -42,13 +43,14 @@ class Runstage(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend(
-            [Name, Skip, Arguments, Setup, Validator, Runsteps, Log, Cleanup]
+            [Name, Skip, Suppress, Arguments, Setup, Validator, Runsteps, Log, Cleanup]
         )
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
             [
+                APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_INTO,

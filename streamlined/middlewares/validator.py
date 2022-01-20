@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from functools import partial
 from typing import Any, Awaitable, Callable, Dict, List
 
 from ..common import (
@@ -13,6 +14,7 @@ from ..common import (
     IDENTITY_FACTORY,
     IS_CALLABLE,
     IS_DICT,
+    IS_DICT_MISSING_KEY,
     IS_NONE,
     IS_NOT_CALLABLE,
     IS_NOT_DICT,
@@ -43,8 +45,7 @@ def _TRANSFORM_WHEN_HANDLER_IS_CALLABLE(
     return {ACTION: value}
 
 
-def _MISSING_HANDLER_ACTION(value: Dict[str, Any]) -> bool:
-    return ACTION not in value
+_MISSING_HANDLER_ACTION = partial(IS_DICT_MISSING_KEY, key=ACTION)
 
 
 def _TRANSFORM_WHEN_HANDLER_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:
@@ -101,8 +102,7 @@ class ValidatorHandler(Middleware, WithMiddlewares):
         return await coroutine()
 
 
-def _MISSING_HANDLERS(value: Dict[str, Any]) -> bool:
-    return HANDLERS not in value
+_MISSING_HANDLERS = partial(IS_DICT_MISSING_KEY, key=HANDLERS)
 
 
 def _TRANSFORM_WHEN_MISSING_HANDLERS(value: Dict[str, Any]) -> Dict[str, Any]:

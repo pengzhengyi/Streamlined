@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Any, Awaitable, Dict
 
 from ..common import (
@@ -7,12 +8,14 @@ from ..common import (
     DEFAULT_KEYERROR,
     IDENTITY_FACTORY,
     IS_DICT,
+    IS_DICT_MISSING_KEY,
     IS_NONE,
     IS_NOT_CALLABLE,
     IS_NOT_DICT,
     NOOP,
     RETURN_FALSE,
     VALUE,
+    WHEN,
 )
 from ..services import Scoped
 from .action import Action
@@ -23,8 +26,7 @@ def _TRANSFORM_WHEN_NOT_DICT(value: Any) -> Dict[str, Any]:
     return {VALUE: value}
 
 
-def _MISSING_ACTION(value: Dict[str, Any]) -> bool:
-    return ACTION not in value
+_MISSING_ACTION = partial(IS_DICT_MISSING_KEY, key=ACTION)
 
 
 def _TRANSFORM_WHEN_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:
@@ -32,8 +34,7 @@ def _TRANSFORM_WHEN_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:
     return value
 
 
-def _MISSING_VALUE(value: Dict[str, Any]) -> bool:
-    return VALUE not in value
+_MISSING_VALUE = partial(IS_DICT_MISSING_KEY, key=VALUE)
 
 
 def _TRANSFORM_WHEN_MISSING_VALUE(value: Dict[str, Any]) -> Dict[str, Any]:
@@ -92,16 +93,18 @@ class Skip(Middleware):
     def _do_parse(self, value: Dict[str, Any]) -> Dict[str, Middleware]:
         self.verify(value)
 
-        return {"_should_skip": Action({ACTION: value[VALUE]}), "_when_skip": Action(value)}
+        return {WHEN: Action(value[VALUE]), ACTION: Action(value[ACTION])}
 
     async def should_skip(self, context: Context) -> Awaitable[bool]:
-        scoped: Scoped = await Middleware.apply_onto(self._should_skip, context)
+        should_skip_action: Action = getattr(self, WHEN)
+        scoped = await should_skip_action.apply_onto(context)
         skipped = scoped.getmagic(VALUE)
         context.scoped.setmagic(SKIP, skipped)
         return skipped
 
     async def when_skip(self, context: Context) -> Awaitable[Scoped]:
-        scoped: Scoped = await Middleware.apply_into(self._when_skip, context)
+        action_when_skip: Action = getattr(self, ACTION)
+        scoped = await action_when_skip.apply_into(context)
         return scoped.getmagic(VALUE)
 
     async def _do_apply(self, context: Context) -> Scoped:

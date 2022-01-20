@@ -1,22 +1,23 @@
 import asyncio
 import random
 from typing import Any, Dict, List
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from streamlined.common import VALUE
-from streamlined.middlewares import (
+from streamlined import (
     ACTION,
+    ARGUMENTS,
     NAME,
     PARALLEL,
     RUNSTEP,
     RUNSTEPS,
     SCHEDULING,
+    SUPPRESS,
+    VALUE,
     Runstep,
     Runsteps,
 )
-from streamlined.middlewares.argument import ARGUMENTS
 
 
 @pytest.mark.asyncio
@@ -38,9 +39,28 @@ async def test_runstep_action_requires_arguments(simple_executor):
         }
     )
 
-    scoped = await runstep.run()
+    scoped = await runstep.run(simple_executor)
     mock.assert_called_once_with(10, 20)
     assert scoped.getmagic(VALUE) == 30
+
+
+@pytest.mark.asyncio
+async def test_runstep_suppress_no_argument_exception(simple_executor) -> None:
+    suppressed_action = AsyncMock()
+
+    def add(a, b):
+        return a + b
+
+    runstep = Runstep(
+        {
+            NAME: "perform add of two numbers",
+            ACTION: add,
+            SUPPRESS: {ACTION: suppressed_action},
+        }
+    )
+
+    scoped = await runstep.run(simple_executor)
+    suppressed_action.assert_awaited_once()
 
 
 @pytest.mark.asyncio

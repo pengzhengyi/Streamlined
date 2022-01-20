@@ -1,6 +1,7 @@
+from functools import partial
 from typing import Any, Dict, Iterable, Tuple
 
-from ..common import DEFAULT_KEYERROR, IS_NOT_DICT, VALUE
+from ..common import DEFAULT_KEYERROR, IS_DICT_MISSING_KEY, IS_NOT_DICT, VALUE
 from ..services import Scoped
 from .action import AbstractAction, Action
 from .cleanup import Cleanup
@@ -9,15 +10,12 @@ from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlew
 from .middlewares import StackedMiddlewares
 from .name import NAME, Name
 from .skip import Skip
+from .suppress import Suppress
 from .validator import Validator
 
+_MISSING_ARGUMENT_NAME = partial(IS_DICT_MISSING_KEY, key=NAME)
 
-def _MISSING_ARGUMENT_NAME(value: Dict[str, Any]) -> bool:
-    return NAME not in value
-
-
-def _MISSING_ARGUMENT_VALUE(value: Dict[str, Any]) -> bool:
-    return VALUE not in value
+_MISSING_ARGUMENT_VALUE = partial(IS_DICT_MISSING_KEY, key=VALUE)
 
 
 def _set_argument_value(_scoped_: Scoped) -> Tuple[Any, Any]:
@@ -35,12 +33,23 @@ class SetArgument(AbstractAction):
 class Argument(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
-        self.middleware_types.extend([Name, Skip, Validator, Action, SetArgument, Log, Cleanup])
+        self.middleware_types.extend(
+            [Name, Skip, Suppress, Validator, Action, SetArgument, Log, Cleanup]
+        )
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
-            [APPLY_ONTO, APPLY_ONTO, APPLY_ONTO, APPLY_INTO, APPLY_ONTO, APPLY_ONTO, APPLY_ONTO]
+            [
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_INTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+            ]
         )
 
     def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:

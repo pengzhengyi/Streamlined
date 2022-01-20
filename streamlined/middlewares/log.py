@@ -1,5 +1,5 @@
-import itertools
 import logging
+from functools import partial
 from typing import Any, Dict
 
 from ..common import (
@@ -8,6 +8,7 @@ from ..common import (
     IDENTITY_FACTORY,
     IS_CALLABLE,
     IS_DICT,
+    IS_DICT_MISSING_KEY,
     IS_NOT_CALLABLE,
     IS_STR,
     LEVEL,
@@ -16,7 +17,7 @@ from ..common import (
     VALUE,
 )
 from ..services import Scoped
-from .action import ACTION, Action
+from .action import Action
 from .middleware import Context, Middleware
 
 
@@ -24,24 +25,21 @@ def _TRANSFORM_WHEN_IS_STR(value: str) -> Dict[str, Any]:
     return {MESSAGE: value}
 
 
-def _MISSING_MESSAGE(value):
-    return MESSAGE not in value
+_MISSING_MESSAGE = partial(IS_DICT_MISSING_KEY, key=MESSAGE)
 
 
-def _MISSING_LEVEL(value):
-    return LEVEL not in value
+_MISSING_LEVEL = partial(IS_DICT_MISSING_KEY, key=LEVEL)
 
 
-def _TRANSFORM_WHEN_MISSING_LEVEL(value):
+def _TRANSFORM_WHEN_MISSING_LEVEL(value: Dict[str, Any]) -> Dict[str, Any]:
     value[LEVEL] = logging.DEBUG
     return value
 
 
-def _MISSING_LOGGER(value):
-    return LOGGER not in value
+_MISSING_LOGGER = partial(IS_DICT_MISSING_KEY, key=LOGGER)
 
 
-def _TRANSFORM_WHEN_MISSING_LOGGER(value):
+def _TRANSFORM_WHEN_MISSING_LOGGER(value: Dict[str, Any]) -> Dict[str, Any]:
     value[LOGGER] = logging.getLogger
     return value
 
@@ -128,11 +126,9 @@ class Log(Middleware):
     def _do_parse(self, value: Dict[str, Any]) -> Dict[str, Middleware]:
         self.verify(value)
 
-        parsed = dict()
-        middleware_name = ACTION
-        for middleware_type, keyname in zip(itertools.repeat(Action), [LOGGER, LEVEL, MESSAGE]):
-            new_value = {middleware_name: value[keyname]}
-            parsed[keyname] = middleware_type(new_value)
+        parsed: Dict[str, Middleware] = dict()
+        for keyname in [LOGGER, LEVEL, MESSAGE]:
+            parsed[keyname] = Action(value[keyname])
 
         return parsed
 

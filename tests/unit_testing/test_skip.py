@@ -10,7 +10,7 @@ from streamlined.middlewares import SKIP, Context, Skip
 @pytest.mark.asyncio
 async def test_skip_when_value_omitted(simple_executor):
     original_action = AsyncMock()
-    skip = Skip({SKIP: {ACTION: original_action}})
+    skip = Skip({ACTION: original_action})
 
     context, _ = Context.new(simple_executor)
     context = replace(context, next=original_action)

@@ -17,6 +17,7 @@ from .runstage import Runstages
 from .runstep import _MISSING_RUNSTEP_NAME, _TRANSFORM_WHEN_MISSING_NAME
 from .setup import Setup
 from .skip import Skip
+from .suppress import Suppress
 from .validator import Validator
 
 _MISSING_PIPELINE_NAME = _MISSING_RUNSTEP_NAME
@@ -50,13 +51,14 @@ class Pipeline(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend(
-            [Name, Skip, Arguments, Setup, Validator, Runstages, Log, Cleanup]
+            [Name, Skip, Suppress, Arguments, Setup, Validator, Runstages, Log, Cleanup]
         )
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
             [
+                APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_INTO,
