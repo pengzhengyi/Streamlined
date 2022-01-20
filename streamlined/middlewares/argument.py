@@ -10,6 +10,7 @@ from .middleware import APPLY_INTO, APPLY_ONTO, Context, Middleware, WithMiddlew
 from .middlewares import StackedMiddlewares
 from .name import NAME, Name
 from .skip import Skip
+from .suppress import Suppress
 from .validator import Validator
 
 _MISSING_ARGUMENT_NAME = partial(IS_DICT_MISSING_KEY, key=NAME)
@@ -32,12 +33,23 @@ class SetArgument(AbstractAction):
 class Argument(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
-        self.middleware_types.extend([Name, Skip, Validator, Action, SetArgument, Log, Cleanup])
+        self.middleware_types.extend(
+            [Name, Skip, Suppress, Validator, Action, SetArgument, Log, Cleanup]
+        )
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
-            [APPLY_ONTO, APPLY_ONTO, APPLY_ONTO, APPLY_INTO, APPLY_ONTO, APPLY_ONTO, APPLY_ONTO]
+            [
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_INTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+                APPLY_ONTO,
+            ]
         )
 
     def create_middlewares_from(self, value: Dict[str, Any]) -> Iterable[Middleware]:

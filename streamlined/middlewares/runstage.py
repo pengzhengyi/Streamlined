@@ -17,6 +17,7 @@ from .runstep import (
 )
 from .setup import Setup
 from .skip import Skip
+from .suppress import Suppress
 from .validator import Validator
 
 _MISSING_RUNSTAGE_NAME = _MISSING_RUNSTEP_NAME
@@ -42,13 +43,14 @@ class Runstage(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend(
-            [Name, Skip, Arguments, Setup, Validator, Runsteps, Log, Cleanup]
+            [Name, Skip, Suppress, Arguments, Setup, Validator, Runsteps, Log, Cleanup]
         )
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
             [
+                APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_INTO,

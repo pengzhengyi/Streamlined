@@ -10,10 +10,9 @@ from ..common import (
     DEFAULT_KEYERROR,
     IS_DICT,
     IS_DICT_MISSING_KEY,
-    IS_NONE,
     IS_NOT_CALLABLE,
     NOOP,
-    RETURN_TRUE,
+    TAUTOLOGY,
     WHEN,
 )
 from ..services import Scoped
@@ -26,10 +25,6 @@ CAUGHT_EXCEPTION = "caught_exception"
 _MISSING_EXCEPTION = partial(IS_DICT_MISSING_KEY, key=EXCEPTION)
 _MISSING_WHEN = partial(IS_DICT_MISSING_KEY, key=WHEN)
 _MISSING_ACTION = partial(IS_DICT_MISSING_KEY, key=ACTION)
-
-
-def _TRANSFORM_WHEN_IS_NONE(value: None) -> Type[Exception]:
-    return Exception
 
 
 def _IS_EXCEPTION_CLASS(value: Any) -> bool:
@@ -57,7 +52,7 @@ def _TRANSFORM_WHEN_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _TRANSFORM_WHEN_MISSING_WHEN(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[WHEN] = RETURN_TRUE
+    value[WHEN] = TAUTOLOGY
     return value
 
 
@@ -88,9 +83,6 @@ class Suppress(Middleware):
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
-
-        # `{'suppress': None}` -> `{'suppress': Exception}`
-        self.simplifications.append((IS_NONE, _TRANSFORM_WHEN_IS_NONE))
 
         # `{'suppress': <exception>}` -> `{'suppress': {EXCEPTION: <exception>}}`
         self.simplifications.append((_IS_EXCEPTION_CLASS, _TRANSFORM_WHEN_IS_EXCEPTION_CLASS))

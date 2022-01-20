@@ -21,6 +21,7 @@ from .middlewares import StackedMiddlewares
 from .name import NAME, Name
 from .setup import Setup
 from .skip import Skip
+from .suppress import Suppress
 from .validator import Validator
 
 _MISSING_RUNSTEP_NAME = partial(IS_DICT_MISSING_KEY, key=NAME)
@@ -58,13 +59,14 @@ class Runstep(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend(
-            [Name, Skip, Arguments, Setup, Validator, Action, Log, Cleanup]
+            [Name, Skip, Suppress, Arguments, Setup, Validator, Action, Log, Cleanup]
         )
 
     def _init_middleware_apply_methods(self) -> None:
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend(
             [
+                APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_INTO,
