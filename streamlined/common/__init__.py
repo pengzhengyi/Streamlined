@@ -30,7 +30,7 @@ from .dictionary import (
 )
 from .functionmaker import create_identity_function, rewrite_function_parameters
 from .logging import get_default_handler, use_basic_logging_config
-from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, TYPE, VALUE
+from .names import ACTION, DEFAULT, HANDLERS, LEVEL, LOGGER, MESSAGE, TYPE, VALUE, WHEN
 from .predicates import (
     AND,
     IS_CALLABLE,

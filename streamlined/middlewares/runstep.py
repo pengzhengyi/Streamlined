@@ -1,7 +1,16 @@
 import uuid
+from functools import partial
 from typing import Any, Dict, List
 
-from ..common import AND, DEFAULT_KEYERROR, IS_CALLABLE, IS_DICT, IS_NOT_DICT, VOID
+from ..common import (
+    AND,
+    DEFAULT_KEYERROR,
+    IS_CALLABLE,
+    IS_DICT,
+    IS_DICT_MISSING_KEY,
+    IS_NOT_DICT,
+    VOID,
+)
 from ..services import Scoped
 from .action import ACTION, Action
 from .argument import Arguments
@@ -14,13 +23,8 @@ from .setup import Setup
 from .skip import Skip
 from .validator import Validator
 
-
-def _MISSING_RUNSTEP_NAME(value: Dict[str, Any]) -> bool:
-    return NAME not in value
-
-
-def _MISSING_RUNSTEP_ACTION(value: Dict[str, Any]) -> bool:
-    return ACTION not in value
+_MISSING_RUNSTEP_NAME = partial(IS_DICT_MISSING_KEY, key=NAME)
+_MISSING_RUNSTEP_ACTION = partial(IS_DICT_MISSING_KEY, key=ACTION)
 
 
 def _TRANSFORM_WHEN_MISSING_ACTION(value: Dict[str, Any]) -> Dict[str, Any]:

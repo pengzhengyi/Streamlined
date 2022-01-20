@@ -1,6 +1,7 @@
+from functools import partial
 from typing import Any, Dict, List
 
-from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT
+from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_DICT_MISSING_KEY, IS_NOT_DICT
 from ..services import Scoped
 from .argument import Arguments
 from .cleanup import Cleanup
@@ -21,8 +22,7 @@ from .validator import Validator
 _MISSING_RUNSTAGE_NAME = _MISSING_RUNSTEP_NAME
 
 
-def _MISSING_RUNSTAGE_RUNSTEPS(value: Dict[str, Any]) -> bool:
-    return RUNSTEPS not in value
+_MISSING_RUNSTAGE_RUNSTEPS = partial(IS_DICT_MISSING_KEY, key=RUNSTEPS)
 
 
 class Runstage(Middleware, WithMiddlewares):

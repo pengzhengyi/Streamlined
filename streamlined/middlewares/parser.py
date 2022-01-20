@@ -51,8 +51,8 @@ class Parser(AbstractParser):
             setattr(self, name, value)
 
     def parse(self, value: Any) -> Dict[str, Any]:
+        value_to_parse = value
         if IS_DICT(value):
-            value = value.get(self.name, value)
-            return super().parse(value)
-        else:
-            raise TypeError(f"Expect {value} to be a Dictionary")
+            value_to_parse = value.get(self.name, value)
+
+        return super().parse(value_to_parse)

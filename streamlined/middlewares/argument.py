@@ -1,6 +1,7 @@
+from functools import partial
 from typing import Any, Dict, Iterable, Tuple
 
-from ..common import DEFAULT_KEYERROR, IS_NOT_DICT, VALUE
+from ..common import DEFAULT_KEYERROR, IS_DICT_MISSING_KEY, IS_NOT_DICT, VALUE
 from ..services import Scoped
 from .action import AbstractAction, Action
 from .cleanup import Cleanup
@@ -11,13 +12,9 @@ from .name import NAME, Name
 from .skip import Skip
 from .validator import Validator
 
+_MISSING_ARGUMENT_NAME = partial(IS_DICT_MISSING_KEY, key=NAME)
 
-def _MISSING_ARGUMENT_NAME(value: Dict[str, Any]) -> bool:
-    return NAME not in value
-
-
-def _MISSING_ARGUMENT_VALUE(value: Dict[str, Any]) -> bool:
-    return VALUE not in value
+_MISSING_ARGUMENT_VALUE = partial(IS_DICT_MISSING_KEY, key=VALUE)
 
 
 def _set_argument_value(_scoped_: Scoped) -> Tuple[Any, Any]:

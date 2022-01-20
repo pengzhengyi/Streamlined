@@ -6,3 +6,4 @@ MESSAGE = VALUE
 DEFAULT = "__default__"
 HANDLERS = "handlers"
 TYPE = "type"
+WHEN = "when"
