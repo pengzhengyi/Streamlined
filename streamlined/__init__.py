@@ -62,6 +62,7 @@ from .middlewares import (
     STDERR,
     STDIN,
     STDOUT,
+    SUBSTEPS,
     SUPPRESS,
     VALIDATOR,
     VALIDATOR_AFTER_STAGE,
