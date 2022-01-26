@@ -25,3 +25,11 @@ def test_valueref_string_representation():
     directory = ref(dict(origin="source", source_dir="/tmp"))
     assert directory == "/tmp"
     assert str(ref) == "{origin}_dir|source_dir->/tmp"
+
+
+def test_reference_overrides_and_fallbacks():
+    ref = ValueRef(
+        "{what}{which}", overrides=dict(what="tweet"), fallbacks=dict(which=1, tweet1="Hello")
+    )
+    tweet = ref(dict(which=100, tweet100="Welcome to the party!"))
+    assert tweet == "Welcome to the party!"

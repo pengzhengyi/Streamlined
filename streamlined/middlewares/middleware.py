@@ -65,12 +65,17 @@ class Context:
     next: ScopedNext = ASYNC_NOOP
 
     @classmethod
-    def new(cls, executor: Executor) -> Tuple[Context, Scoping]:
+    def new(cls, executor: Optional[Executor] = None) -> Tuple[Context, Scoping]:
         """
         Create a new middleware context from a executor.
 
+        When no executor is provided, default to create a `SimpleExecutor`.
+
         Scoped is created from a newly created Scoping.
         """
+        if executor is None:
+            executor = SimpleExecutor()
+
         scoping = Scoping()
         return (
             cls(

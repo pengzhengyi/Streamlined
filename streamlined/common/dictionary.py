@@ -1,7 +1,18 @@
 from __future__ import annotations
 
 from collections import UserDict
-from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple, TypeVar
+from contextlib import suppress
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+)
 
 from .predicates import IS_DICT, IS_SEQUENCE
 
@@ -51,8 +62,11 @@ def update_with_callable(dictionary: Dict[K, V], key: K, value_updater: Callable
 
 class ProxyDictionary(UserDict):
     """
-    A proxy dictionary is intended to provide some more key value
-    pairs beyond a mapping object.
+    A proxy dictionary is intended to provide a Dictionary like view by
+    chaining multiple mapping object.
+
+    For example, suppose dictionaries `A`, `B`, `C` are provided to
+    `ProxyDictionary`. Key will first be searched in `A`, then `B` if failed, then `C` if failed again.
 
     >>> original = {'a': 1, 'b': 2}
     >>> proxied = ProxyDictionary(original, c=3)
@@ -60,17 +74,17 @@ class ProxyDictionary(UserDict):
     6
     """
 
-    proxy: Mapping[Any, Any]
+    proxies: Sequence[Mapping[Any, Any]]
 
-    def __init__(self, proxy: Mapping[Any, Any], **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.proxy = proxy
+    def __init__(self, *proxies: Mapping[Any, Any], **fallbacks: Any) -> None:
+        super().__init__(**fallbacks)
+        self.proxies = proxies
 
     def __getitem__(self, key: Any) -> Any:
-        try:
-            return super().__getitem__(key)
-        except KeyError:
-            return self.proxy[key]
+        for proxy in self.proxies:
+            with suppress(KeyError):
+                return proxy[key]
+        return super().__getitem__(key)
 
 
 def findkey(source: Any, predicate: Callable[[Any], bool]) -> Iterable[Any]:

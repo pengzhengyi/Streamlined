@@ -1,11 +1,38 @@
 from string import Formatter
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
+
+from ..common import ProxyDictionary
 
 
 class Reference(Formatter):
-    def __init__(self, format_string: str) -> None:
+    def __init__(
+        self,
+        format_string: str,
+        overrides: Optional[Mapping[str, Any]] = None,
+        fallbacks: Optional[Mapping[str, Any]] = None,
+    ) -> None:
         super().__init__()
         self.format_string = format_string
+        self._init_overrides(overrides)
+        self._init_fallbacks(fallbacks)
+
+    def _init_overrides(self, overrides: Optional[Mapping[str, Any]]) -> None:
+        self.overrides = dict() if overrides is None else overrides
+
+    def _init_fallbacks(self, fallbacks: Optional[Mapping[str, Any]]) -> None:
+        self.fallbacks = dict() if fallbacks is None else fallbacks
+
+    def _create_proxy_dictionary(self, mapping: Mapping[str, Any]) -> ProxyDictionary:
+        proxies = []
+        if self.overrides:
+            proxies.append(self.overrides)
+
+        proxies.append(mapping)
+
+        if self.fallbacks:
+            proxies.append(self.fallbacks)
+
+        return ProxyDictionary(*proxies)
 
     def __call__(self, _scoped_: Mapping[str, Any]) -> Any:
         return self.resolve(_scoped_)
@@ -80,7 +107,8 @@ class NameRef(Reference):
             return super().__str__()
 
     def resolve(self, _scoped_: Mapping[str, Any]) -> str:
-        self._resolved_name = self.vformat(self.format_string, [], _scoped_)
+        proxy_dict = self._create_proxy_dictionary(_scoped_)
+        self._resolved_name = self.vformat(self.format_string, [], proxy_dict)
         return self._resolved_name
 
 
@@ -143,7 +171,8 @@ class ValueRef(NameRef):
 
     def resolve(self, _scoped_: Mapping[str, Any]) -> Any:
         resolved_name = super().resolve(_scoped_)
-        self._resolved_value = _scoped_[resolved_name]
+        proxy_dict = self._create_proxy_dictionary(_scoped_)
+        self._resolved_value = proxy_dict[resolved_name]
         return self._resolved_value
 
 
