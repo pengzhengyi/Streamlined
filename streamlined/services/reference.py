@@ -10,6 +10,12 @@ class Reference(Formatter):
     def __call__(self, _scoped_: Mapping[str, Any]) -> Any:
         return self.resolve(_scoped_)
 
+    def __str__(self) -> str:
+        return f"{self.format_string}->?"
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({str(self)})"
+
     def resolve(self, _scoped_: Mapping[str, Any]) -> Any:
         """
         Resolve this format string in provided scope.
@@ -65,8 +71,17 @@ class NameRef(Reference):
     'document_version-alpha'
     """
 
+    _resolved_name: str
+
+    def __str__(self) -> str:
+        try:
+            return f"{self.format_string}->{self._resolved_name}"
+        except AttributeError:
+            return super().__str__()
+
     def resolve(self, _scoped_: Mapping[str, Any]) -> str:
-        return self.vformat(self.format_string, [], _scoped_)
+        self._resolved_name = self.vformat(self.format_string, [], _scoped_)
+        return self._resolved_name
 
 
 class ValueRef(NameRef):
@@ -118,9 +133,18 @@ class ValueRef(NameRef):
     1
     """
 
+    _resolved_value: Any
+
+    def __str__(self) -> str:
+        try:
+            return f"{self.format_string}|{self._resolved_name}->{self._resolved_value}"
+        except AttributeError:
+            return super().__str__()
+
     def resolve(self, _scoped_: Mapping[str, Any]) -> Any:
         resolved_name = super().resolve(_scoped_)
-        return _scoped_[resolved_name]
+        self._resolved_value = _scoped_[resolved_name]
+        return self._resolved_value
 
 
 if __name__ == "__main__":

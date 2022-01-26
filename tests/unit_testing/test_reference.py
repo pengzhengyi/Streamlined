@@ -17,3 +17,11 @@ async def test_valueref_in_middleware(simple_executor):
     scoped = await argument.run(simple_executor, origin="source", source_dir="/tmp")
 
     assert scoped["source_dir"] == "/tmp"
+
+
+def test_valueref_string_representation():
+    ref = ValueRef("{origin}_dir")
+    assert str(ref) == "{origin}_dir->?"
+    directory = ref(dict(origin="source", source_dir="/tmp"))
+    assert directory == "/tmp"
+    assert str(ref) == "{origin}_dir|source_dir->/tmp"
