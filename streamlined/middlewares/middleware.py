@@ -19,6 +19,7 @@ from typing import (
     Type,
     Union,
 )
+from uuid import uuid4
 
 from aiorun import run
 
@@ -71,6 +72,11 @@ class AbstractMiddleware:
         """
         return context.scoped
 
+    def _set_id(self, scoped: Scoped) -> str:
+        id = str(uuid4())
+        scoped.setmagic(f"{self.get_name()}_id", id)
+        return id
+
     async def apply_into(self, context: Context) -> Scoped:
         """
         Apply this middleware onto the execution chain.
@@ -79,9 +85,9 @@ class AbstractMiddleware:
 
         Parameters
         ------
-        executor:
-        next: Current execution chain. This is usually the result of `apply` of next middleware.
+        context: Current execution context.
         """
+        self._set_id(context.scoped)
         scoped = await self._do_apply(context)
         return context.update_scoped(scoped)
 

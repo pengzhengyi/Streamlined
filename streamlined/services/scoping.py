@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections import UserDict, deque
-from typing import Any, Deque, Iterable, Mapping, Optional, TypeVar
+from typing import Any, Deque, Iterable, Mapping, Optional, TypeVar, Union
 
 from treelib import Node, Tree
 
@@ -239,12 +239,27 @@ class Scoped(Scoping):
     def getmagic(self, name: Any) -> Any:
         return self[to_magic_naming(name)]
 
-    def set(self, name: Any, value: Any, num_scope_up: int = 0) -> None:
-        scope = self.up(num_scope_up)
+    def set(self, name: Any, value: Any, at: Union[str, int] = 0) -> None:
+        if isinstance(at, int):
+            scope = self.up(at)
+        else:
+            keyname = to_magic_naming(at + "_id")
+            scope = self.get_nearest(keyname)
         scope[name] = value
 
+    def get_nearest(self, name: Any) -> Scoped:
+        """
+        Return the nearest scope containing the name.
+        """
+        for scope in self.enclosing_scopes():
+            if name in scope:
+                return scope
+        raise KeyError(f"Cannot find {name} in any enclosing scope of {self.current_scope}")
+
     def set_nearest(self, name: Any, value: Any) -> None:
-        """Set a value at nearest enclosing scope"""
+        """
+        Set a value at nearest enclosing scope containing this name.
+        """
         for scope in self.enclosing_scopes():
             if name in scope:
                 scope[name] = value
