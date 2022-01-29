@@ -20,8 +20,9 @@ from .action import (
 )
 from .argument import ARGUMENT, ARGUMENTS, Argument, Arguments
 from .cleanup import CLEANUP, Cleanup
+from .context import Context
 from .log import LOG, Log
-from .middleware import Context, Middleware, Middlewares
+from .middleware import Middleware, Middlewares
 from .middlewares import (
     PARALLEL,
     SCHEDULING,
@@ -32,7 +33,7 @@ from .middlewares import (
 from .name import NAME, Name
 from .pipeline import PIPELINE, Pipeline
 from .runstage import RUNSTAGE, RUNSTAGES, Runstage, Runstages
-from .runstep import RUNSTEP, RUNSTEPS, Runstep, Runsteps
+from .runstep import RUNSTEP, RUNSTEPS, SUBSTEPS, Runstep, Runsteps
 from .setup import SETUP, Setup
 from .skip import SKIP, Skip
 from .suppress import CAUGHT_EXCEPTION, EXCEPTION, SUPPRESS, Suppress

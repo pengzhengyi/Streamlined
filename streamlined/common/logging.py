@@ -13,4 +13,4 @@ def use_basic_logging_config() -> None:
 
 
 def get_default_handler() -> Handler:
-    return RichHandler(rich_tracebacks=True)
+    return RichHandler(rich_tracebacks=True, tracebacks_show_locals=True)

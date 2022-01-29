@@ -30,7 +30,7 @@ async def test_runstage_with_name_example(simple_executor):
         return f"{last_name} {first_name}"
 
     def set_fullname_in_parent_scope(_scoped_: Scoped, full_name: str, convention: str) -> None:
-        _scoped_.set(f"full_name_{convention}", full_name, 2)
+        _scoped_.set(f"full_name_{convention}", full_name, RUNSTAGE)
 
     runstage = Runstage(
         {
@@ -83,7 +83,7 @@ async def test_runstage_with_dynamic_generated_runsteps(simple_executor):
         return f"{last_name} {first_name}"
 
     def set_fullname_in_parent_scope(_scoped_: Scoped, full_name: str, convention: str) -> None:
-        _scoped_.set(f"full_name_{convention}", full_name, 2)
+        _scoped_.set(f"full_name_{convention}", full_name, RUNSTAGE)
 
     def create_runstep_config(
         convention: Union[Literal["us"], Literal["chinese"]]

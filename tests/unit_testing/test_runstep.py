@@ -13,11 +13,13 @@ from streamlined import (
     RUNSTEP,
     RUNSTEPS,
     SCHEDULING,
+    SUBSTEPS,
     SUPPRESS,
     VALUE,
     Runstep,
     Runsteps,
 )
+from streamlined.middlewares.runstep import SUBSTEPS
 
 
 @pytest.mark.asyncio
@@ -42,6 +44,17 @@ async def test_runstep_action_requires_arguments(simple_executor):
     scoped = await runstep.run(simple_executor)
     mock.assert_called_once_with(10, 20)
     assert scoped.getmagic(VALUE) == 30
+
+
+@pytest.mark.asyncio
+async def test_runstep_substeps(simple_executor):
+    mock1 = Mock()
+    mock2 = Mock()
+    runstep = Runstep({ACTION: mock1, SUBSTEPS: [{ACTION: mock2}]})
+
+    scoped = await runstep.run(simple_executor)
+    mock1.assert_called_once()
+    mock2.assert_called_once()
 
 
 @pytest.mark.asyncio

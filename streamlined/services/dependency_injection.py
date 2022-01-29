@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import inspect
-from functools import partial
 from inspect import Parameter
 from typing import Any, Callable, ClassVar, Dict, Iterable, List, Mapping, Optional
 
-from ..common import IS_EMPTY_BOUND_ARGUMENTS, get_or_default
+from ..common import IS_EMPTY_BOUND_ARGUMENTS, bound, get_or_default
 from .service import Service
 
 
@@ -90,7 +89,7 @@ class DependencyInjection(Service):
         if IS_EMPTY_BOUND_ARGUMENTS(bound_arguments):
             return _callable
 
-        return partial(_callable, *bound_arguments.args, **bound_arguments.kwargs)
+        return bound(_callable, *bound_arguments.args, **bound_arguments.kwargs)
 
 
 if __name__ == "__main__":

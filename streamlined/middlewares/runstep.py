@@ -59,7 +59,7 @@ class Runstep(Middleware, WithMiddlewares):
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend(
-            [Name, Skip, Suppress, Arguments, Setup, Validator, Action, Log, Cleanup]
+            [Name, Skip, Suppress, Arguments, Setup, Validator, Runsteps, Action, Log, Cleanup]
         )
 
     def _init_middleware_apply_methods(self) -> None:
@@ -70,6 +70,7 @@ class Runstep(Middleware, WithMiddlewares):
                 APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_INTO,
+                APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_ONTO,
                 APPLY_INTO,
@@ -111,3 +112,4 @@ class Runsteps(StackedMiddlewares):
 
 
 RUNSTEPS = Runsteps.get_name()
+SUBSTEPS = RUNSTEPS
