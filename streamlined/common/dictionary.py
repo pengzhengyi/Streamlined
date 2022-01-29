@@ -109,7 +109,7 @@ class ProxyDict(UserDict):
         return super().__str__(self.proxies)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({super().__repr__(self.proxies)})"
+        return f"{self.__class__.__name__}({repr(self.proxies)})"
 
 
 def findkey(source: Any, predicate: Callable[[Any], bool]) -> Iterable[Any]:

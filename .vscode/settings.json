@@ -1,0 +1,16 @@
+{
+    "peacock.remoteColor": "#7f408a",
+    "python.pythonPath": "/opt/conda/bin/python",
+    "workbench.colorCustomizations": {
+        "sash.hoverBorder": "#9f50ad",
+        "statusBar.background": "#7f408a",
+        "statusBar.foreground": "#e7e7e7",
+        "statusBarItem.hoverBackground": "#9f50ad",
+        "statusBarItem.remoteBackground": "#7f408a",
+        "statusBarItem.remoteForeground": "#e7e7e7",
+        "titleBar.activeBackground": "#7f408a",
+        "titleBar.activeForeground": "#e7e7e7",
+        "titleBar.inactiveBackground": "#7f408a99",
+        "titleBar.inactiveForeground": "#e7e7e799"
+    }
+}

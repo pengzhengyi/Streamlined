@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import inspect
 from inspect import Parameter
-from typing import Any, Callable, ClassVar, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Callable, Dict, List, Mapping
 
 from ..common import IS_EMPTY_BOUND_ARGUMENTS, bound, get_or_default
-from .service import Service
 
 
-class DependencyInjection(Service):
+class DependencyInjection:
     """
     Act as injector in [DependencyInjection](https://en.wikipedia.org/wiki/Dependency_injection).
 
@@ -20,27 +19,6 @@ class DependencyInjection(Service):
     >>> add(*ba.args, **ba.kwargs)
     11111
     """
-
-    MISSING: ClassVar[Ellipsis] = ...
-
-    @classmethod
-    def inject(
-        cls,
-        requirements: Iterable[Any],
-        providers: Mapping[Any, Any],
-        defaults: Optional[Iterable[Any]] = None,
-    ) -> Iterable[Any]:
-        """
-        Search in providers for each requirement.
-        """
-        if defaults:
-            for requirement, default in zip(requirements, defaults):
-                yield providers[requirement] if default is cls.MISSING else providers.get(
-                    requirement, default
-                )
-        else:
-            for requirement in requirements:
-                yield providers[requirement]
 
     @classmethod
     def inject_signature(
