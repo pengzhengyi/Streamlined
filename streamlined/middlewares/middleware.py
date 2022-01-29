@@ -30,7 +30,8 @@ from ..common import (
     ASYNC_VOID,
     IS_DICT,
     IS_ITERABLE,
-    ProxyDictionary,
+    MagicDict,
+    ProxyDict,
     findvalue,
     format_help,
 )
@@ -64,6 +65,17 @@ class Context:
     scoped: Scoped
     next: ScopedNext = ASYNC_NOOP
 
+    @property
+    def magic_mappings(self) -> Mapping[str, Any]:
+        mapping = MagicDict(
+            executor=self.executor, scoped=self.scoped, next=self.next, context=self
+        )
+        return mapping
+
+    @property
+    def mappings(self) -> Mapping[str, Any]:
+        return ProxyDict(self.scoped, self.magic_mappings)
+
     @classmethod
     def new(cls, executor: Optional[Executor] = None) -> Tuple[Context, Scoping]:
         """
@@ -84,9 +96,14 @@ class Context:
             scoping,
         )
 
+    def __getitem__(self, key: str) -> Any:
+        return self.mappings[key]
+
+    def __setitem__(self, key: str, item: Any) -> None:
+        raise NotImplementedError("context provides a read-only view")
+
     def prepare(self, _callable: Callable[..., Any]) -> Callable[..., Any]:
-        provider = ProxyDictionary(self.scoped, _scoped_=self.scoped)
-        return DependencyInjection.prepare(_callable, provider)
+        return DependencyInjection.prepare(_callable, self.mappings)
 
     async def submit(self, _callable: Callable[..., Any]) -> Any:
         prepared_action = self.prepare(_callable)

@@ -1,6 +1,8 @@
+from unittest.mock import Mock
+
 import pytest
 
-from streamlined import NAME, VALUE, Argument, NameRef, ValueRef
+from streamlined import CLEANUP, NAME, VALUE, Argument, EvalRef, NameRef, ValueRef
 
 
 @pytest.mark.asyncio
@@ -33,3 +35,21 @@ def test_reference_overrides_and_fallbacks():
     )
     tweet = ref(dict(which=100, tweet100="Welcome to the party!"))
     assert tweet == "Welcome to the party!"
+
+
+@pytest.mark.asyncio
+async def test_evalref(simple_executor):
+    mock = Mock()
+
+    def make_source_dir(source_dir: str) -> None:
+        mock(source_dir)
+
+    argument = Argument(
+        {
+            NAME: NameRef("{origin}_dir"),
+            VALUE: ValueRef("{origin}_dir"),
+            CLEANUP: EvalRef("make_{origin}_dir", overrides=dict(make_source_dir=make_source_dir)),
+        }
+    )
+    scoped = await argument.run(simple_executor, origin="source", source_dir="/tmp")
+    mock.assert_called_once_with("/tmp")

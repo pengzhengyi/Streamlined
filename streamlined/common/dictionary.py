@@ -60,7 +60,26 @@ def update_with_callable(dictionary: Dict[K, V], key: K, value_updater: Callable
         return False
 
 
-class ProxyDictionary(UserDict):
+class MagicDict(UserDict, Mapping[str, Any]):
+    """
+    Exactly like a normal dictionary except all keys are magically named.
+    """
+
+    @staticmethod
+    def to_magic_naming(name: str) -> str:
+        """
+        Transform a plain name to a magic name reserved for special variables.
+
+        >>> to_magic_naming('value')
+        '_value_'
+        """
+        return f"_{name}_"
+
+    def __setitem__(self, key: str, item: V) -> None:
+        return super().__setitem__(self.to_magic_naming(key), item)
+
+
+class ProxyDict(UserDict):
     """
     A proxy dictionary is intended to provide a Dictionary like view by
     chaining multiple mapping object.
@@ -85,6 +104,12 @@ class ProxyDictionary(UserDict):
             with suppress(KeyError):
                 return proxy[key]
         return super().__getitem__(key)
+
+    def __str__(self) -> str:
+        return super().__str__(self.proxies)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({super().__repr__(self.proxies)})"
 
 
 def findkey(source: Any, predicate: Callable[[Any], bool]) -> Iterable[Any]:
