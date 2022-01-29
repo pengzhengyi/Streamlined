@@ -6,129 +6,31 @@ import itertools
 import logging
 from argparse import ArgumentParser
 from asyncio.events import AbstractEventLoop
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
     Dict,
     Iterable,
     Iterator,
     List,
     Mapping,
     Optional,
-    Tuple,
     Type,
     Union,
 )
 
 from aiorun import run
 
-from ..common import (
-    ASYNC_NOOP,
-    ASYNC_VOID,
-    IS_DICT,
-    IS_ITERABLE,
-    MagicDict,
-    ProxyDict,
-    findvalue,
-    format_help,
-)
+from ..common import IS_DICT, IS_ITERABLE, findvalue, format_help
 from ..execution import SimpleExecutor
-from ..services import DependencyInjection, Scoped, Scoping
+from ..services import Scoped
+from .bound_middleware import BoundMiddleware
+from .context import Context, ScopedNext
 from .parser import Parser
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
-
-
-ScopedNext = Callable[[], Awaitable[Optional[Scoped]]]
-
-
-@dataclass
-class Context:
-    """
-    Context for applying middleware.
-
-    Attributes
-    ------
-
-    executor: An instance of [Executor](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor).
-    Tasks can be submitted to this executor for async and parallel execution.
-    next: Current execution chain. This is usually the `apply` of next middleware.
-    scoped: The execution scope for this middleware. Should be returned
-    as middleware's application result.
-    """
-
-    executor: Executor
-    scoped: Scoped
-    next: ScopedNext = ASYNC_NOOP
-
-    @property
-    def magic_mappings(self) -> Mapping[str, Any]:
-        mapping = MagicDict(
-            executor=self.executor, scoped=self.scoped, next=self.next, context=self
-        )
-        return mapping
-
-    @property
-    def mappings(self) -> Mapping[str, Any]:
-        return ProxyDict(self.scoped, self.magic_mappings)
-
-    @classmethod
-    def new(cls, executor: Optional[Executor] = None) -> Tuple[Context, Scoping]:
-        """
-        Create a new middleware context from a executor.
-
-        When no executor is provided, default to create a `SimpleExecutor`.
-
-        Scoped is created from a newly created Scoping.
-        """
-        if executor is None:
-            executor = SimpleExecutor()
-
-        scoping = Scoping()
-        return (
-            cls(
-                executor=executor, scoped=scoping.create_scoped(parent_scope=scoping.global_scope)
-            ),
-            scoping,
-        )
-
-    def __getitem__(self, key: str) -> Any:
-        return self.mappings[key]
-
-    def __setitem__(self, key: str, item: Any) -> None:
-        raise NotImplementedError("context provides a read-only view")
-
-    def prepare(self, _callable: Callable[..., Any]) -> Callable[..., Any]:
-        return DependencyInjection.prepare(_callable, self.mappings)
-
-    async def submit(self, _callable: Callable[..., Any]) -> Any:
-        prepared_action = self.prepare(_callable)
-        result = await self.executor.submit(prepared_action)
-
-        if isinstance(result, Scoping):
-            self.scoped.update(result)
-        return result
-
-    def update_scoped(self, scoped: Optional[Scoped]) -> Scoped:
-        """
-        Update with another scoped. Updated scoped will be returned.
-        """
-        if scoped is not None:
-            self.scoped.update(scoped)
-        return self.scoped
-
-    def replace_with_void_next(self) -> Context:
-        """
-        Use a no-op function to replace current context's next
-        function and return the new context.
-
-        Current context will not be modified.
-        """
-        return replace(self, next=ASYNC_VOID)
 
 
 APPLY_INTO = "apply_into"
@@ -288,18 +190,6 @@ class Middleware(Parser, AbstractMiddleware):
         return format_help(argument_parser, arguments)
 
 
-@dataclass
-class _BoundMiddleware:
-    middleware: Middleware
-    context: Context
-
-    async def apply_into(self) -> Scoped:
-        return await self.middleware.apply_into(self.context)
-
-    async def apply_onto(self) -> Scoped:
-        return await self.middleware.apply_onto(self.context)
-
-
 class Middlewares:
     """
     A queue of middleware.
@@ -357,7 +247,7 @@ class Middlewares:
             context_next = cls._apply_middlewares(context, middlewares, apply_methods)
 
             middleware_context = replace(context, next=context_next)
-            bound_middleware = _BoundMiddleware(middleware, middleware_context)
+            bound_middleware = BoundMiddleware(middleware, middleware_context)
 
             return getattr(bound_middleware, apply_method)
         except StopIteration:

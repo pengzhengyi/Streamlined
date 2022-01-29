@@ -20,8 +20,9 @@ from .action import (
 )
 from .argument import ARGUMENT, ARGUMENTS, Argument, Arguments
 from .cleanup import CLEANUP, Cleanup
+from .context import Context
 from .log import LOG, Log
-from .middleware import Context, Middleware, Middlewares
+from .middleware import Middleware, Middlewares
 from .middlewares import (
     PARALLEL,
     SCHEDULING,
