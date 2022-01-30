@@ -1,6 +1,6 @@
 import pytest
 
-from streamlined.services import Scoped, Scoping
+from streamlined.services import Scoping
 
 
 def test_scoping_two_scopes():
@@ -44,6 +44,20 @@ def test_scoping_update():
     scoping.update(scoped)
 
     assert len(list(scoping.all_scopes)) == 3
+
+
+def test_scoped_update_for_different_global_scopes():
+    scoping1 = Scoping()
+    scoped1 = scoping1.create_scoped(scoping1.global_scope, Alice="US")
+
+    scoping2 = Scoping()
+    scoped2 = scoping2.create_scoped(scoping2.global_scope, Bob="UK")
+
+    assert len(list(scoped1.all_scopes)) == 2
+    scoped1.update(scoped2)
+
+    assert len(list(scoped1.all_scopes)) == 4
+    assert scoped1["Alice"] == "US"
 
 
 def test_set_nearest():

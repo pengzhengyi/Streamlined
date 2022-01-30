@@ -9,10 +9,12 @@ from ..common import IS_EMPTY_BOUND_ARGUMENTS, bound, get_or_default
 
 class DependencyInjection:
     """
+    DependencyInjection will inspect a callable's signature.
+    Then for each parameter, it will try to resolve from specified providers and
+    return a function that is the fully bound version of callable.
+
     Act as injector in [DependencyInjection](https://en.wikipedia.org/wiki/Dependency_injection).
 
-    >>> list(DependencyInjection.inject(['x'], {'x': 1}))
-    [1]
     >>> def add(a, b = 0, *nums, d, e = 0, **kwnums):
     ...     return a + b + sum(nums) + d + e + sum(kwnums.values())
     >>> ba = DependencyInjection.inject_callable(add, {'a': 1, 'nums': [10, 100], 'd': 1000, 'kwnums': {'f': 10000}})
