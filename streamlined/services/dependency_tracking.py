@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Callable, ClassVar, Dict, Iterable, Optional
 
-from .service import Service
 
-
-class DependencyTracking(Service):
+class DependencyTracking:
     """
     Track instances that are prerequisites for this instance.
 

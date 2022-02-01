@@ -17,4 +17,3 @@ from .reaction import (
 )
 from .reference import EvalRef, NameRef, ValueRef
 from .scoping import Scoped, Scoping, to_magic_naming
-from .service import Service

@@ -51,7 +51,7 @@ class Name(Middleware, WithMiddlewares):
     async def _do_apply(self, context: Context) -> Scoped:
         name = await self.get_register_name(context)
 
-        context.scoped.setmagic(NAME, name, num_scope_up=1)
+        context.scoped.setmagic(NAME, name, 1)
 
         await context.next()
         return context.scoped

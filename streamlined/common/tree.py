@@ -13,7 +13,7 @@ def update(
     target: Tree,
     are_equal: Callable[[Node, Node], bool] = is_,
     update_equal: Callable[[Node, Node], None] = VOID,
-):
+) -> None:
     """
     Update source tree with target tree.
 

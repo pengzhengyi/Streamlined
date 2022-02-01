@@ -3,10 +3,8 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Callable, List
 
-from .service import Service
 
-
-class EventNotification(Service):
+class EventNotification:
     """
     EventNotification implements basic [Event-driven messaging](https://en.wikipedia.org/wiki/Event-driven_messaging).
 

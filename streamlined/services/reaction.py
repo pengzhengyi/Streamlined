@@ -5,7 +5,6 @@ from typing import Any, Callable, Optional, Type, TypeVar, Union
 from decorator import decorator
 
 from ..common import TAUTOLOGY, VOID
-from .service import Service
 
 T = TypeVar("T")
 Predicate = Callable[..., bool]
@@ -81,7 +80,7 @@ def after(
 ReactAt = Union[before, after, raises]
 
 
-class Reaction(Service):
+class Reaction:
     """
     Reaction is an abstract class that should be subclassed to use.
 
@@ -100,7 +99,6 @@ class Reaction(Service):
         """
         Perform an action at specific timings of registered function.
         """
-        pass
 
     def bind(self, at: ReactAt, **kwargs: Any):
         return at(do=self.react, when=self.when, **kwargs)
