@@ -1,4 +1,5 @@
-from unittest.mock import Mock
+from functools import partial
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -86,3 +87,18 @@ async def test_arguments_set_in_scope(simple_executor):
     scoped = await arguments.run(simple_executor)
     assert scoped["first_name"] == "John"
     assert scoped["last_name"] == "Doe"
+
+
+@pytest.mark.asyncio
+async def test_argument_partial_async_action(simple_executor):
+    mock = AsyncMock()
+
+    async def work(return_value: int) -> int:
+        await mock(return_value)
+        return return_value
+
+    argument = Argument({NAME: "async_result", VALUE: partial(work, return_value=10)})
+
+    scoped = await argument.run(simple_executor)
+    assert scoped["async_result"] == 10
+    mock.assert_awaited_once_with(10)
