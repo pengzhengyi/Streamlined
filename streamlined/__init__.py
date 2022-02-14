@@ -38,6 +38,7 @@ from .middlewares import (
     CAUGHT_EXCEPTION,
     CHOICES,
     CLEANUP,
+    CONCURRENCY,
     CONST,
     DEFAULT,
     DEST,

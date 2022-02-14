@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 from asyncio.tasks import Task
+from contextlib import suppress
 from dataclasses import dataclass, replace
 from functools import partial
 from typing import Any, Dict, Iterable, List, Set, Type
@@ -8,23 +9,25 @@ from typing import Any, Dict, Iterable, List, Set, Type
 from ..common import (
     AND,
     DEFAULT_KEYERROR,
+    IDENTITY_FACTORY,
     IS_CALLABLE,
     IS_DICT,
+    IS_DICT_MISSING_KEY,
     IS_LIST,
     IS_LIST_OF_DICT,
-    IS_NONE,
     IS_NOT_CALLABLE,
     IS_NOT_DICT,
     IS_NOT_LIST,
     IS_NOT_LIST_OF_DICT,
     VALUE,
 )
-from ..scheduling import SEQUENTIAL, Dependency, Schedule, Scheduler, Unit
+from ..scheduling import SEQUENTIAL, Dependency, Parallel, Schedule, Scheduler, Unit
 from ..services import Scoped
-from .action import ACTION, Action
+from .action import Action
 from .middleware import APPLY_METHOD, APPLY_ONTO, Context, Middleware, WithMiddlewares
 
 SCHEDULING = "scheduling"
+CONCURRENCY = "concurrency"
 
 
 @dataclass
@@ -33,12 +36,19 @@ class MiddlewareWithApplyMethod:
     apply_method: APPLY_METHOD
 
 
-def _MISSING_VALUE(value: Dict[str, Any]) -> bool:
-    return VALUE not in value
+_MISSING_VALUE = partial(IS_DICT_MISSING_KEY, key=VALUE)
 
 
-def _MISSING_SCHEDULING(value: Dict[str, Any]) -> bool:
-    return SCHEDULING not in value
+def _HAS_SCHEDULING(value: Dict[str, Any]) -> bool:
+    return SCHEDULING in value
+
+
+def _NEED_DEFAULT_SCHEDULING(value: Dict[str, Any]) -> bool:
+    return IS_DICT_MISSING_KEY(value, SCHEDULING) and IS_DICT_MISSING_KEY(value, CONCURRENCY)
+
+
+def _IS_CONCURRENCY_PRESENT_BUT_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
+    return CONCURRENCY in value and IS_NOT_CALLABLE(value[CONCURRENCY])
 
 
 def _TRANSFORM_WHEN_IS_LIST_OF_DICT(value: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -48,22 +58,18 @@ def _TRANSFORM_WHEN_IS_LIST_OF_DICT(value: List[Dict[str, Any]]) -> Dict[str, An
 _TRANSFORM_WHEN_IS_CALLABLE = _TRANSFORM_WHEN_IS_LIST_OF_DICT
 
 
-def _TRANSFORM_WHEN_MISSING_SCHEDULING(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[SCHEDULING] = None
+def _TRANSFORM_WHEN_CONCURRENCY_PRESENT_BUT_NOT_CALLABLE(value: Dict[str, Any]) -> Dict[str, Any]:
+    value[CONCURRENCY] = IDENTITY_FACTORY(value[CONCURRENCY])
     return value
 
 
-def _IS_SCHEDULING_NONE(value: Dict[str, Any]) -> bool:
-    return IS_NONE(value[SCHEDULING])
-
-
-def _SCHEDULING_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
-    return IS_NOT_CALLABLE(value[SCHEDULING])
-
-
-def _TRANSFORM_WHEN_SCHEDULING_IS_NONE(value: Dict[str, Any]) -> Dict[str, Any]:
+def _TRANSFORM_WHEN_NEED_DEFAULT_SCHEDULING(value: Dict[str, Any]) -> Dict[str, Any]:
     value[SCHEDULING] = SEQUENTIAL
     return value
+
+
+def _SCHEDULING_PRESENT_BUT_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
+    return SCHEDULING in value and IS_NOT_CALLABLE(value[SCHEDULING])
 
 
 def _IS_SCHEDULING_LIST_BUT_NOT_LIST_OF_DEPENDENCY(value: Dict[str, Any]) -> bool:
@@ -187,6 +193,7 @@ def _TRANSFORM_SCHEDULING_WHEN_IS_LIST_OF_REQUIREMENT(value: Dict[str, Any]) -> 
 class ScheduledMiddlewares(Middleware, WithMiddlewares):
     middlewares_generator: Action
     scheduler: Scheduler
+    concurrency: Action
 
     middlewares: List[Middleware]
     middleware_schedule: Schedule
@@ -198,15 +205,21 @@ class ScheduledMiddlewares(Middleware, WithMiddlewares):
         if IS_NOT_DICT(value):
             raise TypeError(f"{value} should be dict")
 
-        if _MISSING_SCHEDULING(value):
+        if _NEED_DEFAULT_SCHEDULING(value):
             raise DEFAULT_KEYERROR(value, SCHEDULING)
-        elif _SCHEDULING_NOT_CALLABLE(value):
+        elif _SCHEDULING_PRESENT_BUT_NOT_CALLABLE(value):
             raise ValueError(f"{SCHEDULING} should be a callable generating a schedule")
 
         if _MISSING_VALUE(value):
             raise DEFAULT_KEYERROR(value, VALUE)
         elif IS_NOT_LIST(value[VALUE]) and IS_NOT_CALLABLE(value[VALUE]):
             raise TypeError(f"{value[VALUE]} should be list or a callable returning a list")
+
+        if _IS_CONCURRENCY_PRESENT_BUT_NOT_CALLABLE(value):
+            raise ValueError(f"{CONCURRENCY} is present but not a callable")
+
+        if CONCURRENCY in value and SCHEDULING in value:
+            raise ValueError(f"only one of {CONCURRENCY} and {SCHEDULING}can be specified")
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
@@ -217,33 +230,39 @@ class ScheduledMiddlewares(Middleware, WithMiddlewares):
         # `[{...}]` -> `{VALUE: [{...}]}`
         self.simplifications.append((IS_LIST_OF_DICT, _TRANSFORM_WHEN_IS_LIST_OF_DICT))
 
-        # `{VALUE: [{...}]}` -> `{VALUE: [{...}], SCHEDULING: NONE}`
+        # `{VALUE: [{...}], CONCURRENCY: <int>}` -> `{VALUE: [{...}], CONCURRENCY: IDENTITY_FACTORY(<int>)}`
         self.simplifications.append(
-            (AND(IS_DICT, _MISSING_SCHEDULING), _TRANSFORM_WHEN_MISSING_SCHEDULING)
+            (
+                AND(IS_DICT, _IS_CONCURRENCY_PRESENT_BUT_NOT_CALLABLE),
+                _TRANSFORM_WHEN_CONCURRENCY_PRESENT_BUT_NOT_CALLABLE,
+            )
         )
 
-        # `{VALUE: [{...}], SCHEDULING: NONE}` -> `{VALUE: [{...}], SCHEDULING: SEQUENTIAL}`
+        # `{VALUE: [{...}]}` -> `{VALUE: [{...}], SCHEDULING: SEQUENTIAL}`
         self.simplifications.append(
-            (AND(IS_DICT, _IS_SCHEDULING_NONE), _TRANSFORM_WHEN_SCHEDULING_IS_NONE)
+            (AND(IS_DICT, _NEED_DEFAULT_SCHEDULING), _TRANSFORM_WHEN_NEED_DEFAULT_SCHEDULING)
         )
 
         # `{VALUE: [{...}], SCHEDULING: [(..., ...)]}` -> `{VALUE: [{...}], SCHEDULING: [(..., ..., None, None)]}`
         self.simplifications.append(
             (
-                AND(IS_DICT, _IS_SCHEDULING_LIST_BUT_NOT_LIST_OF_DEPENDENCY),
+                AND(IS_DICT, _HAS_SCHEDULING, _IS_SCHEDULING_LIST_BUT_NOT_LIST_OF_DEPENDENCY),
                 _TRANSFORM_WHEN_SCHEDULING_NOT_LIST_OF_DEPENDENCY,
             )
         )
 
         # `{VALUE: [{...}], {SCHEDULING: <dependency>}}` -> `{VALUE: [{...}], {SCHEDULING: [<dependency>]}}`
         self.simplifications.append(
-            (AND(IS_DICT, _IS_SCHEDULING_DEPENDENCY), _TRANSFORM_WHEN_SCHEDULING_IS_DEPENDENCY)
+            (
+                AND(IS_DICT, _HAS_SCHEDULING, _IS_SCHEDULING_DEPENDENCY),
+                _TRANSFORM_WHEN_SCHEDULING_IS_DEPENDENCY,
+            )
         )
 
         # `{VALUE: [{...}], {SCHEDULING: [<dependency>]}}` -> `{SCHEDULING: <SCHEDULE_GENERATOR>}`
         self.simplifications.append(
             (
-                AND(IS_DICT, _IS_SCHEDULING_LIST_OF_DEPENDENCY),
+                AND(IS_DICT, _HAS_SCHEDULING, _IS_SCHEDULING_LIST_OF_DEPENDENCY),
                 _TRANSFORM_SCHEDULING_WHEN_IS_LIST_OF_REQUIREMENT,
             )
         )
@@ -254,14 +273,24 @@ class ScheduledMiddlewares(Middleware, WithMiddlewares):
             for middleware, apply_method in zip(self.middlewares, self.apply_methods)
         ]
 
-    def _create_schedule(self, units: List[Unit]) -> Schedule:
-        return self.scheduler(units)
-
     def _do_parse(self, value: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "middlewares_generator": Action({ACTION: value[VALUE]}),
-            "scheduler": value[SCHEDULING],
+        parsed = {
+            "middlewares_generator": Action(value[VALUE]),
         }
+        if SCHEDULING in value:
+            parsed["scheduler"] = value[SCHEDULING]
+        if CONCURRENCY in value:
+            parsed["concurrency"] = Action(value[CONCURRENCY])
+
+        return parsed
+
+    async def _init_scheduler(self, context: Context) -> None:
+        with suppress(AttributeError):
+            scoped = await self.concurrency.apply_onto(context.replace_with_void_next())
+            context.scoped.update(scoped)
+            concurrency: int = scoped.getmagic(VALUE)
+            context.scoped.setmagic(CONCURRENCY, concurrency)
+            self.scheduler = Parallel(concurrency)
 
     async def _init_schedule(self, context: Context) -> None:
         scoped = await self.middlewares_generator.apply_onto(context.replace_with_void_next())
@@ -270,9 +299,10 @@ class ScheduledMiddlewares(Middleware, WithMiddlewares):
         middleware_configs = scoped.getmagic(VALUE)
         self.middlewares = list(self.create_middlewares_from(middleware_configs))
         self.middleware_units = self._get_middleware_units()
-        self.middleware_schedule = self._create_schedule(self.middleware_units)
+        self.middleware_schedule = self.scheduler(self.middleware_units)
 
     async def _do_apply(self, context: Context) -> Scoped:
+        await self._init_scheduler(context)
         await self._init_schedule(context)
 
         def create_task(unit: Unit) -> "Task[Scoped]":
