@@ -8,6 +8,7 @@ import pytest
 from streamlined import (
     ACTION,
     ARGUMENTS,
+    CONCURRENCY,
     NAME,
     PARALLEL,
     RUNSTEP,
@@ -16,7 +17,6 @@ from streamlined import (
     SUBSTEPS,
     SUPPRESS,
     VALUE,
-    Parallel,
     Runstep,
     Runsteps,
 )
@@ -127,7 +127,7 @@ async def test_runstep_parallel_with_max_concurrency(simple_executor):
             for i in range(NUM_RUNSTEPS)
         ]
 
-    runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, SCHEDULING: Parallel(5)}})
+    runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, CONCURRENCY: 5}})
 
     scoped = await runstep.run(simple_executor)
     assert mock.call_count == NUM_RUNSTEPS
