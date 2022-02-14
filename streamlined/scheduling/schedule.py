@@ -4,7 +4,7 @@ import asyncio
 from asyncio import Queue as AsyncQueue
 from asyncio.queues import QueueEmpty
 from asyncio.tasks import FIRST_COMPLETED, Task
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from functools import partial
 from typing import (
     Any,
@@ -23,7 +23,6 @@ from typing import (
 
 import networkx as nx
 from networkx.classes.digraph import DiGraph
-from ray.util.queue import Queue
 
 from ..services import EventNotification
 from .unit import Unit
@@ -36,10 +35,8 @@ def closing(thing: Any) -> Any:
     try:
         yield thing
     finally:
-        try:
+        with suppress(AttributeError):
             thing.close()
-        except AttributeError:
-            return
 
 
 class Schedule:
@@ -99,9 +96,6 @@ class Schedule:
     def __iadd__(self, other: Any) -> Schedule:
         return self.__add__(other)
 
-    def __iter__(self) -> Iterable[Unit]:
-        yield from self.walk()
-
     def __getstate__(self) -> DiGraph:
         return self.graph
 
@@ -109,7 +103,7 @@ class Schedule:
         self.graph = state
 
     async def __aiter__(self) -> AsyncIterable[Unit]:
-        async for unit in self.walk_async():
+        async for unit in self.walk():
             yield unit
 
     def _init_events(self) -> None:
@@ -197,34 +191,7 @@ class Schedule:
 
         return unit
 
-    def walk(
-        self,
-        queue: Optional[Queue] = None,
-        enqueue: Optional[Callable[[Unit], None]] = None,
-        dequeue: Optional[Callable[..., Unit]] = None,
-    ) -> Iterable[Unit]:
-        """
-        Yield the units as they can be executed (all prerequisites satisfied).
-
-        The units will also be `enqueue` into `queue` when they become ready to execute.
-
-        At each iteration, an unit will be dequeued from `queue` for actual execution.
-        """
-        if queue is None:
-            queue = Queue()
-        if enqueue is None:
-            enqueue = queue.put
-        if dequeue is None:
-            dequeue = queue.get
-
-        with closing(queue):
-            with self.on_requirements_satisfied.registering(enqueue):
-                self.notify(self._source)
-
-                while (unit := dequeue()) != self._sink:
-                    yield unit
-
-    async def walk_async(
+    async def walk(
         self,
         queue: Optional[AsyncQueue[Unit]] = None,
         enqueue: Optional[Callable[[Unit], None]] = None,
@@ -292,7 +259,7 @@ class Schedule:
         available tasks (generated from units) to work and
         yield once a result is ready.
         """
-        task_to_unit: Dict[Task[T]] = dict()
+        task_to_unit: Dict[Task[T], Unit] = dict()
         done: Set[Task[T]] = set()
         ongoing: Set[Task[T]] = set()
 

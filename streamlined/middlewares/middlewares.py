@@ -3,7 +3,7 @@ import importlib
 from asyncio.tasks import Task
 from dataclasses import dataclass, replace
 from functools import partial
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Type
+from typing import Any, Dict, Iterable, List, Set, Type
 
 from ..common import (
     AND,
@@ -19,13 +19,11 @@ from ..common import (
     IS_NOT_LIST_OF_DICT,
     VALUE,
 )
-from ..scheduling import Dependency, Schedule, Unit
+from ..scheduling import SEQUENTIAL, Dependency, Schedule, Scheduler, Unit
 from ..services import Scoped
 from .action import ACTION, Action
 from .middleware import APPLY_METHOD, APPLY_ONTO, Context, Middleware, WithMiddlewares
 
-SEQUENTIAL = "sequential"
-PARALLEL = "parallel"
 SCHEDULING = "scheduling"
 
 
@@ -65,56 +63,6 @@ def _SCHEDULING_NOT_CALLABLE(value: Dict[str, Any]) -> bool:
 
 def _TRANSFORM_WHEN_SCHEDULING_IS_NONE(value: Dict[str, Any]) -> Dict[str, Any]:
     value[SCHEDULING] = SEQUENTIAL
-    return value
-
-
-def _IS_SCHEDULING_SEQUENTIAL(value: Dict[str, Any]) -> bool:
-    return SEQUENTIAL == value[SCHEDULING]
-
-
-ScheduleGenerator = Callable[[List[Unit]], Schedule]
-
-
-def _SEQUENTIAL_SCHEDULE_GENERATOR(units: List[Unit]) -> Schedule:
-    schedule = Schedule()
-
-    last_unit: Optional[Unit] = None
-    last_unit_index = len(units) - 1
-
-    for i, unit in enumerate(units):
-        is_first = i == 0
-        is_last = i == last_unit_index
-
-        schedule.push(unit, has_prerequisites=not is_first, has_dependents=not is_last)
-
-        if last_unit is not None:
-            unit.require(last_unit)
-
-        last_unit = unit
-
-    return schedule
-
-
-def _TRANSFORM_WHEN_SCHEDULING_IS_SEQUENTIAL(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[SCHEDULING] = _SEQUENTIAL_SCHEDULE_GENERATOR
-    return value
-
-
-def _IS_SCHEDULING_PARALLEL(value: Dict[str, Any]) -> bool:
-    return PARALLEL == value[SCHEDULING]
-
-
-def _PARALLEL_SCHEDULE_GENERATOR(units: List[Unit]) -> Schedule:
-    schedule = Schedule()
-
-    for unit in units:
-        schedule.push(unit, has_prerequisites=False, has_dependents=False)
-
-    return schedule
-
-
-def _TRANSFORM_WHEN_SCHEDULING_IS_PARALLEL(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[SCHEDULING] = _PARALLEL_SCHEDULE_GENERATOR
     return value
 
 
@@ -238,7 +186,7 @@ def _TRANSFORM_SCHEDULING_WHEN_IS_LIST_OF_REQUIREMENT(value: Dict[str, Any]) -> 
 
 class ScheduledMiddlewares(Middleware, WithMiddlewares):
     middlewares_generator: Action
-    schedule_generator: ScheduleGenerator
+    scheduler: Scheduler
 
     middlewares: List[Middleware]
     middleware_schedule: Schedule
@@ -279,17 +227,7 @@ class ScheduledMiddlewares(Middleware, WithMiddlewares):
             (AND(IS_DICT, _IS_SCHEDULING_NONE), _TRANSFORM_WHEN_SCHEDULING_IS_NONE)
         )
 
-        # `{VALUE: [{...}], SCHEDULING: SEQUENTIAL}` -> `{VALUE: [{...}], SCHEDULING: _SEQUENTIAL_SCHEDULE_GENERATOR}`
-        self.simplifications.append(
-            (AND(IS_DICT, _IS_SCHEDULING_SEQUENTIAL), _TRANSFORM_WHEN_SCHEDULING_IS_SEQUENTIAL)
-        )
-
-        # `{VALUE: [{...}], SCHEDULING: PARALLEL}` -> `{VALUE: [{...}], SCHEDULING: _PARALLELL_SCHEDULE_GENERATOR}`
-        self.simplifications.append(
-            (AND(IS_DICT, _IS_SCHEDULING_PARALLEL), _TRANSFORM_WHEN_SCHEDULING_IS_PARALLEL)
-        )
-
-        # `{VALUE: [{...}], {SCHEDULING: [(..., ...)]]}}` -> `{VALUE: [{...}], {SCHEDULING: [(..., ..., None, None)]}}`
+        # `{VALUE: [{...}], SCHEDULING: [(..., ...)]}` -> `{VALUE: [{...}], SCHEDULING: [(..., ..., None, None)]}`
         self.simplifications.append(
             (
                 AND(IS_DICT, _IS_SCHEDULING_LIST_BUT_NOT_LIST_OF_DEPENDENCY),
@@ -317,12 +255,12 @@ class ScheduledMiddlewares(Middleware, WithMiddlewares):
         ]
 
     def _create_schedule(self, units: List[Unit]) -> Schedule:
-        return self.schedule_generator(units)
+        return self.scheduler(units)
 
     def _do_parse(self, value: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "middlewares_generator": Action({ACTION: value[VALUE]}),
-            "schedule_generator": value[SCHEDULING],
+            "scheduler": value[SCHEDULING],
         }
 
     async def _init_schedule(self, context: Context) -> None:

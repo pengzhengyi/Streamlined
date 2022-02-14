@@ -48,7 +48,6 @@ from .middlewares import (
     METAVAR,
     NAME,
     NARGS,
-    PARALLEL,
     PIPELINE,
     REQUIRED,
     RUNSTAGE,
@@ -56,7 +55,6 @@ from .middlewares import (
     RUNSTEP,
     RUNSTEPS,
     SCHEDULING,
-    SEQUENTIAL,
     SETUP,
     SHELL,
     SKIP,
@@ -85,6 +83,7 @@ from .middlewares import (
     Suppress,
     Validator,
 )
+from .scheduling import PARALLEL, SEQUENTIAL, Parallel
 from .services import EvalRef, NameRef, Scoped, Scoping, ValueRef
 
 resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
