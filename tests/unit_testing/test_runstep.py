@@ -16,6 +16,7 @@ from streamlined import (
     SUBSTEPS,
     SUPPRESS,
     VALUE,
+    Parallel,
     Runstep,
     Runsteps,
 )
@@ -99,6 +100,34 @@ async def test_runstep_parallel(simple_executor):
         ]
 
     runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, SCHEDULING: PARALLEL}})
+
+    scoped = await runstep.run(simple_executor)
+    assert mock.call_count == NUM_RUNSTEPS
+
+
+@pytest.mark.asyncio
+async def test_runstep_parallel_with_max_concurrency(simple_executor):
+
+    mock = Mock()
+
+    async def sleep_and_do():
+        asyncio.sleep(0.1)
+        mock()
+        return random.random()
+
+    NUM_RUNSTEPS = 10
+
+    def create_runsteps() -> List[Dict[str, Any]]:
+        return [
+            {
+                RUNSTEP: {
+                    ACTION: sleep_and_do,
+                }
+            }
+            for i in range(NUM_RUNSTEPS)
+        ]
+
+    runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, SCHEDULING: Parallel(5)}})
 
     scoped = await runstep.run(simple_executor)
     assert mock.call_count == NUM_RUNSTEPS

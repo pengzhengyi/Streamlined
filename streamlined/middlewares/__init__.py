@@ -23,13 +23,7 @@ from .cleanup import CLEANUP, Cleanup
 from .context import Context
 from .log import LOG, Log
 from .middleware import Middleware, Middlewares
-from .middlewares import (
-    PARALLEL,
-    SCHEDULING,
-    SEQUENTIAL,
-    ScheduledMiddlewares,
-    StackedMiddlewares,
-)
+from .middlewares import SCHEDULING, ScheduledMiddlewares, StackedMiddlewares
 from .name import NAME, Name
 from .pipeline import PIPELINE, Pipeline
 from .runstage import RUNSTAGE, RUNSTAGES, Runstage, Runstages
