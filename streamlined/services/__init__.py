@@ -7,13 +7,5 @@ These services should be plug and use, decoupled from anything else.
 from .dependency_injection import DependencyInjection
 from .dependency_tracking import DependencyTracking
 from .event_notification import EventNotification
-from .reaction import (
-    Reaction,
-    after,
-    before,
-    bind_named_reaction,
-    bind_reaction,
-    raises,
-)
 from .reference import EvalRef, NameRef, ValueRef
 from .scoping import Scoped, Scoping, to_magic_naming

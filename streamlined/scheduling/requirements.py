@@ -2,66 +2,22 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Dict, Generic, Iterable, Optional
-from typing import OrderedDict as TOrderedDict
-from typing import TypeVar
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Generic,
+    Iterable,
+    Optional,
+    OrderedDict,
+    TypeVar,
+)
 
 from ..common import TAUTOLOGY_FACTORY, BidirectionalIndex
-from ..services import EventNotification, Reaction, after, before
+from ..services import EventNotification
 
 T = TypeVar("T")
-
-
-class NotifyNewRequirement(Reaction):
-    def when(
-        self,
-        execution_requirements: Requirements[T],
-        prerequisite: T,
-        is_satisfied: bool,
-    ) -> bool:
-        return prerequisite not in execution_requirements
-
-    def react(
-        self,
-        execution_requirements: Requirements[T],
-        prerequisite: T,
-        is_satisfied: bool,
-    ) -> None:
-        execution_requirements.groups[execution_requirements.DEFAULT_GROUP] = prerequisite
-        execution_requirements.on_new_requirement(prerequisite=prerequisite)
-
-
-NOTIFY_NEW_REQUIREMENT = NotifyNewRequirement()
-
-
-class NotifyRequirementsSatisfied(Reaction):
-    def when(
-        self,
-        execution_requirements: Requirements[T],
-        prerequisite: T,
-        *args: Any,
-        **kwargs: Any,
-    ) -> bool:
-        # since `is_satisfied` might be modified by condition, check directly
-        if execution_requirements[prerequisite]:
-            for group in execution_requirements.groups[prerequisite]:
-                if execution_requirements.are_requirements_satisfied(group):
-                    return True
-
-        return False
-
-    def react(
-        self,
-        execution_requirements: Requirements[T],
-        prerequisite: T,
-        is_satisfied: bool,
-        *args: Any,
-        **kwargs: Any,
-    ) -> None:
-        execution_requirements.on_requirements_satisfied()
-
-
-NOTIFY_REQUIREMENTS_SATISFIED = NotifyRequirementsSatisfied()
 
 
 @dataclass
@@ -82,7 +38,7 @@ class Dependency(Generic[T]):
         return Prerequisite(self.prerequisite, self.condition, self.group)
 
 
-class Requirements(Generic[T], TOrderedDict[T, bool]):
+class Requirements(Generic[T], OrderedDict[T, bool]):
     """
     Requirements is used to model dependencies.
 
@@ -163,9 +119,6 @@ class Requirements(Generic[T], TOrderedDict[T, bool]):
 
     DEFAULT_GROUP: ClassVar[str] = "__DEFAULT__"
 
-    conditions: Dict[T, Callable[[], bool]]
-    groups: BidirectionalIndex[Any, T]
-
     @property
     def prerequisites(self) -> Iterable[Prerequisite[T]]:
         for prerequisite in self:
@@ -181,22 +134,29 @@ class Requirements(Generic[T], TOrderedDict[T, bool]):
         self._init_groups()
 
     def _init_conditions(self) -> None:
-        self.conditions = defaultdict(TAUTOLOGY_FACTORY)
+        self.conditions: Dict[T, Callable[[], bool]] = defaultdict(TAUTOLOGY_FACTORY)
 
     def _init_groups(self) -> None:
-        self.groups = BidirectionalIndex()
+        self.groups: BidirectionalIndex[Any, T] = BidirectionalIndex()
 
     def _init_events(self) -> None:
         self.on_new_requirement = EventNotification()
         self.on_requirements_satisfied = EventNotification()
 
-    @NOTIFY_NEW_REQUIREMENT.bind(at=before)
-    @NOTIFY_REQUIREMENTS_SATISFIED.bind(at=after)
     def __setitem__(self, prerequisite: T, is_satisfied: bool) -> None:
+        if prerequisite not in self:
+            self.groups[self.DEFAULT_GROUP] = prerequisite
+            self.on_new_requirement(prerequisite=prerequisite)
+
         if is_satisfied:
             is_satisfied = self.conditions[prerequisite]()
 
         super().__setitem__(prerequisite, is_satisfied)
+
+        if self[prerequisite]:
+            for group in self.groups[prerequisite]:
+                if self.are_requirements_satisfied(group):
+                    self.on_requirements_satisfied()
 
     def are_requirements_satisfied(self, group: Optional[str] = None) -> bool:
         """
