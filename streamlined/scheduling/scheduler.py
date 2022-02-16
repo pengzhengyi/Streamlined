@@ -4,13 +4,13 @@ from typing import Callable, List, Optional, Union
 from .schedule import Schedule
 from .unit import Unit
 
-Scheduler = Callable[[List[Unit]], Schedule]
-
 
 class AbstractScheduler:
     """
     A scheduler can create a schedule from a list of execution units.
     """
+
+    __slots__ = ()
 
     def __init__(self) -> None:
         pass
@@ -39,6 +39,8 @@ class Sequential(AbstractScheduler):
     the second execution unit will start execution after the first
     execution unit finishes.
     """
+
+    __slots__ = ()
 
     def schedule(self, schedule: Schedule, units: List[Unit]) -> None:
         last_unit: Optional[Unit] = None
@@ -73,6 +75,8 @@ class Parallel(Sequential):
     ```
     """
 
+    __slots__ = ("max_concurrency",)
+
     def __init__(self, max_concurrency: Union[int, float] = inf) -> None:
         """
         Create a Parallel scheduler.
@@ -95,5 +99,6 @@ class Parallel(Sequential):
             super().schedule(schedule, units_in_group)
 
 
+Scheduler = Callable[[List[Unit]], Schedule]
 SEQUENTIAL: Scheduler = Sequential()
 PARALLEL: Scheduler = Parallel()

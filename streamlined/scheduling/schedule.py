@@ -57,11 +57,10 @@ class Schedule:
     """
 
     UNIT_FACTORY: ClassVar[Type[Unit]] = Unit
-
     _ATTRIBUTE_NAME_FOR_SOURCE: ClassVar[str] = "source"
     _ATTRIBUTE_NAME_FOR_SINK: ClassVar[str] = "sink"
 
-    graph: DiGraph
+    __slots__ = ("on_complete", "on_requirements_satisfied", "graph")
 
     @property
     def _source(self) -> Unit:
