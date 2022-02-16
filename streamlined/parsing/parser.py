@@ -10,8 +10,7 @@ class Parser(Simplification):
     Represents abstract parsing of config.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+    __slots__ = ()
 
     def parse(self, value: Any) -> Dict[str, Any]:
         simplified_value = self.simplify(value)
