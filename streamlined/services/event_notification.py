@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Callable, List
+from typing import Any, Callable, Generator, List
 
 
 class EventNotification:
@@ -17,7 +17,11 @@ class EventNotification:
     ['Alice', 'Bob']
     """
 
-    listeners: List[Callable[..., Any]]
+    __slots__ = ("listeners",)
+
+    @staticmethod
+    def notify(listener: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
+        listener(*args, **kwargs)
 
     def __init__(
         self,
@@ -25,7 +29,10 @@ class EventNotification:
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
-        self.listeners = list()
+        self._init_listeners()
+
+    def _init_listeners(self) -> None:
+        self.listeners: List[Callable[..., Any]] = list()
 
     def __call__(self, *args: Any, **kwargs: Any) -> None:
         for listener in self.listeners:
@@ -60,7 +67,9 @@ class EventNotification:
         return self
 
     @contextmanager
-    def registering(self, _callable: Callable[..., Any]):
+    def registering(
+        self, _callable: Callable[..., Any]
+    ) -> Generator[EventNotification, None, None]:
         """
         Create a context manager that registers the event listener at entering and unregisters at exiting.
         Register an event listener
@@ -70,9 +79,6 @@ class EventNotification:
             yield self
         finally:
             self.unregister(_callable)
-
-    def notify(self, listener: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
-        listener(*args, **kwargs)
 
 
 if __name__ == "__main__":

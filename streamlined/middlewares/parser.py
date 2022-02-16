@@ -20,9 +20,6 @@ class Parser(AbstractParser):
     Standardization of data format should be specified in `_init_simplifications`.
     """
 
-    declaration: Any
-    definition: Any
-
     @cached_property
     def name(self) -> str:
         return self.__class__.__name__.lower()
