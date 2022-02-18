@@ -71,7 +71,7 @@ class Skip(Middleware):
         # `{'skip': None}` -> `{'skip': False}`
         self.simplifications.append((IS_NONE, CONTRADICTION))
 
-        # `{'skip': <bool>}` -> `{'skip': lambda: <bool>}`
+        # `{'skip': <bool>}` -> `{'skip': IDENTITY_FACTORY(<bool>)}`
         self.simplifications.append((AND(IS_NOT_DICT, IS_NOT_CALLABLE), IDENTITY_FACTORY))
 
         # `{'skip': <any>}` -> `{'skip': {VALUE: <any>}}`

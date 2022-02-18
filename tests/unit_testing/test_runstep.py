@@ -17,6 +17,7 @@ from streamlined import (
     SUBSTEPS,
     SUPPRESS,
     VALUE,
+    Parallel,
     Runstep,
     Runsteps,
 )
@@ -66,11 +67,7 @@ async def test_runstep_suppress_no_argument_exception(simple_executor) -> None:
         return a + b
 
     runstep = Runstep(
-        {
-            NAME: "perform add of two numbers",
-            ACTION: add,
-            SUPPRESS: {ACTION: suppressed_action},
-        }
+        {NAME: "perform add of two numbers", ACTION: add, SUPPRESS: {ACTION: suppressed_action},}
     )
 
     scoped = await runstep.run(simple_executor)
@@ -90,14 +87,7 @@ async def test_runstep_parallel(simple_executor):
     NUM_RUNSTEPS = 50
 
     def create_runsteps() -> List[Dict[str, Any]]:
-        return [
-            {
-                RUNSTEP: {
-                    ACTION: sleep_and_do,
-                }
-            }
-            for i in range(NUM_RUNSTEPS)
-        ]
+        return [{RUNSTEP: {ACTION: sleep_and_do,}} for i in range(NUM_RUNSTEPS)]
 
     runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, SCHEDULING: PARALLEL}})
 
@@ -118,14 +108,7 @@ async def test_runstep_parallel_with_max_concurrency(simple_executor):
     NUM_RUNSTEPS = 10
 
     def create_runsteps() -> List[Dict[str, Any]]:
-        return [
-            {
-                RUNSTEP: {
-                    ACTION: sleep_and_do,
-                }
-            }
-            for i in range(NUM_RUNSTEPS)
-        ]
+        return [{RUNSTEP: {ACTION: sleep_and_do,}} for i in range(NUM_RUNSTEPS)]
 
     runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, CONCURRENCY: 5}})
 

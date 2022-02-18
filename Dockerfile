@@ -55,6 +55,7 @@ RUN apt-get update && \
 	locales \
 	sudo \
 	ncdu \
+	graphviz \
 	man-db \
 	strace \
 	build-essential \

@@ -13,11 +13,11 @@ class Variant(Simplification):
     format to standard format.
     """
 
-    _variant_simplifications: List[Tuple[Predicate, Transform]]
+    __slots__ = ("_variant_simplifications",)
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self) -> None:
         self._init_simplifications_for_variant()
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
     @classmethod
     def get_name(cls) -> str:
@@ -66,7 +66,7 @@ class Variant(Simplification):
             yield predicate
 
     def _init_simplifications_for_variant(self) -> None:
-        self._variant_simplifications = []
+        self._variant_simplifications: List[Tuple[Predicate, Transform]] = []
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()
@@ -77,14 +77,14 @@ class Variant(Simplification):
 
 
 class WithVariants(Simplification):
-    variants: List[Variant]
+    __slots__ = ("variants",)
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self) -> None:
         self._init_variants()
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
     def _init_variants(self) -> None:
-        self.variants = []
+        self.variants: List[Variant] = []
 
     def _init_simplifications(self) -> None:
         super()._init_simplifications()

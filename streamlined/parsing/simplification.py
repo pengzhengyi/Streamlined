@@ -5,13 +5,26 @@ from ..common import Predicate, Transform
 
 
 class Simplification:
-    """Reduce multiple config formats to more standard formats."""
+    """
+    Reduce multiple config formats to more standard formats.
 
-    simplifications: List[Tuple[Predicate, Transform]]
+    Simplification
+    ------
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    The most important attribute for Simplification is `simplifications`.
+    This should be a list holding tuples of predicate and transform
+    functions. Predicate decides whether current value need to be
+    simplified and transform decides how to simplify current value.
+
+    In order to fully simplify a value, more general (primitive)
+    simplifications should precede those apply specifically.
+    """
+
+    __slots__ = ("simplifications",)
+
+    def __init__(self) -> None:
         self._init_simplifications()
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
     @classmethod
     def aggregate(cls, simplifications: List[Tuple[Predicate, Transform]]) -> Transform:
@@ -28,14 +41,16 @@ class Simplification:
         """
         Using a list of simplifications to simplify a value.
         """
-        for predicate, transform in simplifications:
-            if predicate(value):
-                return cls.simplify_with(simplifications, transform(value))
+        simplified_value = value
 
-        return value
+        for predicate, transform in simplifications:
+            if predicate(simplified_value):
+                simplified_value = transform(simplified_value)
+
+        return simplified_value
 
     def _init_simplifications(self) -> None:
-        self.simplifications = []
+        self.simplifications: List[Tuple[Predicate, Transform]] = []
 
     def simplify(self, value: Any) -> Any:
         """

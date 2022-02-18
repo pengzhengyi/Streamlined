@@ -53,6 +53,8 @@ class AbstractMiddleware:
     which should be the modified scope.
     """
 
+    __slots__ = ()
+
     @classmethod
     def get_name(cls) -> str:
         return cls.__name__.lower()
@@ -320,9 +322,6 @@ class WithMiddlewares(Middlewares):
     to initialize `self.middlewares`.
     """
 
-    middleware_types: List[Type[Middleware]]
-    middleware_apply_methods: List[APPLY_METHOD]
-
     @property
     def apply_methods(self) -> Iterable[APPLY_METHOD]:
         """
@@ -354,10 +353,10 @@ class WithMiddlewares(Middlewares):
         self._init_middleware_apply_methods()
 
     def _init_middleware_types(self) -> None:
-        self.middleware_types = []
+        self.middleware_types: List[Type[Middleware]] = []
 
     def _init_middleware_apply_methods(self) -> None:
-        self.middleware_apply_methods = []
+        self.middleware_apply_methods: List[APPLY_METHOD] = []
 
     def get_middleware_names(self) -> Iterable[str]:
         for middleware_type in self.middleware_types:

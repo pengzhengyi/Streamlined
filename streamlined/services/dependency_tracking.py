@@ -23,7 +23,7 @@ class DependencyTracking:
 
     REQUIREMENTS_FACTORY: ClassVar[Callable[[], Dict[DependencyTracking, bool]]] = dict
 
-    _requirements: Dict[DependencyTracking, bool]
+    __slots__ = ("_requirements",)
 
     @property
     def prerequisites(self) -> Iterable[DependencyTracking]:
@@ -34,16 +34,14 @@ class DependencyTracking:
         return all(self._requirements.values())
 
     @classmethod
-    def empty(cls, *args: Any, **kwargs: Any) -> DependencyTracking:
-        return cls(*args, **kwargs)
+    def empty(cls) -> DependencyTracking:
+        return cls()
 
     def __init__(
         self,
-        *args: Any,
         prerequisites: Optional[Iterable[DependencyTracking]] = None,
-        **kwargs: Any
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self._init_requirements(prerequisites)
 
     def _init_requirements(self, prerequisites: Optional[Iterable[DependencyTracking]]) -> None:
@@ -52,6 +50,24 @@ class DependencyTracking:
         if prerequisites:
             for prerequisite in prerequisites:
                 self.require(prerequisite)
+
+    def __lshift__(self, other: Any) -> DependencyTracking:
+        if isinstance(other, DependencyTracking):
+            other.require(self)
+            return other
+        else:
+            raise TypeError(
+                f"Cannot record dependency relationship because {other} is not an instance of DependencyTracking"
+            )
+
+    def __rshift__(self, other: Any) -> DependencyTracking:
+        if isinstance(other, DependencyTracking):
+            self.require(other)
+            return other
+        else:
+            raise TypeError(
+                f"Cannot record dependency relationship because {other} is not an instance of DependencyTracking"
+            )
 
     def require(self, prerequisite: DependencyTracking) -> None:
         """Add an instance as a prerequisite."""

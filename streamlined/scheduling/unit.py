@@ -15,11 +15,20 @@ class Unit(DependencyTracking):
 
     REQUIREMENTS_FACTORY: ClassVar[Type[Requirements[Unit]]] = Requirements
     _requirements: Requirements[Unit]
-    value: Any
+
+    __slots__ = ("value",)
 
     @classmethod
     def empty(cls) -> Unit:
         return cls(None)
+
+    @property
+    def on_new_requirement(self) -> EventNotification:
+        return self._requirements.on_new_requirement
+
+    @property
+    def on_requirements_satisfied(self) -> EventNotification:
+        return self._requirements.on_requirements_satisfied
 
     @property
     def dependencies(self) -> Iterable[Dependency[Unit]]:
@@ -63,11 +72,3 @@ class Unit(DependencyTracking):
         All prerequisites are automatically in a default requirement group.
         """
         self._requirements.groups[group] = prerequisite
-
-    @property
-    def on_new_requirement(self) -> EventNotification:
-        return self._requirements.on_new_requirement
-
-    @property
-    def on_requirements_satisfied(self) -> EventNotification:
-        return self._requirements.on_requirements_satisfied
