@@ -57,8 +57,8 @@ class Schedule:
     """
 
     UNIT_FACTORY: ClassVar[Type[Unit]] = Unit
-    _ATTRIBUTE_NAME_FOR_SOURCE: ClassVar[str] = "source"
-    _ATTRIBUTE_NAME_FOR_SINK: ClassVar[str] = "sink"
+    _ATTRIBUTE_NAME_FOR_SOURCE: ClassVar[str] = "SOURCE"
+    _ATTRIBUTE_NAME_FOR_SINK: ClassVar[str] = "SINK"
 
     __slots__ = ("on_complete", "on_requirements_satisfied", "graph")
 
@@ -125,7 +125,7 @@ class Schedule:
         self._sink.require(unit)
 
     def _init_terminal_node(self, attribute_name: str) -> Unit:
-        unit = Unit.empty()
+        unit = Unit(attribute_name)
         self._init_events_for_unit(unit)
         self.graph.add_node(unit)
         self.graph.graph[attribute_name] = unit
@@ -189,6 +189,64 @@ class Schedule:
             self._add_sink_as_dependent(unit)
 
         return unit
+
+    def draw(
+        self,
+        pos: Optional[Dict[Any, Any]] = None,
+        node_color: Any = None,
+        edge_color: Any = "#2A2D34",
+        labels: Optional[Dict[Any, str]] = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Draw schedule using Matplotlib
+
+        Reference
+        ------
+        [NetworkX draw_networkx](https://networkx.org/documentation/stable/reference/generated/networkx.drawing.nx_pylab.draw_networkx.html#networkx-drawing-nx-pylab-draw-networkx).
+        """
+        if pos is None:
+            pos = nx.nx_pydot.pydot_layout(self.graph, prog="dot", root=self._source)
+
+        use_default_node_color = node_color is None
+        if use_default_node_color:
+            node_color = []
+        use_default_labels = labels is None
+        if use_default_labels:
+            labels = dict()
+
+        for node in self.graph.nodes:
+            if use_default_node_color:
+                if node is self._source:
+                    node_color.append("#009B72")
+                elif node is self._sink:
+                    node_color.append("#DC602E")
+                else:
+                    node_color.append("#009DDC")
+
+            if use_default_labels:
+                labels[node] = node.value
+
+        nx.draw_networkx(
+            self.graph,
+            pos=pos,
+            node_color=node_color,
+            edge_color=edge_color,
+            labels=labels,
+            **kwargs,
+        )
+
+    def write_dot(self, path: str) -> None:
+        """
+        Write NetworkX graph G to Graphviz dot format on path.
+
+        Path can be a string or a file handle.
+
+        Reference
+        ------
+        [write_dot](https://networkx.org/documentation/stable/reference/generated/networkx.drawing.nx_pydot.write_dot.html#networkx-drawing-nx-pydot-write-dot).
+        """
+        nx.drawing.nx_pydot.write_dot(self.graph, path)
 
     async def walk(
         self,

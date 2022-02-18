@@ -20,6 +20,8 @@ setup(
         "networkx[default]",
         "decorator",
         "wrapt",
+        "matplotlib",
+        "pydot",
         "uuid",
         "aiorun",
         "uvloop",

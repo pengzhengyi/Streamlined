@@ -53,6 +53,8 @@ class AbstractMiddleware:
     which should be the modified scope.
     """
 
+    __slots__ = ()
+
     @classmethod
     def get_name(cls) -> str:
         return cls.__name__.lower()
