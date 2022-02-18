@@ -63,4 +63,4 @@ from .predicates import (
 from .subprocess import StdinStream, Stream, SubprocessResult, run
 from .template import Template, TemplateParameter, TemplateParameterDefault
 from .transforms import IDENTITY, IDENTITY_FACTORY, Transform
-from .tree import transplant, update
+from .tree import to_networkx, transplant, update

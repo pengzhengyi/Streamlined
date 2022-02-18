@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import uuid
 from collections import UserDict, deque
-from typing import Any, Deque, Iterable, Mapping, Optional, TypeVar, Union
+from typing import Any, Deque, Dict, Iterable, Mapping, Optional, TypeVar, Union
 
+import networkx as nx
 from treelib import Node, Tree
 from treelib.exceptions import MultipleRootError
 
-from ..common import transplant
+from ..common import to_networkx, transplant
 from ..common import update as tree_update
 
 K = TypeVar("K")
@@ -31,12 +32,15 @@ class Scope(UserDict, Mapping[str, Any]):
 
     __hash__ = object.__hash__
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, __id: Optional[uuid.UUID] = None, **kwargs: Any) -> None:
         super().__init__(kwargs)
-        self.id = uuid.uuid4()
+        self.id = uuid.uuid4() if __id is None else __id
 
-    def __str__(self) -> str:
-        return f"{self.id}={super().__str__()}"
+    def __get_items_str(self) -> str:
+        return ", ".join("{!s}={!r}".format(key, value) for key, value in self.items())
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({repr(self.id)}, {self.__get_items_str()})"
 
     def __lt__(self, other: Scope) -> bool:
         return self.id < other.id
@@ -172,6 +176,60 @@ class Scoping:
     def create_scoped(self, parent_scope: Scope, **kwargs: Any) -> Scoped:
         scope = self.create_scope(parent_scope, **kwargs)
         return Scoped(self, scope)
+
+    def show(self, **kwargs: Any) -> None:
+        """
+        Print the tree structure in hierarchy style.
+
+        Reference
+        ------
+        [Tree.show](https://treelib.readthedocs.io/en/latest/treelib.html#treelib.tree.Tree.show)
+        """
+        self._tree.show(**kwargs)
+
+    def to_networkx(self) -> nx.DiGraph:
+        """
+        Convert a Tree to NetworkX DiGraph.
+        """
+        return to_networkx(self._tree)
+
+    def draw(
+        self,
+        pos: Optional[Dict[Any, Any]] = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Draw schedule using Matplotlib
+
+        Tricks
+        ------
+        Use `bbox=dict(fc="white")` to only print labels.
+
+        Reference
+        ------
+        [NetworkX draw_networkx](https://networkx.org/documentation/stable/reference/generated/networkx.drawing.nx_pylab.draw_networkx.html#networkx-drawing-nx-pylab-draw-networkx)
+        """
+        graph = self.to_networkx()
+        if pos is None:
+            pos = nx.nx_pydot.pydot_layout(graph, prog="dot", root=self.global_scope)
+
+        nx.draw_networkx(
+            graph,
+            pos=pos,
+            **kwargs,
+        )
+
+    def write_dot(self, filename: str, shape: str = "ellipsis", **kwargs: Any) -> None:
+        """
+        Write NetworkX graph G to Graphviz dot format on path.
+
+        Path can be a string or a file handle.
+
+        Reference
+        ------
+        [to_graphviz](https://treelib.readthedocs.io/en/latest/treelib.html#treelib.tree.Tree.to_graphviz)
+        """
+        self._tree.to_graphviz(filename, shape=shape)
 
 
 class Scoped(Scoping):

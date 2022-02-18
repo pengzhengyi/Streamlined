@@ -1,7 +1,8 @@
 from collections import deque
 from operator import is_
-from typing import Callable, Deque, List, Optional, Tuple
+from typing import Any, Callable, Deque, List, Optional, Tuple
 
+import networkx as nx
 from treelib import Node, Tree
 from treelib.exceptions import MultipleRootError
 
@@ -57,6 +58,23 @@ def update(
                 to_examine.append((source_equal_node, target.children(target_node.identifier)))
             except StopIteration:
                 transplant(source, source_node=parent, target=target, target_node=target_node)
+
+
+def to_networkx(tree: Tree) -> nx.DiGraph:
+    """
+    Convert a Tree to NetworkX DiGraph.
+    """
+    graph = nx.DiGraph()
+
+    frontier: Deque[Any] = deque([tree.root])
+
+    while frontier:
+        nid = frontier.popleft()
+        for child_nid in tree.is_branch(nid):
+            graph.add_edge(nid, child_nid)
+            frontier.append(child_nid)
+
+    return graph
 
 
 def transplant(source: Tree, source_node: Node, target: Tree, target_node: Node) -> None:
