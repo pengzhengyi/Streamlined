@@ -76,5 +76,5 @@ def test_set_nearest():
 
 def test_store_at_file():
     with Scope.transient() as scope:
-        scope["Alice"] = "US"
-        assert scope["Alice"] == "US"
+        scope["shell"] = "bash"
+        assert scope["shell"] == "bash"

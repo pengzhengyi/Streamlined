@@ -130,6 +130,7 @@ class PersistentStorageProvider(StorageProvider):
 
     def close(self) -> None:
         if self.remove_at_close:
+            self.shelf.close()
             for savefile in self._get_shelf_files():
                 os.remove(savefile)
         else:
