@@ -8,7 +8,7 @@ from .dependency_injection import DependencyInjection
 from .dependency_tracking import DependencyTracking
 from .event_notification import EventNotification
 from .reference import EvalRef, NameRef, ValueRef
-from .scoping import Scoped, Scoping, to_magic_naming
+from .scoping import Scope, Scoped, Scoping, StorageType, to_magic_naming
 from .storage_provider import (
     HybridStorageProvider,
     InMemoryStorageProvider,

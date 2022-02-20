@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import glob
+import math
 import os
 import shelve
 from collections import UserDict
-from typing import Any, Iterable, Iterator, MutableMapping, Optional
+from contextlib import suppress
+from typing import Any, Iterable, Iterator, MutableMapping, Optional, Union
 
 from pqdict import maxpq
 from pympler import asizeof
@@ -75,7 +77,7 @@ class InMemoryStorageProvider(UserDict[str, Any], StorageProvider):
     Use a dictionary as a storage provider.
     """
 
-    def free(self) -> None:
+    def close(self) -> None:
         self.clear()
 
 
@@ -105,7 +107,8 @@ class PersistentStorageProvider(StorageProvider):
         return self.shelf.__getitem__(__k)
 
     def __setitem__(self, __k: str, __v: Any) -> None:
-        return self.shelf.__setitem__(__k, __v)
+        self.shelf.__setitem__(__k, __v)
+        self.shelf.sync()
 
     def __len__(self) -> int:
         return self.shelf.__len__()
@@ -173,61 +176,100 @@ class HybridStorageProvider(StorageProvider):
 
     @property
     def _in_memory_footprint(self) -> int:
-        return sum(self._in_memory_priority_queue.values())
+        if self.has_in_memory_storage:
+            return sum(self._in_memory_priority_queue.values())
+        else:
+            return 0
+
+    @property
+    def has_in_memory_storage(self) -> bool:
+        """
+        Whether any mapping might be stored in memory.
+        """
+        return self._in_memory_limit > 0
+
+    @property
+    def has_persistent_storage(self) -> bool:
+        """
+        Whether any mapping might be stored in disk.
+        """
+        return self._in_memory_limit != math.inf
 
     def __init__(
         self,
         __filename: str,
-        __in_memory_limit: int = 1024 * 1024,
-        __remove_at_close: bool = False,
+        __in_memory_limit: Union[float, int],
+        __remove_at_close: bool,
         **kwargs: Any,
     ) -> None:
-        self._init_in_memory_storage_provider(__in_memory_limit)
-        self._init_persistent_memory_storage_provider(__filename, __remove_at_close)
+        self._in_memory_limit = __in_memory_limit
+        self._init_in_memory_storage_provider()
+        self._init_persistent_memory_storage_provider(
+            __filename, __remove_at_close, __in_memory_limit
+        )
         super().__init__(**kwargs)
 
-    def _init_in_memory_storage_provider(self, in_memory_limit: int) -> None:
-        self._in_memory_limit = in_memory_limit
-        self._in_memory_priority_queue = maxpq()
-        self._in_memory_storage = InMemoryStorageProvider()
+    def _init_in_memory_storage_provider(self) -> None:
+        if self.has_in_memory_storage:
+            self._in_memory_priority_queue = maxpq()
+            self._in_memory_storage = InMemoryStorageProvider()
 
     def _init_persistent_memory_storage_provider(
-        self, filename: str, remove_at_close: bool
+        self, filename: str, remove_at_close: bool, in_memory_limit: Union[float, int]
     ) -> None:
-        self._persistent_storage = PersistentStorageProvider(filename, remove_at_close)
+        if self.has_persistent_storage:
+            self._persistent_storage = PersistentStorageProvider(filename, remove_at_close)
 
     def __getitem__(self, __k: str) -> Any:
-        try:
-            return self._in_memory_storage.__getitem__(__k)
-        except KeyError:
+        if self.has_in_memory_storage:
+            with suppress(KeyError):
+                return self._in_memory_storage.__getitem__(__k)
+        if self.has_persistent_storage:
             return self._persistent_storage.__getitem__(__k)
 
+        raise KeyError(f"Cannot find key {__k}")
+
     def __len__(self) -> int:
-        return self._in_memory_storage.__len__() + self._persistent_storage.__len__()
+        length = 0
+
+        if self.has_in_memory_storage:
+            length += self._in_memory_storage.__len__()
+        if self.has_persistent_storage:
+            length += self._persistent_storage.__len__()
+
+        return length
 
     def __iter__(self) -> Iterator[Any]:
-        yield from self._in_memory_storage.__iter__()
-        yield from self._persistent_storage.__iter__()
+        if self.has_in_memory_storage:
+            yield from self._in_memory_storage.__iter__()
+        if self.has_persistent_storage:
+            yield from self._persistent_storage.__iter__()
 
     def __delitem__(self, __k: str) -> None:
-        try:
-            self._in_memory_storage.__delitem__(__k)
-            self._in_memory_priority_queue.__delitem__(__k)
-        except KeyError:
+        if self.has_in_memory_storage:
+            with suppress(KeyError):
+                self._in_memory_storage.__delitem__(__k)
+                self._in_memory_priority_queue.__delitem__(__k)
+        if self.has_persistent_storage:
             self._persistent_storage.__delitem__(__k)
 
     def __setitem__(self, __k: str, __v: Any) -> None:
-        new_cost: int = asizeof.asizeof(__v)
-        try:
-            # stored in memory
-            existing_cost: int = self._in_memory_priority_queue[__k]
-            if new_cost != existing_cost:
+        if self.has_in_memory_storage:
+            # save in memory
+            new_cost: int = asizeof.asizeof(__v)
+            try:
+                # stored in memory
+                existing_cost: int = self._in_memory_priority_queue[__k]
+                if new_cost != existing_cost:
+                    self._in_memory_priority_queue[__k] = new_cost
+            except KeyError:
                 self._in_memory_priority_queue[__k] = new_cost
-        except KeyError:
-            self._in_memory_priority_queue[__k] = new_cost
-        self._in_memory_storage.__setitem__(__k, __v)
+            self._in_memory_storage.__setitem__(__k, __v)
 
-        self._rebalance_memory()
+            if self.has_persistent_storage:
+                self._rebalance_memory()
+        elif self.has_persistent_storage:
+            self._persistent_storage.__setitem__(__k, __v)
 
     def _rebalance_memory(self) -> None:
         limit = self._in_memory_limit
@@ -240,12 +282,17 @@ class HybridStorageProvider(StorageProvider):
 
     def memory_footprint(self, key: Optional[str] = None) -> int:
         if key is None:
-            return (
-                self._in_memory_storage.memory_footprint()
-                + self._persistent_storage.memory_footprint()
-            )
-        return super().memory_footprint(key)
+            footprint = 0
+            if self.has_in_memory_storage:
+                footprint += self._in_memory_storage.memory_footprint()
+            if self.has_persistent_storage:
+                footprint += self._persistent_storage.memory_footprint()
+            return footprint
+        else:
+            return super().memory_footprint(key)
 
     def close(self) -> None:
-        self._in_memory_storage.close()
-        self._persistent_storage.close()
+        if self.has_in_memory_storage:
+            self._in_memory_storage.close()
+        if self.has_persistent_storage:
+            self._persistent_storage.close()

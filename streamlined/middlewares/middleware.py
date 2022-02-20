@@ -25,7 +25,7 @@ from aiorun import run
 
 from ..common import IS_DICT, IS_ITERABLE, findvalue, format_help
 from ..execution import SimpleExecutor
-from ..services import Scoped
+from ..services import Scoped, StorageType
 from .bound_middleware import BoundMiddleware
 from .context import Context, ScopedNext
 from .parser import Parser
@@ -113,7 +113,12 @@ class AbstractMiddleware:
         apply = getattr(self, apply_method)
         return await apply(context)
 
-    async def run(self, executor: Optional[Executor] = None, **kwargs: Any) -> Scoped:
+    async def run(
+        self,
+        executor: Optional[Executor] = None,
+        storage_type: StorageType = StorageType.InMemory,
+        **kwargs: Any,
+    ) -> Scoped:
         """
         Run current middleware in an executor.
 
@@ -131,7 +136,7 @@ class AbstractMiddleware:
         if executor is None:
             executor = SimpleExecutor()
 
-        context, scoping = Context.new(executor)
+        context, scoping = Context.new(executor, storage_type)
         for name, value in kwargs.items():
             scoping.global_scope[name] = value
 
@@ -140,11 +145,21 @@ class AbstractMiddleware:
         scoping.update(scoped)
         return scoped
 
-    async def __run_and_stop(self, executor: Optional[Executor] = None, **kwargs: Any) -> None:
-        await self.run(executor, **kwargs)
+    async def __run_and_stop(
+        self,
+        executor: Optional[Executor] = None,
+        storage_type: StorageType = StorageType.InMemory,
+        **kwargs: Any,
+    ) -> None:
+        await self.run(executor, storage_type, **kwargs)
         asyncio.get_running_loop().stop()
 
-    def run_as_main(self, executor: Optional[Executor] = None, **kwargs: Any) -> None:
+    def run_as_main(
+        self,
+        executor: Optional[Executor] = None,
+        storage_type: StorageType = StorageType.InMemory,
+        **kwargs: Any,
+    ) -> None:
         """
         Await completion of middleware in provided executor. This method can be
         used as main method.
@@ -156,7 +171,7 @@ class AbstractMiddleware:
         """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.create_task(self.__run_and_stop(executor, **kwargs))
+        loop.create_task(self.__run_and_stop(executor, storage_type, **kwargs))
 
         def handler(loop: AbstractEventLoop, context: Mapping[str, Any]) -> None:
             try:

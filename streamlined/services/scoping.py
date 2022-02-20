@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import math
 import os
 import tempfile
 import uuid
 from collections import deque
+from enum import Enum
 from typing import Any, Deque, Dict, Iterable, Optional, TypeVar, Union
 
 import networkx as nx
@@ -28,6 +30,16 @@ def to_magic_naming(name: str) -> str:
     return f"_{name}_"
 
 
+class StorageType(str, Enum):
+    """
+    Describes how scope is stored.
+    """
+
+    Persistent = "persistent"
+    Transient = "transient"
+    InMemory = "in_memory"
+
+
 class Scope(HybridStorageProvider):
     """
     Scope stores mappings from name to value.
@@ -37,10 +49,41 @@ class Scope(HybridStorageProvider):
 
     __hash__ = object.__hash__
 
+    @classmethod
+    def persistent(cls) -> Scope:
+        """
+        Create a scope persistent on disk.
+        """
+        return cls(None, 0)
+
+    @classmethod
+    def transient(cls) -> Scope:
+        """
+        Create a scope transient on disk.
+
+        If `close` or `free` is called on this scope, it will remove the
+        corresponding disk storage.
+        """
+        return cls(None, 0, True)
+
+    @classmethod
+    def in_memory(cls) -> Scope:
+        """
+        Create a scope stores everything in memory.
+        """
+        return cls()
+
+    @classmethod
+    def of(cls, storage_type: StorageType) -> Scope:
+        """
+        Create a Scope based on a storage type.
+        """
+        return getattr(cls, storage_type.value)()
+
     def __init__(
         self,
         __id: Optional[uuid.UUID] = None,
-        __in_memory_limit: int = 1024 * 1024,
+        __in_memory_limit: Union[float, int] = math.inf,
         __remove_at_close: bool = False,
         **kwargs: Any,
     ) -> None:
@@ -112,6 +155,37 @@ class Scoping:
     def _update_node_when_equal(scope_node: Node, other_scope_node: Node) -> None:
         scope_node.identifier.update(other_scope_node.identifier)
 
+    @classmethod
+    def persistent(cls) -> Scoping:
+        """
+        Create a scoping where every scope will persist on disk.
+        """
+        return cls(None, 0)
+
+    @classmethod
+    def transient(cls) -> Scoping:
+        """
+        Create a scoping where every scope will be transient on disk.
+
+        If `close` or `free` is called on this scope, it will remove the
+        corresponding disk storage.
+        """
+        return cls(None, 0, True)
+
+    @classmethod
+    def in_memory(cls) -> Scoping:
+        """
+        Create a scoping where every scope will store everything in memory.
+        """
+        return cls()
+
+    @classmethod
+    def of(cls, storage_type: StorageType) -> Scoping:
+        """
+        Create a Scoping based on a storage type.
+        """
+        return getattr(cls, storage_type.value)()
+
     @property
     def global_scope(self) -> Scope:
         return self._tree.root
@@ -124,7 +198,7 @@ class Scoping:
     def __init__(
         self,
         _tree: Optional[Tree] = None,
-        in_memory_limit: int = 1024 * 1024,
+        in_memory_limit: Union[float, int] = math.inf,
         remove_at_close: bool = False,
     ):
         """

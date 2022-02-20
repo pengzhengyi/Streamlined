@@ -1,6 +1,6 @@
 import pytest
 
-from streamlined.services import Scoping
+from streamlined.services import Scope, Scoping, StorageType
 
 
 def test_scoping_two_scopes():
@@ -61,7 +61,7 @@ def test_scoped_update_for_different_global_scopes():
 
 
 def test_set_nearest():
-    scoping = Scoping()
+    scoping = Scoping.of(StorageType.InMemory)
     scoping.global_scope["Alice"] = "US"
 
     scoped = scoping.create_scoped(scoping.global_scope, Bob="UK")
@@ -72,3 +72,9 @@ def test_set_nearest():
 
     with pytest.raises(KeyError):
         scoped.set_nearest("Benjamin", "France")
+
+
+def test_store_at_file():
+    with Scope.transient() as scope:
+        scope["Alice"] = "US"
+        assert scope["Alice"] == "US"
