@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="streamlined",
-    version="0.3.7",
+    version="0.3.8",
     author="Zhengyi Peng",
     author_email="pengzhengyipengzhengyi@gmail.com",
     description="Make ML or generic pipeline more streamlined",
@@ -23,9 +23,11 @@ setup(
         "matplotlib",
         "pydot",
         "uuid",
+        "pympler",
         "aiorun",
         "uvloop",
         "aiofile",
+        "pqdict",
         "aiofiles",
         "nest_asyncio",
         "rich",

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import uuid
-from collections import UserDict, deque
-from typing import Any, Deque, Dict, Iterable, Mapping, Optional, TypeVar, Union
+from collections import deque
+from typing import Any, Deque, Dict, Iterable, Optional, TypeVar, Union
 
 import networkx as nx
 from treelib import Node, Tree
@@ -10,6 +12,7 @@ from treelib.exceptions import MultipleRootError
 
 from ..common import to_networkx, transplant
 from ..common import update as tree_update
+from .storage_provider import HybridStorageProvider
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -25,16 +28,38 @@ def to_magic_naming(name: str) -> str:
     return f"_{name}_"
 
 
-class Scope(UserDict, Mapping[str, Any]):
+class Scope(HybridStorageProvider):
     """
     Scope stores mappings from name to value.
     """
 
+    __slots__ = ("id",)
+
     __hash__ = object.__hash__
 
-    def __init__(self, __id: Optional[uuid.UUID] = None, **kwargs: Any) -> None:
-        super().__init__(kwargs)
-        self.id = uuid.uuid4() if __id is None else __id
+    def __init__(
+        self,
+        __id: Optional[uuid.UUID] = None,
+        __in_memory_limit: int = 1024 * 1024,
+        __remove_at_close: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        self._init_id(__id)
+        super().__init__(
+            self._get_default_persistent_storage_filename(),
+            __in_memory_limit,
+            __remove_at_close,
+            **kwargs,
+        )
+
+    def _init_id(self, _id: Optional[uuid.UUID]) -> None:
+        if _id is None:
+            self.id = uuid.uuid4()
+        else:
+            self.id = _id
+
+    def _get_default_persistent_storage_filename(self) -> str:
+        return os.path.join(tempfile.gettempdir(), "streamlined", "scoping", str(self.id))
 
     def __get_items_str(self) -> str:
         return ", ".join("{!s}={!r}".format(key, value) for key, value in self.items())
@@ -46,7 +71,7 @@ class Scope(UserDict, Mapping[str, Any]):
         return self.id < other.id
 
     def getmagic(self, name: str) -> Any:
-        return self[to_magic_naming(name)]
+        return self.__getitem__(to_magic_naming(name))
 
     def setmagic(self, name: str, value: Any) -> None:
         """
@@ -57,7 +82,7 @@ class Scope(UserDict, Mapping[str, Any]):
         >>> scope[to_magic_naming('value')]
         3
         """
-        self[to_magic_naming(name)] = value
+        self.__setitem__(to_magic_naming(name), value)
 
 
 class Scoping:
@@ -69,6 +94,8 @@ class Scoping:
     - caller-callee corresponds to parent-child relationship
     - parallel-execution corresponds to sibling relationship
     """
+
+    __slots__ = ("_tree", "_in_memory_limit", "_remove_at_close")
 
     @staticmethod
     def _are_equal_node(scope_node: Node, other_scope_node: Node) -> bool:
@@ -94,14 +121,23 @@ class Scoping:
         for node in self._tree.all_nodes_itr():
             yield node.identifier
 
-    def __init__(self, _tree: Optional[Tree] = None):
+    def __init__(
+        self,
+        _tree: Optional[Tree] = None,
+        in_memory_limit: int = 1024 * 1024,
+        remove_at_close: bool = False,
+    ):
         """
         The constructor can be invoked in two flavors:
 
         - Create New: call with no arguments
         - From Existing: provide `_tree`
+
+        `in_memory_limit` and `remove_at_close` can control how Scope chooses between
+        saving object in memory versus storage. See `HybridStorageProvider` for more info.
         """
         self._init_tree(_tree)
+        self._init_scope_init_args(in_memory_limit, remove_at_close)
 
     def _init_tree(self, _tree: Optional[Tree] = None) -> None:
         if _tree is None:
@@ -111,6 +147,10 @@ class Scoping:
         else:
             # from existing
             self._tree = _tree
+
+    def _init_scope_init_args(self, in_memory_limit: int, remove_at_close: bool) -> None:
+        self._in_memory_limit = in_memory_limit
+        self._remove_at_close = remove_at_close
 
     def __contains__(self, scope: Scope) -> bool:
         return self._tree.contains(scope)
@@ -169,7 +209,7 @@ class Scoping:
         return self._tree.create_node(identifier=scope, parent=parent_scope)
 
     def create_scope(self, parent_scope: Scope, **kwargs: Any) -> Scope:
-        scope = Scope(**kwargs)
+        scope = Scope(None, self._in_memory_limit, self._remove_at_close, **kwargs)
         self.add_scope(parent_scope, scope)
         return scope
 
@@ -237,7 +277,7 @@ class Scoped(Scoping):
     While Scoping is a tree of Scope, Scoped is a branch of Scope.
     """
 
-    current_scope: Scope
+    __slots__ = ("current_scope",)
 
     def __init__(
         self,
