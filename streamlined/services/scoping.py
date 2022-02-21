@@ -5,9 +5,10 @@ import os
 import tempfile
 import uuid
 from collections import deque
-from typing import Any, Deque, Dict, Iterable, Optional, TypeVar, Union
+from typing import Any, Deque, Dict, Iterable, Optional, Tuple, TypeVar, Union
 
 import networkx as nx
+from pqdict import maxpq
 from treelib import Node, Tree
 from treelib.exceptions import MultipleRootError
 
@@ -75,6 +76,38 @@ class Scope(HybridStorageProvider):
 
     def __get_items_str(self) -> str:
         return ", ".join("{!s}={!r}".format(key, value) for key, value in self.items())
+
+    def __get_abbreviated_items(self, limit: int) -> Iterable[Tuple[str, str]]:
+        item_representations = maxpq()
+
+        usage = 0
+        for key, value in self.items():
+            representation = repr(value)
+            abbreviated_representation = f"<{type(value).__name__}>"
+            cost = len(representation)
+            item_representations.additem(
+                (str(key), representation, abbreviated_representation), cost
+            )
+            usage += cost
+
+        while usage > limit and item_representations:
+            (
+                (key, representation, abbreviated_representation),
+                cost,
+            ) = item_representations.popitem()
+
+            deduction = cost - len(abbreviated_representation)
+            usage -= deduction
+            yield key, abbreviated_representation
+
+        for key, representation, _ in item_representations.keys():
+            yield key, representation
+
+    def __get_abbreviated_items_str(self, limit: int = 1000) -> str:
+        return ", ".join(f"{key}={value}" for key, value in self.__get_abbreviated_items(limit))
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({repr(self.id)}, {self.__get_abbreviated_items_str()})"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({repr(self.id)}, {self.__get_items_str()})"
