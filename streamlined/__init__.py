@@ -85,7 +85,9 @@ from .middlewares import (
     Validator,
 )
 from .scheduling import PARALLEL, SEQUENTIAL, Parallel
-from .services import EvalRef, NameRef, Scope, Scoped, Scoping, StorageType, ValueRef
+from .services import EvalRef
+from .services import HybridStorageOption as StorageOption
+from .services import NameRef, Scope, Scoped, Scoping, ValueRef
 
 resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
 sys.setrecursionlimit(10**5)

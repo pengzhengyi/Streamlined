@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping, Optional, T
 
 from ..common import ASYNC_NOOP, ASYNC_VOID, MagicDict, ProxyDict
 from ..execution import SimpleExecutor
-from ..services import DependencyInjection, Scoped, Scoping, StorageType
+from ..services import DependencyInjection, HybridStorageOption, Scoped, Scoping
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -44,7 +44,9 @@ class Context:
 
     @classmethod
     def new(
-        cls, executor: Optional[Executor] = None, storage_type: StorageType = StorageType.InMemory
+        cls,
+        executor: Optional[Executor] = None,
+        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
     ) -> Tuple[Context, Scoping]:
         """
         Create a new middleware context from a executor.
@@ -56,7 +58,7 @@ class Context:
         if executor is None:
             executor = SimpleExecutor()
 
-        scoping = Scoping.of(storage_type)
+        scoping = Scoping.of(storage_option)
         return (
             cls(
                 executor=executor, scoped=scoping.create_scoped(parent_scope=scoping.global_scope)

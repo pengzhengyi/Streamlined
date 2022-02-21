@@ -25,7 +25,7 @@ from aiorun import run
 
 from ..common import IS_DICT, IS_ITERABLE, findvalue, format_help
 from ..execution import SimpleExecutor
-from ..services import Scoped, StorageType
+from ..services import HybridStorageOption, Scoped
 from .bound_middleware import BoundMiddleware
 from .context import Context, ScopedNext
 from .parser import Parser
@@ -116,7 +116,7 @@ class AbstractMiddleware:
     async def run(
         self,
         executor: Optional[Executor] = None,
-        storage_type: StorageType = StorageType.InMemory,
+        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
         **kwargs: Any,
     ) -> Scoped:
         """
@@ -136,7 +136,7 @@ class AbstractMiddleware:
         if executor is None:
             executor = SimpleExecutor()
 
-        context, scoping = Context.new(executor, storage_type)
+        context, scoping = Context.new(executor, storage_option)
         for name, value in kwargs.items():
             scoping.global_scope[name] = value
 
@@ -148,16 +148,16 @@ class AbstractMiddleware:
     async def __run_and_stop(
         self,
         executor: Optional[Executor] = None,
-        storage_type: StorageType = StorageType.InMemory,
+        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
         **kwargs: Any,
     ) -> None:
-        await self.run(executor, storage_type, **kwargs)
+        await self.run(executor, storage_option, **kwargs)
         asyncio.get_running_loop().stop()
 
     def run_as_main(
         self,
         executor: Optional[Executor] = None,
-        storage_type: StorageType = StorageType.InMemory,
+        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
         **kwargs: Any,
     ) -> None:
         """
@@ -171,7 +171,7 @@ class AbstractMiddleware:
         """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.create_task(self.__run_and_stop(executor, storage_type, **kwargs))
+        loop.create_task(self.__run_and_stop(executor, storage_option, **kwargs))
 
         def handler(loop: AbstractEventLoop, context: Mapping[str, Any]) -> None:
             try:

@@ -1,6 +1,6 @@
 import pytest
 
-from streamlined.services import Scope, Scoping, StorageType
+from streamlined.services import HybridStorageOption, Scope, Scoping
 
 
 def test_scoping_two_scopes():
@@ -61,20 +61,20 @@ def test_scoped_update_for_different_global_scopes():
 
 
 def test_set_nearest():
-    scoping = Scoping.of(StorageType.InMemory)
-    scoping.global_scope["Alice"] = "US"
+    with Scoping.of(HybridStorageOption.TRANSIENT_STORAGE) as scoping:
+        scoping.global_scope["Alice"] = "US"
 
-    scoped = scoping.create_scoped(scoping.global_scope, Bob="UK")
-    scoped["Jerry"] = "Germany"
+        scoped = scoping.create_scoped(scoping.global_scope, Bob="UK")
+        scoped["Jerry"] = "Germany"
 
-    scoped.set_nearest("Jerry", "UK")
-    assert scoped["Jerry"] == "UK"
+        scoped.set_nearest("Jerry", "UK")
+        assert scoped["Jerry"] == "UK"
 
-    with pytest.raises(KeyError):
-        scoped.set_nearest("Benjamin", "France")
+        with pytest.raises(KeyError):
+            scoped.set_nearest("Benjamin", "France")
 
 
 def test_store_at_file():
-    with Scope.transient() as scope:
+    with Scope.of(HybridStorageOption.TRANSIENT_STORAGE) as scope:
         scope["shell"] = "bash"
         assert scope["shell"] == "bash"

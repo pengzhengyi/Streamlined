@@ -11,27 +11,39 @@ from typing import Any, Iterable, Iterator, MutableMapping, Optional, Union
 from pqdict import maxpq
 from pympler import asizeof
 
+from .storage_option import HybridStorageOption, PersistentStorageOption, StorageOption
+
 
 class StorageProvider(MutableMapping[str, Any]):
     """
     StorageProvider is an abstract class requiring a MutableMapping provider.
 
     In addition to normal MutableMapping operations, derived classes are
-    recommended to implement a `close` operation which offset the memory
-    footprint. Such operation might involves clearing the data, removing the
-    persistent file, or removing a database.
+    recommended to implement the following operations:
+
+    + `close` operation which does proper clean up
+    + `free` which offsets the memory footprint by operations like
+      clearing the data, removing the persistent file, or removing a
+      database.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__()
+    __slots__ = ("cleanup_at_close",)
 
-        for key, value in kwargs.items():
-            self.__setitem__(key, value)
+    @classmethod
+    def of(cls, storage_option: StorageOption) -> StorageProvider:
+        """
+        Create a storage provider from a storage option.
+        """
+        return cls(*storage_option.args, **storage_option.kwargs)
+
+    def __init__(self, cleanup_at_close: bool = False) -> None:
+        super().__init__()
+        self.cleanup_at_close = cleanup_at_close
 
     def __enter__(self) -> StorageProvider:
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         self.close()
 
     def __getitem__(self, __k: str) -> Any:
@@ -49,16 +61,6 @@ class StorageProvider(MutableMapping[str, Any]):
     def __iter__(self) -> Iterator[Any]:
         raise NotImplementedError()
 
-    def free(self) -> None:
-        return self.close()
-
-    def close(self) -> None:
-        """
-        Offset the memory usage of this provider. The default implementation
-        does nothing.
-        """
-        return
-
     def memory_footprint(self, key: Optional[str] = None) -> int:
         """
         Get the memory footprint of current provider.
@@ -71,14 +73,35 @@ class StorageProvider(MutableMapping[str, Any]):
             value = self.__getitem__(key)
             return asizeof.asizeof(value)
 
+    def cleanup(self) -> None:
+        """
+        Offset the memory usage.
+        """
+        return
+
+    def close(self) -> None:
+        """
+        Proper clean up. For example, make sure data is synced to storage/database.
+
+        Once this function is called, no more writes should be issued to this storage
+        provider.
+        """
+        if self.cleanup_at_close:
+            self.cleanup()
+
 
 class InMemoryStorageProvider(UserDict[str, Any], StorageProvider):
     """
     Use a dictionary as a storage provider.
     """
 
-    def close(self) -> None:
+    def __init__(self, cleanup_at_close: bool = False) -> None:
+        super().__init__()
+        self.cleanup_at_close = cleanup_at_close
+
+    def cleanup(self) -> None:
         self.clear()
+        super().cleanup()
 
 
 class PersistentStorageProvider(StorageProvider):
@@ -90,17 +113,21 @@ class PersistentStorageProvider(StorageProvider):
     [shelve]https://docs.python.org/3/library/shelve.html)
     """
 
-    __slots__ = ("shelf", "_filename", "remove_at_close")
+    __slots__ = ("shelf", "filename")
 
-    def __init__(self, __filename: str, __remove_at_close: bool = False, **kwargs: Any) -> None:
-        self._init_shelf(__filename, __remove_at_close)
-        super().__init__(**kwargs)
+    @classmethod
+    def of(
+        cls, filename: str, storage_option: PersistentStorageOption
+    ) -> PersistentStorageProvider:
+        return cls(filename, *storage_option.args, **storage_option.kwargs)
 
-    def _init_shelf(self, filename: str, remove_at_close: bool) -> None:
-        self._filename = filename
+    def __init__(self, filename: str, cleanup_at_close: bool = False) -> None:
+        self._init_shelf(filename)
+        super().__init__(cleanup_at_close)
+
+    def _init_shelf(self, filename: str) -> None:
+        self.filename = filename
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        self.remove_at_close = remove_at_close
-
         self.shelf = shelve.open(filename)
 
     def __getitem__(self, __k: str) -> Any:
@@ -120,7 +147,7 @@ class PersistentStorageProvider(StorageProvider):
         return self.shelf.__iter__()
 
     def _get_shelf_files(self) -> Iterable[str]:
-        yield from glob.iglob(f"{self._filename}.*")
+        yield from glob.iglob(f"{self.filename}.*")
 
     def memory_footprint(self, key: Optional[str] = None) -> int:
         if key is None:
@@ -128,13 +155,15 @@ class PersistentStorageProvider(StorageProvider):
 
         return super().memory_footprint(key)
 
+    def cleanup(self) -> None:
+        for savefile in self._get_shelf_files():
+            os.remove(savefile)
+
+        super().cleanup()
+
     def close(self) -> None:
-        if self.remove_at_close:
-            self.shelf.close()
-            for savefile in self._get_shelf_files():
-                os.remove(savefile)
-        else:
-            self.shelf.close()
+        self.shelf.close()
+        super().close()
 
 
 class HybridStorageProvider(StorageProvider):
@@ -144,7 +173,7 @@ class HybridStorageProvider(StorageProvider):
 
     Memory Limit
     ------
-    At creation, HybridStorageProvider can specify a `in_memory_limit`. Until
+    At creation, HybridStorageProvider can specify a `memory_limit`. Until
     the memory footprint exceeds this limit, all mappings will be stored in
     InMemoryStorageProvider. Then whenever the memory footprint is about
     to exceed, HybridStorageProvider will transfer the most expensive mappings to PersistentProvider until the live memory usage is below the
@@ -169,11 +198,15 @@ class HybridStorageProvider(StorageProvider):
     """
 
     __slots__ = (
+        "_memory_limit",
         "_in_memory_priority_queue",
-        "_in_memory_limit",
         "_in_memory_storage",
         "_persistent_storage",
     )
+
+    @classmethod
+    def of(cls, filename: str, storage_option: HybridStorageOption) -> HybridStorageProvider:
+        return cls(filename, *storage_option.args, **storage_option.kwargs)
 
     @property
     def _in_memory_footprint(self) -> int:
@@ -187,28 +220,25 @@ class HybridStorageProvider(StorageProvider):
         """
         Whether any mapping might be stored in memory.
         """
-        return self._in_memory_limit > 0
+        return self._memory_limit > 0
 
     @property
     def has_persistent_storage(self) -> bool:
         """
         Whether any mapping might be stored in disk.
         """
-        return self._in_memory_limit != math.inf
+        return self._memory_limit != math.inf
 
     def __init__(
         self,
-        __filename: str,
-        __in_memory_limit: Union[float, int],
-        __remove_at_close: bool,
-        **kwargs: Any,
+        filename: str,
+        memory_limit: Union[float, int],
+        cleanup_at_close: bool = False,
     ) -> None:
-        self._in_memory_limit = __in_memory_limit
+        super().__init__(cleanup_at_close)
+        self._memory_limit = memory_limit
         self._init_in_memory_storage_provider()
-        self._init_persistent_memory_storage_provider(
-            __filename, __remove_at_close, __in_memory_limit
-        )
-        super().__init__(**kwargs)
+        self._init_persistent_memory_storage_provider(filename, cleanup_at_close)
 
     def _init_in_memory_storage_provider(self) -> None:
         if self.has_in_memory_storage:
@@ -216,10 +246,10 @@ class HybridStorageProvider(StorageProvider):
             self._in_memory_storage = InMemoryStorageProvider()
 
     def _init_persistent_memory_storage_provider(
-        self, filename: str, remove_at_close: bool, in_memory_limit: Union[float, int]
+        self, filename: str, cleanup_at_close: bool
     ) -> None:
         if self.has_persistent_storage:
-            self._persistent_storage = PersistentStorageProvider(filename, remove_at_close)
+            self._persistent_storage = PersistentStorageProvider(filename, cleanup_at_close)
 
     def __getitem__(self, __k: str) -> Any:
         if self.has_in_memory_storage:
@@ -273,7 +303,7 @@ class HybridStorageProvider(StorageProvider):
             self._persistent_storage.__setitem__(__k, __v)
 
     def _rebalance_memory(self) -> None:
-        limit = self._in_memory_limit
+        limit = self._memory_limit
         usage = self._in_memory_footprint
         while usage > limit:
             key, cost = self._in_memory_priority_queue.popitem()
@@ -292,8 +322,18 @@ class HybridStorageProvider(StorageProvider):
         else:
             return super().memory_footprint(key)
 
+    def cleanup(self) -> None:
+        if self.has_in_memory_storage:
+            self._in_memory_storage.cleanup()
+        if self.has_persistent_storage:
+            self._persistent_storage.cleanup()
+
+        super().cleanup()
+
     def close(self) -> None:
         if self.has_in_memory_storage:
             self._in_memory_storage.close()
         if self.has_persistent_storage:
             self._persistent_storage.close()
+
+        super().close()
