@@ -3,13 +3,16 @@ from __future__ import annotations
 import glob
 import math
 import os
+import pickle
 import shelve
 from collections import UserDict
 from contextlib import suppress
-from typing import Any, Iterable, Iterator, MutableMapping, Optional, Union
+from pickle import PickleError
+from typing import Any, Iterable, Iterator, List, MutableMapping, Optional, Tuple, Union
+from warnings import warn
 
 from pqdict import maxpq
-from pympler import asizeof
+from pympler.asizeof import flatsize
 
 from .storage_option import HybridStorageOption, PersistentStorageOption, StorageOption
 
@@ -68,10 +71,10 @@ class StorageProvider(MutableMapping[str, Any]):
         When key is specified, get the memory memory_footprint of specified value.
         """
         if key is None:
-            return asizeof.asizeof(self)
+            return flatsize(self)
         else:
             value = self.__getitem__(key)
-            return asizeof.asizeof(value)
+            return flatsize(value)
 
     def cleanup(self) -> None:
         """
@@ -134,6 +137,14 @@ class PersistentStorageProvider(StorageProvider):
         return self.shelf.__getitem__(__k)
 
     def __setitem__(self, __k: str, __v: Any) -> None:
+        """
+        Set a mapping from key to value.
+
+        Raises
+        ------
+        AttributeError
+            When a value cannot be pickled
+        """
         self.shelf.__setitem__(__k, __v)
         self.shelf.sync()
 
@@ -287,7 +298,7 @@ class HybridStorageProvider(StorageProvider):
     def __setitem__(self, __k: str, __v: Any) -> None:
         if self.has_in_memory_storage:
             # save in memory
-            new_cost: int = asizeof.asizeof(__v)
+            new_cost: int = flatsize(__v)
             try:
                 # stored in memory
                 existing_cost: int = self._in_memory_priority_queue[__k]
@@ -303,13 +314,29 @@ class HybridStorageProvider(StorageProvider):
             self._persistent_storage.__setitem__(__k, __v)
 
     def _rebalance_memory(self) -> None:
+        unpickleables: List[Tuple[str, Any, int]] = []
+
         limit = self._memory_limit
         usage = self._in_memory_footprint
-        while usage > limit:
+        while self._in_memory_priority_queue and usage > limit:
             key, cost = self._in_memory_priority_queue.popitem()
             value = self._in_memory_storage.pop(key)
-            self._persistent_storage.__setitem__(key, value)
-            usage -= cost
+            try:
+                pickle.dumps(value)
+                self._persistent_storage.__setitem__(key, value)
+                usage -= cost
+            except (PickleError, AttributeError):
+                unpickleables.append((key, value, cost))
+
+        for key, value, cost in unpickleables:
+            self._in_memory_priority_queue.additem(key, cost)
+            self._in_memory_storage[key] = value
+
+        if usage > limit:
+            warn(
+                f"Memory usage {usage} exceeds limit {limit} since remaining are all not pickleable",
+                category=RuntimeWarning,
+            )
 
     def memory_footprint(self, key: Optional[str] = None) -> int:
         if key is None:
