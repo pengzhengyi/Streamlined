@@ -116,7 +116,7 @@ class AbstractMiddleware:
     async def run(
         self,
         executor: Optional[Executor] = None,
-        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
+        storage_option: HybridStorageOption = HybridStorageOption.PERSISTENT_MEMORY,
         **kwargs: Any,
     ) -> Scoped:
         """
@@ -143,12 +143,13 @@ class AbstractMiddleware:
         scoped = await self.apply_onto(context)
 
         scoping.update(scoped)
+        scoping.close()
         return scoped
 
     async def __run_and_stop(
         self,
         executor: Optional[Executor] = None,
-        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
+        storage_option: HybridStorageOption = HybridStorageOption.PERSISTENT_MEMORY,
         **kwargs: Any,
     ) -> None:
         await self.run(executor, storage_option, **kwargs)
@@ -157,7 +158,7 @@ class AbstractMiddleware:
     def run_as_main(
         self,
         executor: Optional[Executor] = None,
-        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
+        storage_option: HybridStorageOption = HybridStorageOption.PERSISTENT_MEMORY,
         **kwargs: Any,
     ) -> None:
         """
