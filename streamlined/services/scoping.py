@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import math
+import os
+import tempfile
 import uuid
-from collections import UserDict, deque
-from typing import Any, Deque, Dict, Iterable, Mapping, Optional, TypeVar, Union
+from collections import deque
+from typing import Any, Deque, Dict, Iterable, Optional, Tuple, TypeVar, Union
 
 import networkx as nx
+from pqdict import maxpq
 from treelib import Node, Tree
 from treelib.exceptions import MultipleRootError
 
 from ..common import to_networkx, transplant
 from ..common import update as tree_update
+from .storage_option import HybridStorageOption
+from .storage_provider import HybridStorageProvider
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -25,19 +31,83 @@ def to_magic_naming(name: str) -> str:
     return f"_{name}_"
 
 
-class Scope(UserDict, Mapping[str, Any]):
+class Scope(HybridStorageProvider):
     """
     Scope stores mappings from name to value.
     """
 
+    __slots__ = ("id",)
+
     __hash__ = object.__hash__
 
-    def __init__(self, __id: Optional[uuid.UUID] = None, **kwargs: Any) -> None:
-        super().__init__(kwargs)
-        self.id = uuid.uuid4() if __id is None else __id
+    @classmethod
+    def of(
+        cls,
+        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
+    ) -> Scope:
+        """
+        Create a Scope based on a storage type.
+        """
+        return cls(None, *storage_option.args, **storage_option.kwargs)
+
+    def __init__(
+        self,
+        id: Optional[uuid.UUID] = None,
+        memory_limit: Union[float, int] = math.inf,
+        cleanup_at_close: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        self._init_id(id)
+        super().__init__(
+            self._get_default_persistent_storage_filename(),
+            memory_limit,
+            cleanup_at_close,
+        )
+        self.update(**kwargs)
+
+    def _init_id(self, id: Optional[uuid.UUID]) -> None:
+        if id is None:
+            self.id = uuid.uuid4()
+        else:
+            self.id = id
+
+    def _get_default_persistent_storage_filename(self) -> str:
+        return os.path.join(tempfile.gettempdir(), "streamlined", "scoping", str(self.id))
 
     def __get_items_str(self) -> str:
         return ", ".join("{!s}={!r}".format(key, value) for key, value in self.items())
+
+    def __get_abbreviated_items(self, limit: int) -> Iterable[Tuple[str, str]]:
+        item_representations = maxpq()
+
+        usage = 0
+        for key, value in self.items():
+            representation = repr(value)
+            abbreviated_representation = f"<{type(value).__name__}>"
+            cost = len(representation)
+            item_representations.additem(
+                (str(key), representation, abbreviated_representation), cost
+            )
+            usage += cost
+
+        while usage > limit and item_representations:
+            (
+                (key, representation, abbreviated_representation),
+                cost,
+            ) = item_representations.popitem()
+
+            deduction = cost - len(abbreviated_representation)
+            usage -= deduction
+            yield key, abbreviated_representation
+
+        for key, representation, _ in item_representations.keys():
+            yield key, representation
+
+    def __get_abbreviated_items_str(self, limit: int = 1000) -> str:
+        return ", ".join(f"{key}={value}" for key, value in self.__get_abbreviated_items(limit))
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({repr(self.id)}, {self.__get_abbreviated_items_str()})"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({repr(self.id)}, {self.__get_items_str()})"
@@ -46,7 +116,7 @@ class Scope(UserDict, Mapping[str, Any]):
         return self.id < other.id
 
     def getmagic(self, name: str) -> Any:
-        return self[to_magic_naming(name)]
+        return self.__getitem__(to_magic_naming(name))
 
     def setmagic(self, name: str, value: Any) -> None:
         """
@@ -57,7 +127,7 @@ class Scope(UserDict, Mapping[str, Any]):
         >>> scope[to_magic_naming('value')]
         3
         """
-        self[to_magic_naming(name)] = value
+        self.__setitem__(to_magic_naming(name), value)
 
 
 class Scoping:
@@ -69,6 +139,8 @@ class Scoping:
     - caller-callee corresponds to parent-child relationship
     - parallel-execution corresponds to sibling relationship
     """
+
+    __slots__ = ("_tree", "_memory_limit", "_cleanup_at_close")
 
     @staticmethod
     def _are_equal_node(scope_node: Node, other_scope_node: Node) -> bool:
@@ -85,6 +157,15 @@ class Scoping:
     def _update_node_when_equal(scope_node: Node, other_scope_node: Node) -> None:
         scope_node.identifier.update(other_scope_node.identifier)
 
+    @classmethod
+    def of(
+        cls, storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY
+    ) -> Scoping:
+        """
+        Create a Scoping based on a storage type.
+        """
+        return cls(None, *storage_option.args, **storage_option.kwargs)
+
     @property
     def global_scope(self) -> Scope:
         return self._tree.root
@@ -94,14 +175,29 @@ class Scoping:
         for node in self._tree.all_nodes_itr():
             yield node.identifier
 
-    def __init__(self, _tree: Optional[Tree] = None):
+    def __init__(
+        self,
+        _tree: Optional[Tree] = None,
+        memory_limit: Union[float, int] = math.inf,
+        cleanup_at_close: bool = False,
+    ):
         """
         The constructor can be invoked in two flavors:
 
         - Create New: call with no arguments
         - From Existing: provide `_tree`
+
+        `memory_limit` can control how Scope chooses between saving object in memory
+        versus storage. See `HybridStorageProvider` for more info.
         """
         self._init_tree(_tree)
+        self._init_scope_init_args(memory_limit, cleanup_at_close)
+
+    def __enter__(self) -> Scoping:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+        self.close()
 
     def _init_tree(self, _tree: Optional[Tree] = None) -> None:
         if _tree is None:
@@ -111,6 +207,12 @@ class Scoping:
         else:
             # from existing
             self._tree = _tree
+
+    def _init_scope_init_args(
+        self, memory_limit: Union[float, int], cleanup_at_close: bool
+    ) -> None:
+        self._memory_limit = memory_limit
+        self._cleanup_at_close = cleanup_at_close
 
     def __contains__(self, scope: Scope) -> bool:
         return self._tree.contains(scope)
@@ -169,13 +271,29 @@ class Scoping:
         return self._tree.create_node(identifier=scope, parent=parent_scope)
 
     def create_scope(self, parent_scope: Scope, **kwargs: Any) -> Scope:
-        scope = Scope(**kwargs)
+        scope = Scope(None, self._memory_limit, self._cleanup_at_close, **kwargs)
         self.add_scope(parent_scope, scope)
         return scope
 
     def create_scoped(self, parent_scope: Scope, **kwargs: Any) -> Scoped:
         scope = self.create_scope(parent_scope, **kwargs)
         return Scoped(self, scope)
+
+    def cleanup(self) -> None:
+        """
+        Forcing release of memory used for scopes.
+
+        It will call `close` on every scope.
+        """
+        for scope in self.all_scopes:
+            scope.cleanup()
+
+    def close(self) -> None:
+        """
+        Proper clean up. It will call `close` on every scope.
+        """
+        for scope in self.all_scopes:
+            scope.close()
 
     def show(self, **kwargs: Any) -> None:
         """
@@ -237,7 +355,7 @@ class Scoped(Scoping):
     While Scoping is a tree of Scope, Scoped is a branch of Scope.
     """
 
-    current_scope: Scope
+    __slots__ = ("current_scope",)
 
     def __init__(
         self,

@@ -10,9 +10,11 @@ matplotlib
 mypy
 nest_asyncio
 networkx[default]
+pqdict
 pre-commit
 pydot
 pylint
+pympler
 pytest
 pytest-asyncio
 pytest-cov
