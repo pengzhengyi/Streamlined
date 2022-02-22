@@ -190,8 +190,8 @@ class Scoping:
         `memory_limit` can control how Scope chooses between saving object in memory
         versus storage. See `HybridStorageProvider` for more info.
         """
-        self._init_tree(_tree)
         self._init_scope_init_args(memory_limit, cleanup_at_close)
+        self._init_tree(_tree)
 
     def __enter__(self) -> Scoping:
         return self
@@ -203,7 +203,7 @@ class Scoping:
         if _tree is None:
             # create new
             self._tree = Tree()
-            self._tree.create_node(identifier=Scope())
+            self._tree.create_node(identifier=self._create_scope())
         else:
             # from existing
             self._tree = _tree
@@ -270,8 +270,11 @@ class Scoping:
     def add_scope(self, parent_scope: Scope, scope: Scope) -> Node:
         return self._tree.create_node(identifier=scope, parent=parent_scope)
 
+    def _create_scope(self, **kwargs: Any) -> Scope:
+        return Scope(None, self._memory_limit, self._cleanup_at_close, **kwargs)
+
     def create_scope(self, parent_scope: Scope, **kwargs: Any) -> Scope:
-        scope = Scope(None, self._memory_limit, self._cleanup_at_close, **kwargs)
+        scope = self._create_scope(**kwargs)
         self.add_scope(parent_scope, scope)
         return scope
 
