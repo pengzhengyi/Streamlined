@@ -30,3 +30,14 @@ def test_hybrid_storage_warning_for_unpickleable_exceeds_memory(tmp_path: Path):
 
             assert len(w) == 1
             assert issubclass(w[-1].category, RuntimeWarning)
+
+
+def test_update_for_hybrid_storage_provider(tmp_path: Path):
+    unpickleable = lambda a, b: a + b
+    filename1 = str(tmp_path.joinpath("storage"))
+    with HybridStorageProvider(filename1, 1, False) as storage_provider:
+        storage_provider["add"] = unpickleable
+
+        storage_provider.update(storage_provider)
+
+        assert len(storage_provider) == 1
