@@ -277,7 +277,7 @@ class Scoping:
 
     def create_scoped(self, parent_scope: Scope, **kwargs: Any) -> Scoped:
         scope = self.create_scope(parent_scope, **kwargs)
-        return Scoped(self, scope)
+        return Scoped(self, scope, self._memory_limit, self._cleanup_at_close)
 
     def cleanup(self) -> None:
         """
@@ -361,8 +361,10 @@ class Scoped(Scoping):
         self,
         scoping: Scoping,
         scope: Scope,
+        memory_limit: Union[float, int] = math.inf,
+        cleanup_at_close: bool = False,
     ):
-        super().__init__(_tree=Tree())
+        super().__init__(Tree(), memory_limit, cleanup_at_close)
         self.__init_branch(scoping, scope)
 
     def __init_branch(self, scoping: Scoping, scope: Scope) -> None:
