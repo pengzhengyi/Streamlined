@@ -271,6 +271,13 @@ class HybridStorageProvider(StorageProvider):
 
         raise KeyError(f"Cannot find key {__k}")
 
+    def __contains__(self, __o: object) -> bool:
+        if self.has_in_memory_storage and self._in_memory_priority_queue.__contains__(__o):
+            return True
+        if self.has_persistent_storage and self._persistent_storage.__contains__(__o):
+            return True
+        return False
+
     def __len__(self) -> int:
         length = 0
 
@@ -314,23 +321,26 @@ class HybridStorageProvider(StorageProvider):
             self._persistent_storage.__setitem__(__k, __v)
 
     def _rebalance_memory(self) -> None:
-        unpickleables: List[Tuple[str, Any, int]] = []
+        unpickleables: List[Tuple[str, int]] = []
 
         limit = self._memory_limit
         usage = self._in_memory_footprint
         while self._in_memory_priority_queue and usage > limit:
             key, cost = self._in_memory_priority_queue.popitem()
-            value = self._in_memory_storage.pop(key)
+            value = self._in_memory_storage[key]
+
             try:
                 pickle.dumps(value)
+                # only pop value when it is pickleable, which means it will be moved
+                # from memory to storage
+                self._in_memory_storage.pop(key)
                 self._persistent_storage.__setitem__(key, value)
                 usage -= cost
-            except (PickleError, AttributeError):
-                unpickleables.append((key, value, cost))
+            except (PickleError, AttributeError, TypeError):
+                unpickleables.append((key, cost))
 
-        for key, value, cost in unpickleables:
+        for key, cost in unpickleables:
             self._in_memory_priority_queue.additem(key, cost)
-            self._in_memory_storage[key] = value
 
         if usage > limit:
             warn(
