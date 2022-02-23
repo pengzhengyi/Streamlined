@@ -3,18 +3,21 @@ from __future__ import annotations
 import glob
 import math
 import os
-import pickle
 import shelve
 from collections import UserDict
 from contextlib import suppress
-from pickle import PickleError
-from typing import Any, Iterable, Iterator, List, MutableMapping, Optional, Tuple, Union
-from warnings import warn
+from typing import Any, Iterable, Iterator, MutableMapping, TypeVar, Union
 
+from dill import Pickler, Unpickler, pickles
 from pqdict import maxpq
 from pympler.asizeof import flatsize
 
 from .storage_option import HybridStorageOption, PersistentStorageOption, StorageOption
+
+shelve.Pickler = Pickler
+shelve.Unpickler = Unpickler
+
+T = TypeVar("T")
 
 
 class StorageProvider(MutableMapping[str, Any]):
@@ -43,7 +46,7 @@ class StorageProvider(MutableMapping[str, Any]):
         super().__init__()
         self.cleanup_at_close = cleanup_at_close
 
-    def __enter__(self) -> StorageProvider:
+    def __enter__(self: T) -> T:
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
@@ -63,18 +66,6 @@ class StorageProvider(MutableMapping[str, Any]):
 
     def __iter__(self) -> Iterator[Any]:
         raise NotImplementedError()
-
-    def memory_footprint(self, key: Optional[str] = None) -> int:
-        """
-        Get the memory footprint of current provider.
-
-        When key is specified, get the memory memory_footprint of specified value.
-        """
-        if key is None:
-            return flatsize(self)
-        else:
-            value = self.__getitem__(key)
-            return flatsize(value)
 
     def cleanup(self) -> None:
         """
@@ -160,12 +151,6 @@ class PersistentStorageProvider(StorageProvider):
     def _get_shelf_files(self) -> Iterable[str]:
         yield from glob.iglob(f"{self.filename}.*")
 
-    def memory_footprint(self, key: Optional[str] = None) -> int:
-        if key is None:
-            return sum(os.path.getsize(savefile) for savefile in self._get_shelf_files())
-
-        return super().memory_footprint(key)
-
     def cleanup(self) -> None:
         for savefile in self._get_shelf_files():
             os.remove(savefile)
@@ -179,19 +164,20 @@ class PersistentStorageProvider(StorageProvider):
 
 class HybridStorageProvider(StorageProvider):
     """
-    HybridStorageProvider combines an in-memory storage approach and a
-    persistent storage option.
+    HybridStorageProvider combines a storing-in-memory approach and a
+    storing-in-storage option.
 
     Memory Limit
     ------
     At creation, HybridStorageProvider can specify a `memory_limit`. Until
-    the memory footprint exceeds this limit, all mappings will be stored in
+    the purgeable memory exceeds this limit -- the items that can be
+    serialized to store in storage, all mappings will be stored in
     InMemoryStorageProvider. Then whenever the memory footprint is about
     to exceed, HybridStorageProvider will transfer the most expensive mappings to PersistentProvider until the live memory usage is below the
     limit again.
 
-    Reversely, deleting an item will update the memory footprint
-    estimation but not cause tranferring of mappings from
+    However, oppositely, deleting a serializable item will update the used
+    memory estimation but will not cause mappings to transfer from
     PersistentProvider to InMemoryStorageProvider.
 
     Note that the memory usage is roughly estimated. For example, if a
@@ -210,9 +196,9 @@ class HybridStorageProvider(StorageProvider):
 
     __slots__ = (
         "_memory_limit",
-        "_in_memory_priority_queue",
-        "_in_memory_storage",
-        "_persistent_storage",
+        "_purgeables",
+        "_memory",
+        "_storage",
     )
 
     @classmethod
@@ -220,21 +206,25 @@ class HybridStorageProvider(StorageProvider):
         return cls(filename, *storage_option.args, **storage_option.kwargs)
 
     @property
-    def _in_memory_footprint(self) -> int:
-        if self.has_in_memory_storage:
-            return sum(self._in_memory_priority_queue.values())
+    def purgeable_memory(self) -> int:
+        """
+        The amount of purgeable memory -- memory that can be cached
+        to storage.
+        """
+        if self.use_memory:
+            return sum(self._purgeables.values())
         else:
             return 0
 
     @property
-    def has_in_memory_storage(self) -> bool:
+    def use_memory(self) -> bool:
         """
         Whether any mapping might be stored in memory.
         """
         return self._memory_limit > 0
 
     @property
-    def has_persistent_storage(self) -> bool:
+    def use_storage(self) -> bool:
         """
         Whether any mapping might be stored in disk.
         """
@@ -248,129 +238,102 @@ class HybridStorageProvider(StorageProvider):
     ) -> None:
         super().__init__(cleanup_at_close)
         self._memory_limit = memory_limit
-        self._init_in_memory_storage_provider()
+        self._init_memory_provider()
         self._init_persistent_memory_storage_provider(filename, cleanup_at_close)
 
-    def _init_in_memory_storage_provider(self) -> None:
-        if self.has_in_memory_storage:
-            self._in_memory_priority_queue = maxpq()
-            self._in_memory_storage = InMemoryStorageProvider()
+    def _init_memory_provider(self) -> None:
+        if self.use_memory:
+            self._purgeables = maxpq()
+            self._memory = InMemoryStorageProvider()
 
     def _init_persistent_memory_storage_provider(
         self, filename: str, cleanup_at_close: bool
     ) -> None:
-        if self.has_persistent_storage:
-            self._persistent_storage = PersistentStorageProvider(filename, cleanup_at_close)
+        if self.use_storage:
+            self._storage = PersistentStorageProvider(filename, cleanup_at_close)
 
     def __getitem__(self, __k: str) -> Any:
-        if self.has_in_memory_storage:
+        if self.use_memory:
             with suppress(KeyError):
-                return self._in_memory_storage.__getitem__(__k)
-        if self.has_persistent_storage:
-            return self._persistent_storage.__getitem__(__k)
+                return self._memory.__getitem__(__k)
+        if self.use_storage:
+            return self._storage.__getitem__(__k)
 
         raise KeyError(f"Cannot find key {__k}")
 
     def __contains__(self, __o: object) -> bool:
-        if self.has_in_memory_storage and self._in_memory_priority_queue.__contains__(__o):
+        if self.use_memory and self._memory.__contains__(__o):
             return True
-        if self.has_persistent_storage and self._persistent_storage.__contains__(__o):
+        if self.use_storage and self._storage.__contains__(__o):
             return True
         return False
 
     def __len__(self) -> int:
         length = 0
 
-        if self.has_in_memory_storage:
-            length += self._in_memory_storage.__len__()
-        if self.has_persistent_storage:
-            length += self._persistent_storage.__len__()
+        if self.use_memory:
+            length += self._memory.__len__()
+        if self.use_storage:
+            length += self._storage.__len__()
 
         return length
 
     def __iter__(self) -> Iterator[Any]:
-        if self.has_in_memory_storage:
-            yield from self._in_memory_storage.__iter__()
-        if self.has_persistent_storage:
-            yield from self._persistent_storage.__iter__()
+        if self.use_memory:
+            yield from self._memory.__iter__()
+        if self.use_storage:
+            yield from self._storage.__iter__()
 
     def __delitem__(self, __k: str) -> None:
-        if self.has_in_memory_storage:
+        if self.use_memory:
             with suppress(KeyError):
-                self._in_memory_storage.__delitem__(__k)
-                self._in_memory_priority_queue.__delitem__(__k)
-        if self.has_persistent_storage:
-            self._persistent_storage.__delitem__(__k)
+                self._memory.__delitem__(__k)
+                self._purgeables.__delitem__(__k)
+        if self.use_storage:
+            self._storage.__delitem__(__k)
 
     def __setitem__(self, __k: str, __v: Any) -> None:
-        if self.has_in_memory_storage:
-            # save in memory
-            new_cost: int = flatsize(__v)
-            try:
-                # stored in memory
-                existing_cost: int = self._in_memory_priority_queue[__k]
-                if new_cost != existing_cost:
-                    self._in_memory_priority_queue[__k] = new_cost
-            except KeyError:
-                self._in_memory_priority_queue[__k] = new_cost
-            self._in_memory_storage.__setitem__(__k, __v)
+        if self.use_memory:
+            self._memory.__setitem__(__k, __v)
 
-            if self.has_persistent_storage:
-                self._rebalance_memory()
-        elif self.has_persistent_storage:
-            self._persistent_storage.__setitem__(__k, __v)
+            if pickles(__v):
+                # pickleable -> consider whether to store in storage
+                new_cost: int = flatsize(__v)
+                self._purgeables[__k] = new_cost
+
+                if self.use_storage:
+                    self._rebalance_memory()
+
+        elif self.use_storage:
+            self._storage.__setitem__(__k, __v)
 
     def _rebalance_memory(self) -> None:
-        unpickleables: List[Tuple[str, int]] = []
-
         limit = self._memory_limit
-        usage = self._in_memory_footprint
-        while self._in_memory_priority_queue and usage > limit:
-            key, cost = self._in_memory_priority_queue.popitem()
-            value = self._in_memory_storage[key]
+        usage = self.purgeable_memory
 
-            try:
-                pickle.dumps(value)
-                # only pop value when it is pickleable, which means it will be moved
-                # from memory to storage
-                self._in_memory_storage.pop(key)
-                self._persistent_storage.__setitem__(key, value)
-                usage -= cost
-            except (PickleError, AttributeError, TypeError):
-                unpickleables.append((key, cost))
+        # since `self._purgeables` stores only pickleable
+        # objects, usage can be decreased to 0 and will at some moment
+        # smaller than limit
 
-        for key, cost in unpickleables:
-            self._in_memory_priority_queue.additem(key, cost)
-
-        if usage > limit:
-            warn(
-                f"Memory usage {usage} exceeds limit {limit} since remaining are all not pickleable",
-                category=RuntimeWarning,
-            )
-
-    def memory_footprint(self, key: Optional[str] = None) -> int:
-        if key is None:
-            footprint = 0
-            if self.has_in_memory_storage:
-                footprint += self._in_memory_storage.memory_footprint()
-            if self.has_persistent_storage:
-                footprint += self._persistent_storage.memory_footprint()
-            return footprint
-        else:
-            return super().memory_footprint(key)
+        while usage > limit:
+            # from memory to storage
+            key, cost = self._purgeables.popitem()
+            value = self._memory.pop(key)
+            self._storage.__setitem__(key, value)
+            usage -= cost
 
     def cleanup(self) -> None:
-        if self.has_in_memory_storage:
-            self._in_memory_storage.cleanup()
-        if self.has_persistent_storage:
-            self._persistent_storage.cleanup()
+        if self.use_memory:
+            self._memory.cleanup()
+        if self.use_storage:
+            self._storage.cleanup()
 
         super().cleanup()
 
     def close(self) -> None:
-        if self.has_in_memory_storage:
-            self._in_memory_storage.close()
-        if self.has_persistent_storage:
-            self._persistent_storage.close()
+        if self.use_memory:
+            self._memory.close()
+        if self.use_storage:
+            self._storage.close()
 
         super().close()

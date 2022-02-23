@@ -1,5 +1,4 @@
 from pathlib import Path
-from warnings import catch_warnings
 
 import pytest
 
@@ -11,29 +10,26 @@ from streamlined.services import (
 
 
 def test_persistent_storage_unpickleable(tmp_path: Path):
-    unpickleable = lambda a, b: a + b
+    unpickleable = (i for i in range(4))
     filename = str(tmp_path.joinpath("storage"))
 
     with PersistentStorageProvider.of(
         filename, PersistentStorageOption.PERSISTENT
     ) as storage_provider:
-        with pytest.raises(AttributeError):
+        with pytest.raises(TypeError):
             storage_provider["add"] = unpickleable
 
 
-def test_hybrid_storage_warning_for_unpickleable_exceeds_memory(tmp_path: Path):
-    unpickleable = lambda a, b: a + b
+def test_hybrid_storage_handle_unpickleable(tmp_path: Path):
+    unpickleable = (i for i in range(4))
     filename = str(tmp_path.joinpath("storage"))
     with HybridStorageProvider(filename, 1, True) as storage_provider:
-        with catch_warnings(record=True) as w:
-            storage_provider["add"] = unpickleable
-
-            assert len(w) == 1
-            assert issubclass(w[-1].category, RuntimeWarning)
+        storage_provider["add"] = unpickleable
+        assert len(storage_provider._storage) == 0
 
 
 def test_update_for_hybrid_storage_provider(tmp_path: Path):
-    unpickleable = lambda a, b: a + b
+    unpickleable = (i for i in range(4))
     filename1 = str(tmp_path.joinpath("storage"))
     with HybridStorageProvider(filename1, 1, False) as storage_provider:
         storage_provider["add"] = unpickleable
