@@ -224,6 +224,14 @@ class HybridStorageProvider(StorageProvider):
         return self._memory_limit > 0
 
     @property
+    def use_memory_only_as_storage_fallback(self) -> bool:
+        """
+        This condition is True if and only if both memory storage are used
+        but memory will only store unpickleable mappings.
+        """
+        return 0 < self._memory_limit < 1
+
+    @property
     def use_storage(self) -> bool:
         """
         Whether any mapping might be stored in disk.
@@ -293,6 +301,10 @@ class HybridStorageProvider(StorageProvider):
             self._storage.__delitem__(__k)
 
     def __setitem__(self, __k: str, __v: Any) -> None:
+        if self.use_memory_only_as_storage_fallback:
+            (self._storage if pickles(__v) else self._memory).__setitem__(__k, __v)
+            return
+
         if self.use_memory:
             self._memory.__setitem__(__k, __v)
 
