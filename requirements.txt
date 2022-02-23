@@ -4,6 +4,7 @@ aiorun
 bandit
 black
 decorator
+dill
 Faker
 isort
 matplotlib

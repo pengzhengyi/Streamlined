@@ -72,19 +72,19 @@ class HybridStorageOption(StorageOption):
         tuple(),
         dict(memory_limit=math.inf, cleanup_at_close=True),
     )
-    "Everything will be stored in memory and memory will  be released at `close`"
+    "Everything will be stored in memory and memory will be released at `close`"
 
     PERSISTENT_STORAGE: TArguments = (
         tuple(),
-        dict(memory_limit=0, cleanup_at_close=False),
+        dict(memory_limit=0.1, cleanup_at_close=False),
     )
-    "Everything will be stored in storage and storage will not be released at `close`"
+    "Everything pickleable will be stored in storage and storage will not be released at `close`"
 
     TRANSIENT_STORAGE: TArguments = (
         tuple(),
-        dict(memory_limit=0, cleanup_at_close=True),
+        dict(memory_limit=0.1, cleanup_at_close=True),
     )
-    "Everything will be stored in storage and storage will be released at `close`"
+    "Everything pickleable will be stored in storage and storage will be released at `close`"
 
     PERSISTENT_HYBRID: TArguments = (
         tuple(),
