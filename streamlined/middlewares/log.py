@@ -39,8 +39,19 @@ def _TRANSFORM_WHEN_MISSING_LEVEL(value: Dict[str, Any]) -> Dict[str, Any]:
 _MISSING_LOGGER = partial(IS_DICT_MISSING_KEY, key=LOGGER)
 
 
+def _GET_DEFAULT_LOGGER(_scoped_: Scoped) -> logging.Logger:
+    """
+    If a scope is defined in any enclosing scopes, use that logger.
+    Otherwise, use root logger.
+    """
+    try:
+        return _scoped_.getmagic(LOGGER)
+    except KeyError:
+        return logging.getLogger()
+
+
 def _TRANSFORM_WHEN_MISSING_LOGGER(value: Dict[str, Any]) -> Dict[str, Any]:
-    value[LOGGER] = logging.getLogger
+    value[LOGGER] = _GET_DEFAULT_LOGGER
     return value
 
 
@@ -87,7 +98,7 @@ class Log(Middleware):
         # `{'log': {MESSAGE: ..., LOGGER: ...}}` -> `{'log': {MESSAGE: ..., LOGGER: ..., LEVEL: DEBUG}}`
         self.simplifications.append((AND(IS_DICT, _MISSING_LEVEL), _TRANSFORM_WHEN_MISSING_LEVEL))
 
-        # `{'log': {MESSAGE: ..., LEVEL: ...}}` -> `{'log': {MESSAGE: ..., LOGGER: logging.getLogger, LEVEL: ...}}`
+        # `{'log': {MESSAGE: ..., LEVEL: ...}}` -> `{'log': {MESSAGE: ..., LOGGER: _GET_DEFAULT_LOGGER, LEVEL: ...}}`
         self.simplifications.append(
             (AND(IS_DICT, _MISSING_LOGGER), _TRANSFORM_WHEN_MISSING_LOGGER)
         )
@@ -145,7 +156,7 @@ class Log(Middleware):
             getattr(self, LOGGER), context.replace_with_void_next()
         )
         logger = scoped.getmagic(VALUE)
-        context.scoped.setmagic(LOGGER, logger)
+        context.scoped.setmagic(LOGGER, logger, 1)
         return logger
 
     async def get_message(self, context: Context) -> str:
