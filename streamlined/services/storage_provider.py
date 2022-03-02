@@ -8,12 +8,14 @@ from collections import UserDict
 from contextlib import suppress
 from typing import Any, Iterable, Iterator, MutableMapping, TypeVar, Union
 
-from dill import Pickler, Unpickler, pickles
+import dill.settings
+from dill import FILE_FMODE, Pickler, Unpickler, pickles
 from pqdict import maxpq
 from pympler.asizeof import flatsize
 
 from .storage_option import HybridStorageOption, PersistentStorageOption, StorageOption
 
+dill.settings["fmode"] = FILE_FMODE
 shelve.Pickler = Pickler
 shelve.Unpickler = Unpickler
 
@@ -308,13 +310,11 @@ class HybridStorageProvider(StorageProvider):
         if self.use_memory:
             self._memory.__setitem__(__k, __v)
 
-            if pickles(__v):
+            if self.use_storage and pickles(__v):
                 # pickleable -> consider whether to store in storage
                 new_cost: int = flatsize(__v)
                 self._purgeables[__k] = new_cost
-
-                if self.use_storage:
-                    self._rebalance_memory()
+                self._rebalance_memory()
 
         elif self.use_storage:
             self._storage.__setitem__(__k, __v)

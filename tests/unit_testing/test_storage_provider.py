@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -37,3 +38,18 @@ def test_update_for_hybrid_storage_provider(tmp_path: Path):
         storage_provider.update(storage_provider)
 
         assert len(storage_provider) == 1
+
+
+def test_pickle_io_file(tmp_path: Path):
+    filepath = tmp_path.joinpath("foo.txt")
+    file_writer = filepath.open("w", encoding="utf-8")
+    file_writer.write("Hello World")
+    file_writer.close()
+
+    assert os.path.getsize(str(filepath)) > 0
+
+    filename = str(tmp_path.joinpath("storage"))
+    with HybridStorageProvider(filename, 1, False) as storage_provider:
+        storage_provider["file_writer"] = file_writer
+
+    assert os.path.getsize(str(filepath)) > 0
