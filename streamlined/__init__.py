@@ -93,6 +93,7 @@ from .services import (
     Scoped,
     Scoping,
     ValueRef,
+    to_magic_naming,
 )
 
 resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
