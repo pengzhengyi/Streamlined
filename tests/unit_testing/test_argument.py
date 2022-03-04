@@ -21,18 +21,18 @@ from streamlined.middlewares import (
 @pytest.mark.asyncio
 async def test_argument_set_in_scope(simple_executor):
     argument = Argument({ARGUMENT: {NAME: "first_name", VALUE: "Alice"}})
-    scoped = await argument.run(simple_executor)
-    assert scoped["first_name"] == "Alice"
+    scoping = await argument.run(simple_executor)
+    assert scoping["first_name"] == "Alice"
 
 
 @pytest.mark.asyncio
 async def test_argument_skip(simple_executor):
 
     argument = Argument({ARGUMENT: {NAME: "first_name", VALUE: "Alice", SKIP: True}})
-    scoped = await argument.run(simple_executor)
+    scoping = await argument.run(simple_executor)
 
     with pytest.raises(KeyError):
-        scoped["first_name"]
+        scoping["first_name"]
 
 
 @pytest.mark.asyncio
@@ -43,7 +43,7 @@ async def test_argument_set_after_action(simple_executor):
         mock(name)
 
     argument = Argument({ARGUMENT: {NAME: "name", VALUE: "Alice", CLEANUP: is_name_set}})
-    scoped = await argument.run(simple_executor)
+    await argument.run(simple_executor)
 
     mock.assert_called_once_with("Alice")
 
@@ -59,13 +59,12 @@ async def test_argument_argparse(simple_executor):
             }
         }
     )
-    scoped = await argument.run(simple_executor)
-    assert scoped.get("num_processors") == 10
+    scoping = await argument.run(simple_executor)
+    assert scoping.search("num_processors") == 10
 
 
 @pytest.mark.asyncio
 async def test_argument_argparse_parsed_argument_not_present(simple_executor):
-
     argument = Argument(
         {
             ARGUMENT: {
@@ -74,19 +73,18 @@ async def test_argument_argparse_parsed_argument_not_present(simple_executor):
             }
         }
     )
-    scoped = await argument.run(simple_executor)
-    assert scoped.get("num_processors") is None
+    scoping = await argument.run(simple_executor)
+    assert scoping.search("num_processors") is None
 
 
 @pytest.mark.asyncio
 async def test_arguments_set_in_scope(simple_executor):
-
     arguments = Arguments(
         {ARGUMENTS: [{NAME: "first_name", VALUE: "John"}, {NAME: "last_name", VALUE: "Doe"}]}
     )
-    scoped = await arguments.run(simple_executor)
-    assert scoped["first_name"] == "John"
-    assert scoped["last_name"] == "Doe"
+    scoping = await arguments.run(simple_executor)
+    assert scoping["first_name"] == "John"
+    assert scoping["last_name"] == "Doe"
 
 
 @pytest.mark.asyncio
@@ -99,6 +97,6 @@ async def test_argument_partial_async_action(simple_executor):
 
     argument = Argument({NAME: "async_result", VALUE: partial(work, return_value=10)})
 
-    scoped = await argument.run(simple_executor)
-    assert scoped["async_result"] == 10
+    scoping = await argument.run(simple_executor)
+    assert scoping["async_result"] == 10
     mock.assert_awaited_once_with(10)

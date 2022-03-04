@@ -17,7 +17,6 @@ from streamlined import (
     SUBSTEPS,
     SUPPRESS,
     VALUE,
-    Parallel,
     Runstep,
     Runsteps,
 )
@@ -43,9 +42,9 @@ async def test_runstep_action_requires_arguments(simple_executor):
         }
     )
 
-    scoped = await runstep.run(simple_executor)
+    scoping = await runstep.run(simple_executor)
     mock.assert_called_once_with(10, 20)
-    assert scoped.getmagic(VALUE) == 30
+    assert scoping.searchmagic(VALUE) == 30
 
 
 @pytest.mark.asyncio
@@ -53,8 +52,7 @@ async def test_runstep_substeps(simple_executor):
     mock1 = Mock()
     mock2 = Mock()
     runstep = Runstep({ACTION: mock1, SUBSTEPS: [{ACTION: mock2}]})
-
-    scoped = await runstep.run(simple_executor)
+    await runstep.run(simple_executor)
     mock1.assert_called_once()
     mock2.assert_called_once()
 
@@ -67,10 +65,14 @@ async def test_runstep_suppress_no_argument_exception(simple_executor) -> None:
         return a + b
 
     runstep = Runstep(
-        {NAME: "perform add of two numbers", ACTION: add, SUPPRESS: {ACTION: suppressed_action},}
+        {
+            NAME: "perform add of two numbers",
+            ACTION: add,
+            SUPPRESS: {ACTION: suppressed_action},
+        }
     )
 
-    scoped = await runstep.run(simple_executor)
+    await runstep.run(simple_executor)
     suppressed_action.assert_awaited_once()
 
 
@@ -87,11 +89,18 @@ async def test_runstep_parallel(simple_executor):
     NUM_RUNSTEPS = 50
 
     def create_runsteps() -> List[Dict[str, Any]]:
-        return [{RUNSTEP: {ACTION: sleep_and_do,}} for i in range(NUM_RUNSTEPS)]
+        return [
+            {
+                RUNSTEP: {
+                    ACTION: sleep_and_do,
+                }
+            }
+            for i in range(NUM_RUNSTEPS)
+        ]
 
     runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, SCHEDULING: PARALLEL}})
 
-    scoped = await runstep.run(simple_executor)
+    await runstep.run(simple_executor)
     assert mock.call_count == NUM_RUNSTEPS
 
 
@@ -108,9 +117,16 @@ async def test_runstep_parallel_with_max_concurrency(simple_executor):
     NUM_RUNSTEPS = 10
 
     def create_runsteps() -> List[Dict[str, Any]]:
-        return [{RUNSTEP: {ACTION: sleep_and_do,}} for i in range(NUM_RUNSTEPS)]
+        return [
+            {
+                RUNSTEP: {
+                    ACTION: sleep_and_do,
+                }
+            }
+            for i in range(NUM_RUNSTEPS)
+        ]
 
     runstep = Runsteps({RUNSTEPS: {VALUE: create_runsteps, CONCURRENCY: 5}})
 
-    scoped = await runstep.run(simple_executor)
+    await runstep.run(simple_executor)
     assert mock.call_count == NUM_RUNSTEPS

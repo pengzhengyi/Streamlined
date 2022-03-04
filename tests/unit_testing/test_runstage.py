@@ -59,13 +59,13 @@ async def test_runstage_with_name_example(simple_executor):
         }
     )
 
-    scoped = await runstage.run(simple_executor)
+    scoping = await runstage.run(simple_executor)
 
     us_convention_mock.assert_called_once_with("Alan", "Turing")
     chinese_convention_mock.assert_called_once_with("Alan", "Turing")
 
-    assert scoped.get("full_name_us") == "Alan Turing"
-    assert scoped.get("full_name_chinese") == "Turing Alan"
+    assert scoping.search("full_name_us") == "Alan Turing"
+    assert scoping.search("full_name_chinese") == "Turing Alan"
 
 
 @pytest.mark.asyncio
@@ -116,10 +116,10 @@ async def test_runstage_with_dynamic_generated_runsteps(simple_executor):
         }
     )
 
-    scoped = await runstage.run(simple_executor)
+    scoping = await runstage.run(simple_executor)
 
     us_convention_mock.assert_called_once_with("Alan", "Turing")
     chinese_convention_mock.assert_called_once_with("Alan", "Turing")
 
-    assert scoped.get("full_name_us") == "Alan Turing"
-    assert scoped.get("full_name_chinese") == "Turing Alan"
+    assert scoping.search("full_name_us") == "Alan Turing"
+    assert scoping.search("full_name_chinese") == "Turing Alan"

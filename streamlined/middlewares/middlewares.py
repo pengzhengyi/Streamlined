@@ -287,16 +287,17 @@ class ScheduledMiddlewares(Middleware, WithMiddlewares):
     async def _init_scheduler(self, context: Context) -> None:
         with suppress(AttributeError):
             scoped = await self.concurrency.apply_onto(context.replace_with_void_next())
-            context.scoped.update(scoped)
             concurrency: int = scoped.getmagic(VALUE)
+            context.scoped.update(scoped)
             context.scoped.setmagic(CONCURRENCY, concurrency)
             self.scheduler = Parallel(concurrency)
 
     async def _init_schedule(self, context: Context) -> None:
         scoped = await self.middlewares_generator.apply_onto(context.replace_with_void_next())
+        middleware_configs = scoped.getmagic(VALUE)
+
         context.scoped.update(scoped)
 
-        middleware_configs = scoped.getmagic(VALUE)
         self.middlewares = list(self.create_middlewares_from(middleware_configs))
         self.middleware_units = self._get_middleware_units()
         self.middleware_schedule = self.scheduler(self.middleware_units)
