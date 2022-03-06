@@ -62,14 +62,20 @@ class DependencyInjection:
             raise KeyError(f"cannot resolve arguments for {_callable}") from keyerror
 
     @classmethod
-    def prepare(
-        cls, _callable: Callable[..., Any], providers: Mapping[Any, Any]
+    def bind_callable(
+        cls, _callable: Callable[..., Any], bound_arguments: inspect.BoundArguments
     ) -> Callable[[], Any]:
-        bound_arguments = cls.inject_callable(_callable, providers)
         if IS_EMPTY_BOUND_ARGUMENTS(bound_arguments):
             return _callable
 
         return bound(_callable, *bound_arguments.args, **bound_arguments.kwargs)
+
+    @classmethod
+    def prepare(
+        cls, _callable: Callable[..., Any], providers: Mapping[Any, Any]
+    ) -> Callable[[], Any]:
+        bound_arguments = cls.inject_callable(_callable, providers)
+        return cls.bind_callable(_callable, bound_arguments)
 
 
 if __name__ == "__main__":

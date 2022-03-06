@@ -8,6 +8,7 @@ import pytest
 from streamlined import (
     ACTION,
     ARGUMENTS,
+    CLEANUP,
     CONCURRENCY,
     NAME,
     PARALLEL,
@@ -45,6 +46,27 @@ async def test_runstep_action_requires_arguments(simple_executor):
     scoping = await runstep.run(simple_executor)
     mock.assert_called_once_with(10, 20)
     assert scoping.searchmagic(VALUE) == 30
+
+
+@pytest.mark.asyncio
+async def test_runstep_dynamic_assignment(simple_executor):
+    def record_bob_attendance(attendees: List[str]) -> None:
+        attendees.append("Bob")
+
+    def check_attendance(attendees: List[str]) -> None:
+        assert len(attendees) == 2
+
+    runstep = Runstep(
+        {
+            RUNSTEP: {
+                ARGUMENTS: [{NAME: "attendees", VALUE: ["Alice"]}],
+                ACTION: record_bob_attendance,
+                CLEANUP: check_attendance,
+            }
+        }
+    )
+
+    scoping = await runstep.run(simple_executor)
 
 
 @pytest.mark.asyncio

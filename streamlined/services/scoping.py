@@ -47,6 +47,10 @@ class Scope(Store):
     __slots__ = ("id",)
     __hash__ = object.__hash__
 
+    @property
+    def representation(self) -> str:
+        return self.__str__()
+
     def __init__(self, _id: Optional[uuid.UUID] = None, **kwargs: Any) -> None:
         self._init_id(_id)
         super().__init__()
@@ -332,7 +336,7 @@ class Scoping(AbstractDictionary):
         scope = self.create_scope(parent_scope, **kwargs)
         return Scoped(self, scope)
 
-    def show(self, **kwargs: Any) -> None:
+    def show(self, data_property: str = "representation", **kwargs: Any) -> None:
         """
         Print the tree structure in hierarchy style.
 
@@ -340,7 +344,7 @@ class Scoping(AbstractDictionary):
         ------
         [Tree.show](https://treelib.readthedocs.io/en/latest/treelib.html#treelib.tree.Tree.show)
         """
-        self._tree.show(**kwargs)
+        self._tree.show(data_property=data_property, **kwargs)
 
     def to_networkx(self) -> nx.DiGraph:
         """

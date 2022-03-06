@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping, Optional, Tuple
 
@@ -71,15 +72,20 @@ class Context:
     def __setitem__(self, key: str, item: Any) -> None:
         raise NotImplementedError("context provides a read-only view")
 
-    def prepare(self, _callable: Callable[..., Any]) -> Callable[..., Any]:
-        return DependencyInjection.prepare(_callable, self.mappings)
-
     async def submit(self, _callable: Callable[..., Any]) -> Any:
-        prepared_action = self.prepare(_callable)
+        bound_arguments = DependencyInjection.inject_callable(_callable, self.mappings)
+        prepared_action = DependencyInjection.bind_callable(_callable, bound_arguments)
+
         result = await self.executor.submit(prepared_action)
+
+        # write back key, value manually as value might be mutated
+        for key, value in bound_arguments.arguments.items():
+            with suppress(KeyError):
+                self.scoped.change(key, value)
 
         if isinstance(result, Scoping):
             self.scoped.update(result)
+
         return result
 
     def update_scoped(self, scoped: Optional[Scoped]) -> Scoped:
