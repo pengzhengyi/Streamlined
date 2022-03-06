@@ -4,6 +4,7 @@ import uuid
 from collections import deque
 from contextlib import suppress
 from typing import Any, Deque, Dict, Iterable, Iterator, Optional, Tuple, TypeVar, Union
+from weakref import ReferenceType, ref
 
 import networkx as nx
 from pqdict import maxpq
@@ -127,7 +128,13 @@ class Scoping(AbstractDictionary):
 
     @staticmethod
     def _get_scope(node: Node) -> Scope:
-        return node.data
+        data = node.data
+        if isinstance(data, ReferenceType):
+            return data()
+        elif isinstance(data, Scope):
+            return data
+        else:
+            raise TypeError(f"{data} is not type Scope")
 
     @staticmethod
     def _are_equal_node(scope_node: Node, other_scope_node: Node) -> bool:
@@ -337,7 +344,7 @@ class Scoping(AbstractDictionary):
         """
         Convert a Tree to NetworkX DiGraph.
         """
-        return to_networkx(self._tree)
+        return to_networkx(self._tree, node_converter=self._get_node)
 
     def draw(
         self,
@@ -395,9 +402,11 @@ class Scoped(Scoping):
 
         parent = None
         for node in scoping._ancestors(self.current_scope, start_at_root=True):
-            parent = self._tree.create_node(
-                identifier=node.identifier, data=node.data, parent=parent
-            )
+            scope = self._get_scope(node)
+            with suppress(TypeError):
+                scope = ref(scope)
+
+            parent = self._tree.create_node(identifier=node.identifier, data=scope, parent=parent)
 
     def __getitem__(self, name: Any) -> Any:
         return self.get(name, scope=self.current_scope)
