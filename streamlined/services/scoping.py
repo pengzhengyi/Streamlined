@@ -195,7 +195,9 @@ class Scoping(AbstractDictionary):
     def _clear(self) -> None:
         super()._clear()
         for scope in self.all_scopes:
-            scope.clear()
+            if scope is not None:
+                # safeguard for finalizing
+                scope.clear()
 
     def _ancestors(self, scope: Scope, start_at_root: bool = False) -> Iterable[Node]:
         """
