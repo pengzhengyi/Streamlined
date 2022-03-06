@@ -80,7 +80,7 @@ async def test_runstep_parallel(simple_executor):
     mock = Mock()
 
     async def sleep_and_do():
-        asyncio.sleep(0.1)
+        await asyncio.sleep(0.1)
         mock()
         return random.random()
 
@@ -108,7 +108,7 @@ async def test_runstep_parallel_with_max_concurrency(simple_executor):
     mock = Mock()
 
     async def sleep_and_do():
-        asyncio.sleep(0.1)
+        await asyncio.sleep(0.1)
         mock()
         return random.random()
 

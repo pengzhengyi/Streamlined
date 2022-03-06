@@ -169,16 +169,19 @@ class Shelf(AbstractDictionary):
     def _get_shelf_files(self) -> Iterable[str]:
         yield from iglob(f"{self.filename}.*")
 
+    def _remove_shelf_files(self) -> None:
+        for savefile in self._get_shelf_files():
+            os.remove(savefile)
+
     def _clear(self) -> None:
         super()._clear()
         self.shelf.clear()
-
-        for savefile in self._get_shelf_files():
-            os.remove(savefile)
+        self._remove_shelf_files()
 
     def _close(self) -> None:
         super()._close()
         self.shelf.close()
+        self._remove_shelf_files()
 
     def supports(self, value: Any) -> bool:
         """
