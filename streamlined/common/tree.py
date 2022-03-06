@@ -71,7 +71,9 @@ def to_networkx(tree: Tree) -> nx.DiGraph:
     while frontier:
         nid = frontier.popleft()
         for child_nid in tree.is_branch(nid):
-            graph.add_edge(nid, child_nid)
+            node_data = tree[nid].data
+            child_data = tree[child_nid].data
+            graph.add_edge(node_data, child_data)
             frontier.append(child_nid)
 
     return graph

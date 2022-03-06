@@ -49,12 +49,10 @@ async def test_runstep_action_requires_arguments(simple_executor):
 
 @pytest.mark.asyncio
 async def test_runstep_substeps(simple_executor):
-    mock1 = Mock()
-    mock2 = Mock()
-    runstep = Runstep({ACTION: mock1, SUBSTEPS: [{ACTION: mock2}]})
-    await runstep.run(simple_executor)
-    mock1.assert_called_once()
-    mock2.assert_called_once()
+    mock = Mock()
+    runstep = Runstep({NAME: "runstep", SUBSTEPS: [{NAME: "substep", ACTION: mock}]})
+    scoping = await runstep.run(simple_executor)
+    mock.assert_called_once()
 
 
 @pytest.mark.asyncio
