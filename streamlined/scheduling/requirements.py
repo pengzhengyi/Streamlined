@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import UserDict
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -9,12 +9,13 @@ from typing import (
     Dict,
     Generic,
     Iterable,
+    MutableMapping,
     Optional,
-    OrderedDict,
     TypeVar,
 )
+from weakref import WeakKeyDictionary, WeakSet
 
-from ..common import TAUTOLOGY_FACTORY, BidirectionalIndex
+from ..common import TAUTOLOGY_FACTORY, Bag, BidirectionalIndex
 from ..services import EventNotification
 
 T = TypeVar("T")
@@ -38,7 +39,7 @@ class Dependency(Generic[T]):
         return Prerequisite(self.prerequisite, self.condition, self.group)
 
 
-class Requirements(Generic[T], OrderedDict[T, bool]):
+class Requirements(UserDict[T, bool]):
     """
     Requirements is used to model dependencies.
 
@@ -118,26 +119,30 @@ class Requirements(Generic[T], OrderedDict[T, bool]):
     """
 
     DEFAULT_GROUP: ClassVar[str] = "__DEFAULT__"
+    __slots__ = ("data", "on_new_requirement", "on_requirements_satisfied", "groups", "conditions")
 
     @property
     def prerequisites(self) -> Iterable[Prerequisite[T]]:
         for prerequisite in self:
-            condition = self.conditions[prerequisite]
+            condition = self.conditions.get(prerequisite)
             groups = self.groups[prerequisite]
             for group in groups:
                 yield Prerequisite(prerequisite, condition, group)
 
     def __init__(self) -> None:
-        super().__init__()
+        self.data: Dict[T, bool] = WeakKeyDictionary()
         self._init_events()
         self._init_conditions()
         self._init_groups()
 
     def _init_conditions(self) -> None:
-        self.conditions: Dict[T, Callable[[], bool]] = defaultdict(TAUTOLOGY_FACTORY)
+        self.conditions: MutableMapping[T, Callable[[], bool]] = WeakKeyDictionary()
 
     def _init_groups(self) -> None:
-        self.groups: BidirectionalIndex[Any, T] = BidirectionalIndex()
+        self.groups: BidirectionalIndex[Any, T] = BidirectionalIndex(
+            forward_index_factory=lambda: Bag(set_factory=WeakSet),
+            inverted_index_factory=lambda: Bag(dict_factory=WeakKeyDictionary),
+        )
 
     def _init_events(self) -> None:
         self.on_new_requirement = EventNotification()
@@ -149,7 +154,7 @@ class Requirements(Generic[T], OrderedDict[T, bool]):
             self.on_new_requirement(prerequisite=prerequisite)
 
         if is_satisfied:
-            is_satisfied = self.conditions[prerequisite]()
+            is_satisfied = self.conditions.get(prerequisite, TAUTOLOGY_FACTORY)()
 
         super().__setitem__(prerequisite, is_satisfied)
 
