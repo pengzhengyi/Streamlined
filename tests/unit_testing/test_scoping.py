@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import pytest
 
 from streamlined.services import Scope, Scoping
@@ -85,3 +88,14 @@ def test_store_unpicklable():
     with Scope() as scope:
         scope["unpickleable"] = unpickleable
         assert "unpickleable" in scope._memory
+
+
+def test_to_dot(tmp_path: Path):
+    filepath = tmp_path.joinpath("scoping.dot")
+    assert not os.path.isfile(filepath)
+
+    with Scoping() as scoping:
+        scoping.global_scope["Alice"] = "US"
+        scoping.write_dot(filepath)
+
+    assert os.path.isfile(filepath)
