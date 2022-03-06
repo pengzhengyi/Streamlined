@@ -4,6 +4,7 @@ aiorun
 bandit
 black
 decorator
+diskcache
 Faker
 isort
 matplotlib

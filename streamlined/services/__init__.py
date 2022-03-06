@@ -9,4 +9,4 @@ from .dependency_tracking import DependencyTracking
 from .event_notification import EventNotification
 from .reference import EvalRef, NameRef, ValueRef
 from .scoping import Scope, Scoped, Scoping, to_magic_naming
-from .storage import AbstractDictionary, Dictionary, Shelf, Store
+from .storage import AbstractDictionary, Dictionary, Storage, Store
