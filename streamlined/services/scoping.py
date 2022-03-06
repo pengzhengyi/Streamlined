@@ -350,7 +350,7 @@ class Scoping(AbstractDictionary):
         """
         Convert a Tree to NetworkX DiGraph.
         """
-        return to_networkx(self._tree, node_converter=self._get_node)
+        return to_networkx(self._tree, node_converter=self._get_scope)
 
     def draw(
         self,
