@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import tempfile
 import uuid
 from collections import deque
 from contextlib import suppress
@@ -33,6 +31,16 @@ def to_magic_naming(name: str) -> str:
 class Scope(Store):
     """
     Scope stores mappings from name to value.
+
+    Scope can will utilize file-based store to reduce memory usage and therefore
+    storing more mappings.
+
+    Temporary Directory
+    ------
+    See [gettempdir](https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir) for how temporary directory is determined from environment variables.
+
+    See [tempdir](https://docs.python.org/3/library/tempfile.html#tempfile.tempdir)
+    for how to change temporary directory to a custom location.
     """
 
     __slots__ = ("id",)
@@ -40,7 +48,7 @@ class Scope(Store):
 
     def __init__(self, _id: Optional[uuid.UUID] = None, **kwargs: Any) -> None:
         self._init_id(_id)
-        super().__init__(self._get_temp_store_location())
+        super().__init__()
         self.update(**kwargs)
 
     def _init_id(self, _id: Optional[uuid.UUID] = None) -> None:
@@ -48,21 +56,6 @@ class Scope(Store):
             _id = uuid.uuid4()
 
         self.id = _id
-
-    def _get_temp_store_location(self) -> str:
-        """
-        A file location for file based storage.
-
-        The location is computed as `<TEMPDIR>/streamlined/scoping/<id>`.
-
-        Temporary Directory
-        ------
-        See [gettempdir](https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir) for how temporary directory is determined from environment variables.
-
-        See [tempdir](https://docs.python.org/3/library/tempfile.html#tempfile.tempdir) for
-        how to change temporary directory to a custom location.
-        """
-        return os.path.join(tempfile.gettempdir(), "streamlined", "scoping", str(self.id))
 
     def __get_items_str(self) -> str:
         return ", ".join("{!s}={!r}".format(key, value) for key, value in self.items())

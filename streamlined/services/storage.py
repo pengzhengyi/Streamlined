@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
-import pickle
 import shelve
+import uuid
 from collections import UserDict
 from contextlib import suppress
 from glob import iglob
+from pickle import PickleError
+from tempfile import TemporaryDirectory
 from typing import Any, Iterable, Iterator, MutableMapping, TypeVar
 from weakref import finalize
 
@@ -126,22 +128,23 @@ class Dictionary(UserDict[str, Any], AbstractDictionary):
 
 class Shelf(AbstractDictionary):
     """
-    Provides a persistent dictionary.
+    Use a temporary file as a dictionary.
+
     Reference
     ------
     [shelve]https://docs.python.org/3/library/shelve.html)
     """
 
-    __slots__ = ("shelf", "filename")
+    __slots__ = ("shelf", "_tempdir", "_temppath")
 
-    def __init__(self, filename: str) -> None:
-        self._init_shelf(filename)
+    def __init__(self) -> None:
+        self._init_shelf()
         super().__init__()
 
-    def _init_shelf(self, filename: str) -> None:
-        self.filename = filename
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        self.shelf = shelve.open(filename)
+    def _init_shelf(self) -> None:
+        self._tempdir = TemporaryDirectory(prefix="streamlined", suffix=self.__class__.__name__)
+        self._temppath = os.path.join(self._tempdir.name, str(uuid.uuid4()))
+        self.shelf = shelve.open(self._temppath)
 
     def __getitem__(self, __k: str) -> Any:
         return self.shelf.__getitem__(__k)
@@ -167,7 +170,7 @@ class Shelf(AbstractDictionary):
         return self.shelf.__iter__()
 
     def _get_shelf_files(self) -> Iterable[str]:
-        yield from iglob(f"{self.filename}.*")
+        yield from iglob(f"{self._temppath}.*")
 
     def _remove_shelf_files(self) -> None:
         for savefile in self._get_shelf_files():
@@ -181,17 +184,7 @@ class Shelf(AbstractDictionary):
     def _close(self) -> None:
         super()._close()
         self.shelf.close()
-        self._remove_shelf_files()
-
-    def supports(self, value: Any) -> bool:
-        """
-        Whether given value can be stored in this `shelf`.
-        """
-        try:
-            pickle.dumps(value)
-            return True
-        except Exception:
-            return False
+        self._tempdir.cleanup()
 
 
 class Store(AbstractDictionary):
@@ -210,16 +203,16 @@ class Store(AbstractDictionary):
         "_storage",
     )
 
-    def __init__(self, filename: str) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self._init_memory()
-        self._init_storage(filename)
+        self._init_storage()
 
     def _init_memory(self) -> None:
         self._memory = Dictionary()
 
-    def _init_storage(self, filename: str) -> None:
-        self._storage = Shelf(filename)
+    def _init_storage(self) -> None:
+        self._storage = Shelf()
 
     def __getitem__(self, __k: str) -> Any:
         with suppress(KeyError):
@@ -244,9 +237,9 @@ class Store(AbstractDictionary):
         self._storage.__delitem__(__k)
 
     def __setitem__(self, __k: str, __v: Any) -> None:
-        if self._storage.supports(__v):
+        try:
             self._storage.__setitem__(__k, __v)
-        else:
+        except (PickleError, AttributeError, TypeError):
             self._memory.__setitem__(__k, __v)
 
     def _clear(self) -> None:

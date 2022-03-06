@@ -1,11 +1,10 @@
+import os
 import tracemalloc
-from pathlib import Path
 
 from streamlined.services.storage import Dictionary, Shelf
 
 
-def test_memory_reduction_of_shelf(tmp_path: Path):
-    filepath = str(tmp_path.joinpath("foo.txt"))
+def test_memory_reduction_of_shelf():
     tracemalloc.start()
 
     with Dictionary() as dictionary:
@@ -15,7 +14,7 @@ def test_memory_reduction_of_shelf(tmp_path: Path):
     tracemalloc.reset_peak()
     del dictionary
 
-    with Shelf(filepath) as shelf:
+    with Shelf() as shelf:
         for i in range(100):
             shelf[f"{i}"] = i
         _, shelf_peak = tracemalloc.get_traced_memory()
@@ -23,3 +22,10 @@ def test_memory_reduction_of_shelf(tmp_path: Path):
     del shelf
 
     assert shelf_peak < dict_peak
+
+
+def test_shelf_cleanup():
+    with Shelf() as shelf:
+        filepath = shelf._tempdir.name
+        assert os.path.isdir(filepath)
+    assert not os.path.isdir(filepath)
