@@ -4,7 +4,6 @@ aiorun
 bandit
 black
 decorator
-dill
 Faker
 isort
 matplotlib
@@ -15,14 +14,11 @@ pqdict
 pre-commit
 pydot
 pylint
-pympler
 pytest
 pytest-asyncio
 pytest-cov
 ray[default]
 rich
 treelib
-types-requests
-uuid
 uvloop
 wrapt
