@@ -19,9 +19,9 @@ from streamlined.middlewares import (
 async def test_action_execute_shell_command(simple_executor):
     action = Action({ACTION: {TYPE: SHELL, STDOUT: PIPE, ARGS: ["echo", "Hi"]}})
 
-    scoped = await action.run(simple_executor)
+    scoping = await action.run(simple_executor)
 
-    result = scoped.getmagic(VALUE)
+    result = scoping.searchmagic(VALUE)
     assert result.stdout.strip() == b"Hi"
 
 
@@ -31,7 +31,7 @@ async def test_action_argparse(simple_executor):
         {ACTION: {TYPE: ARGPARSE, NAME: "--foo", ARGTYPE: int, ARGS: ["--foo", "1", "BAR"]}}
     )
 
-    scoped = await action.run(simple_executor)
+    scoping = await action.run(simple_executor)
 
-    result = scoped.getmagic(VALUE)
+    result = scoping.searchmagic(VALUE)
     assert result == 1

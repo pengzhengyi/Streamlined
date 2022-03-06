@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import math
-import os
-import tempfile
 import uuid
 from collections import deque
-from typing import Any, Deque, Dict, Iterable, Optional, Tuple, TypeVar, Union
+from contextlib import suppress
+from typing import Any, Deque, Dict, Iterable, Iterator, Optional, Tuple, TypeVar, Union
+from weakref import ReferenceType, ref
 
 import networkx as nx
 from pqdict import maxpq
@@ -14,8 +13,7 @@ from treelib.exceptions import MultipleRootError
 
 from ..common import to_networkx, transplant
 from ..common import update as tree_update
-from .storage_option import HybridStorageOption
-from .storage_provider import HybridStorageProvider
+from .storage import AbstractDictionary, Store
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -31,48 +29,34 @@ def to_magic_naming(name: str) -> str:
     return f"_{name}_"
 
 
-class Scope(HybridStorageProvider):
+class Scope(Store):
     """
     Scope stores mappings from name to value.
+
+    Scope can will utilize file-based store to reduce memory usage and therefore
+    storing more mappings.
+
+    Temporary Directory
+    ------
+    See [gettempdir](https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir) for how temporary directory is determined from environment variables.
+
+    See [tempdir](https://docs.python.org/3/library/tempfile.html#tempfile.tempdir)
+    for how to change temporary directory to a custom location.
     """
 
     __slots__ = ("id",)
-
     __hash__ = object.__hash__
 
-    @classmethod
-    def of(
-        cls,
-        storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY,
-    ) -> Scope:
-        """
-        Create a Scope based on a storage type.
-        """
-        return cls(None, *storage_option.args, **storage_option.kwargs)
-
-    def __init__(
-        self,
-        id: Optional[uuid.UUID] = None,
-        memory_limit: Union[float, int] = math.inf,
-        cleanup_at_close: bool = False,
-        **kwargs: Any,
-    ) -> None:
-        self._init_id(id)
-        super().__init__(
-            self._get_default_persistent_storage_filename(),
-            memory_limit,
-            cleanup_at_close,
-        )
+    def __init__(self, _id: Optional[uuid.UUID] = None, **kwargs: Any) -> None:
+        self._init_id(_id)
+        super().__init__()
         self.update(**kwargs)
 
-    def _init_id(self, id: Optional[uuid.UUID]) -> None:
-        if id is None:
-            self.id = uuid.uuid4()
-        else:
-            self.id = id
+    def _init_id(self, _id: Optional[uuid.UUID] = None) -> None:
+        if _id is None:
+            _id = uuid.uuid4()
 
-    def _get_default_persistent_storage_filename(self) -> str:
-        return os.path.join(tempfile.gettempdir(), "streamlined", "scoping", str(self.id))
+        self.id = _id
 
     def __get_items_str(self) -> str:
         return ", ".join("{!s}={!r}".format(key, value) for key, value in self.items())
@@ -130,7 +114,7 @@ class Scope(HybridStorageProvider):
         self.__setitem__(to_magic_naming(name), value)
 
 
-class Scoping:
+class Scoping(AbstractDictionary):
     """
     Scoping can be used as a calltree to track execution.
 
@@ -140,84 +124,82 @@ class Scoping:
     - parallel-execution corresponds to sibling relationship
     """
 
-    __slots__ = ("_tree", "_memory_limit", "_cleanup_at_close")
+    __slots__ = "_tree"
+
+    @staticmethod
+    def _get_scope(node: Node) -> Scope:
+        data = node.data
+        if isinstance(data, ReferenceType):
+            return data()
+        elif isinstance(data, Scope):
+            return data
+        else:
+            raise TypeError(f"{data} is not type Scope")
 
     @staticmethod
     def _are_equal_node(scope_node: Node, other_scope_node: Node) -> bool:
         if scope_node is other_scope_node:
             return True
-        scope: Scope = scope_node.identifier
-        other_scope: Scope = other_scope_node.identifier
-        if scope is other_scope:
-            return True
-
-        return scope.id == other_scope.id
-
-    @staticmethod
-    def _update_node_when_equal(scope_node: Node, other_scope_node: Node) -> None:
-        scope_node.identifier.update(other_scope_node.identifier)
+        return scope_node.identifier == other_scope_node.identifier
 
     @classmethod
-    def of(
-        cls, storage_option: HybridStorageOption = HybridStorageOption.TRANSIENT_MEMORY
-    ) -> Scoping:
-        """
-        Create a Scoping based on a storage type.
-        """
-        return cls(None, *storage_option.args, **storage_option.kwargs)
+    def _update_node_when_equal(cls, scope_node: Node, other_scope_node: Node) -> None:
+        cls._get_scope(scope_node).update(cls._get_scope(other_scope_node))
 
     @property
     def global_scope(self) -> Scope:
-        return self._tree.root
+        scope_id = self._tree.root
+        return self._get_scope(self._tree[scope_id])
 
     @property
     def all_scopes(self) -> Iterable[Scope]:
         for node in self._tree.all_nodes_itr():
-            yield node.identifier
+            yield self._get_scope(node)
 
-    def __init__(
-        self,
-        _tree: Optional[Tree] = None,
-        memory_limit: Union[float, int] = math.inf,
-        cleanup_at_close: bool = False,
-    ):
+    def __init__(self, _tree: Optional[Tree] = None):
         """
         The constructor can be invoked in two flavors:
 
         - Create New: call with no arguments
         - From Existing: provide `_tree`
-
-        `memory_limit` can control how Scope chooses between saving object in memory
-        versus storage. See `HybridStorageProvider` for more info.
         """
-        self._init_scope_init_args(memory_limit, cleanup_at_close)
+        super().__init__()
         self._init_tree(_tree)
 
-    def __enter__(self) -> Scoping:
-        return self
+    def __contains__(self, value: Any) -> bool:
+        if isinstance(value, Scope):
+            return self._tree.contains(value.id)
+        else:
+            return any(value in scope for scope in self.all_scopes)
 
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
-        self.close()
+    def __getitem__(self, name: Any) -> Any:
+        return self.search(name, scope=self.global_scope)
+
+    def __len__(self) -> int:
+        return sum(len(scope) for scope in self.all_scopes)
+
+    def __iter__(self) -> Iterator[Any]:
+        for scope in self.descendants_scopes(self.global_scope, breadth_first=True):
+            yield from scope
 
     def _init_tree(self, _tree: Optional[Tree] = None) -> None:
         if _tree is None:
             # create new
             self._tree = Tree()
-            self._tree.create_node(identifier=self._create_scope())
+            scope = self._create_scope()
+            self._tree.create_node(identifier=scope.id, data=scope)
         else:
             # from existing
             self._tree = _tree
 
-    def _init_scope_init_args(
-        self, memory_limit: Union[float, int], cleanup_at_close: bool
-    ) -> None:
-        self._memory_limit = memory_limit
-        self._cleanup_at_close = cleanup_at_close
+    def _clear(self) -> None:
+        super()._clear()
+        for scope in self.all_scopes:
+            if scope is not None:
+                # safeguard for finalizing
+                scope.clear()
 
-    def __contains__(self, scope: Scope) -> bool:
-        return self._tree.contains(scope)
-
-    def ancestors(self, scope: Scope, start_at_root: bool = False) -> Iterable[Node]:
+    def _ancestors(self, scope: Scope, start_at_root: bool = False) -> Iterable[Node]:
         """
         Get ancestors of a specified node.
 
@@ -241,14 +223,47 @@ class Scoping:
         if start_at_root:
             yield from ancestors
 
+    def _descendants(self, scope: Scope, breadth_first: bool = True) -> Iterable[Node]:
+        """
+        Get descendants of a specified node.
+
+        When `breadth_first` is True, descendant nodes will be yielded in breadth first
+        order. Otherwise, it will be yielded in depth first order.
+
+        For example, when
+        A ──┬── B ──── C
+            └── D ──── E
+
+        Calling descendants on `A` with `breadth_first` being True will yield `A`, `B`,
+        `D`, `C`, `E`. Otherwise, it will yield `A`, `B`, `C`, `D`, `E`.
+        """
+        descendants: Deque[Node] = deque([self._get_node(scope)])
+
+        with suppress(IndexError):
+            while node := descendants.popleft():
+                yield node
+                children = self._tree.children(node.identifier)
+                if breadth_first:
+                    descendants.extend(children)
+                else:
+                    descendants.extendleft(children)
+
     def enclosing_scopes(self, scope: Scope, start_at_root: bool = False) -> Iterable[Scope]:
-        for node in self.ancestors(scope, start_at_root):
-            yield node.identifier
+        for node in self._ancestors(scope, start_at_root):
+            yield self._get_scope(node)
+
+    def descendants_scopes(self, scope: Scope, breadth_first: bool = True) -> Iterable[Scope]:
+        for node in self._descendants(scope, breadth_first=breadth_first):
+            yield self._get_scope(node)
 
     def _get_node(self, scope: Scope) -> Node:
-        return self._tree[scope]
+        return self._tree[scope.id]
 
     def get(self, name: Any, scope: Scope) -> Any:
+        """
+        Find value of a specified name from a scope and its enclosing
+        scopes.
+        """
         for scope in self.enclosing_scopes(scope):
             try:
                 return scope[name]
@@ -256,9 +271,44 @@ class Scoping:
                 continue
         raise KeyError(f"{name} is not in ancestors of {scope}")
 
+    def getmagic(self, name: Any, scope: Scope) -> Any:
+        """
+        Find value of a specified name in magic naming from a scope and
+        its enclosing scopes.
+        """
+        return self.get(to_magic_naming(name), scope)
+
+    def search(self, name: Any, scope: Optional[Scope] = None) -> Any:
+        """
+        Find value of a specified name from a scope and its descendants
+        scopes.
+
+        When `scope` is not specified, default to global scope.
+        """
+        if scope is None:
+            scope = self.global_scope
+
+        for scope in self.descendants_scopes(scope):
+            try:
+                return scope[name]
+            except KeyError:
+                continue
+        raise KeyError(f"{name} is not in descendants of {scope}")
+
+    def searchmagic(self, name: Any, scope: Optional[Scope] = None) -> Any:
+        """
+        Find value of a specified name in magic naming from a scope and
+        its enclosing scopes.
+
+        When `scope` is not specified, default to global scope.
+        """
+        return self.search(to_magic_naming(name), scope)
+
     def update(self, scoping: Scoping) -> None:
         """
         Assume two scoping have same root node, `update` will merge in the changes introduced in the other tree.
+
+        ! This operation is destructive, the other tree will become not useable.
         """
         tree_update(
             self._tree,
@@ -267,11 +317,11 @@ class Scoping:
             update_equal=self._update_node_when_equal,
         )
 
-    def add_scope(self, parent_scope: Scope, scope: Scope) -> Node:
-        return self._tree.create_node(identifier=scope, parent=parent_scope)
-
     def _create_scope(self, **kwargs: Any) -> Scope:
-        return Scope(None, self._memory_limit, self._cleanup_at_close, **kwargs)
+        return Scope(None, **kwargs)
+
+    def add_scope(self, parent_scope: Scope, scope: Scope) -> Node:
+        return self._tree.create_node(identifier=scope.id, data=scope, parent=parent_scope.id)
 
     def create_scope(self, parent_scope: Scope, **kwargs: Any) -> Scope:
         scope = self._create_scope(**kwargs)
@@ -280,23 +330,7 @@ class Scoping:
 
     def create_scoped(self, parent_scope: Scope, **kwargs: Any) -> Scoped:
         scope = self.create_scope(parent_scope, **kwargs)
-        return Scoped(self, scope, self._memory_limit, self._cleanup_at_close)
-
-    def cleanup(self) -> None:
-        """
-        Forcing release of memory used for scopes.
-
-        It will call `close` on every scope.
-        """
-        for scope in self.all_scopes:
-            scope.cleanup()
-
-    def close(self) -> None:
-        """
-        Proper clean up. It will call `close` on every scope.
-        """
-        for scope in self.all_scopes:
-            scope.close()
+        return Scoped(self, scope)
 
     def show(self, **kwargs: Any) -> None:
         """
@@ -312,7 +346,7 @@ class Scoping:
         """
         Convert a Tree to NetworkX DiGraph.
         """
-        return to_networkx(self._tree)
+        return to_networkx(self._tree, node_converter=self._get_node)
 
     def draw(
         self,
@@ -340,7 +374,7 @@ class Scoping:
             **kwargs,
         )
 
-    def write_dot(self, filename: str, shape: str = "ellipsis", **kwargs: Any) -> None:
+    def write_dot(self, filename: str) -> None:
         """
         Write NetworkX graph G to Graphviz dot format on path.
 
@@ -348,9 +382,10 @@ class Scoping:
 
         Reference
         ------
-        [to_graphviz](https://treelib.readthedocs.io/en/latest/treelib.html#treelib.tree.Tree.to_graphviz)
+        [write_dot](https://networkx.org/documentation/stable/reference/generated/networkx.drawing.nx_pydot.write_dot.html)
         """
-        self._tree.to_graphviz(filename, shape=shape)
+        graph = self.to_networkx()
+        nx.drawing.nx_pydot.write_dot(graph, filename)
 
 
 class Scoped(Scoping):
@@ -360,45 +395,56 @@ class Scoped(Scoping):
 
     __slots__ = ("current_scope",)
 
-    def __init__(
-        self,
-        scoping: Scoping,
-        scope: Scope,
-        memory_limit: Union[float, int] = math.inf,
-        cleanup_at_close: bool = False,
-    ):
-        super().__init__(Tree(), memory_limit, cleanup_at_close)
+    def __init__(self, scoping: Scoping, scope: Scope):
+        super().__init__(Tree())
         self.__init_branch(scoping, scope)
 
     def __init_branch(self, scoping: Scoping, scope: Scope) -> None:
         self.current_scope = scope
 
         parent = None
-        for node in scoping.ancestors(self.current_scope, start_at_root=True):
-            parent = self._tree.create_node(identifier=node.identifier, parent=parent)
+        for node in scoping._ancestors(self.current_scope, start_at_root=True):
+            scope = self._get_scope(node)
+            with suppress(TypeError):
+                scope = ref(scope)
+
+            parent = self._tree.create_node(identifier=node.identifier, data=scope, parent=parent)
 
     def __getitem__(self, name: Any) -> Any:
         return self.get(name, scope=self.current_scope)
 
-    def __contains__(self, name: Any) -> bool:
-        try:
-            self.__getitem__(name)
-            return True
-        except KeyError:
-            return False
-
     def __setitem__(self, name: Any, value: Any) -> None:
         self.current_scope[name] = value
 
-    def __iter__(self) -> Iterable[Scope]:
-        yield from self.enclosing_scopes(start_at_root=True)
+    def __contains__(self, name: Any) -> bool:
+        return any(
+            scope.__contains__(name) for scope in self.enclosing_scopes(start_at_root=False)
+        )
 
-    def ancestors(
+    def __delitem__(self, __k: str) -> None:
+        for scope in self.enclosing_scopes(start_at_root=False):
+            if scope.__contains__(__k):
+                scope.__delitem__(__k)
+                return
+        raise KeyError(f"{__k} can not be deleted")
+
+    def __iter__(self) -> Iterator[Any]:
+        for scope in self.enclosing_scopes(start_at_root=True):
+            yield from scope
+
+    def _ancestors(
         self, scope: Optional[Scope] = None, start_at_root: bool = False
     ) -> Iterable[Node]:
         if scope is None:
             scope = self.current_scope
-        return super().ancestors(scope, start_at_root=start_at_root)
+        return super()._ancestors(scope, start_at_root=start_at_root)
+
+    def _descendants(
+        self, scope: Optional[Scope] = None, breadth_first: bool = True
+    ) -> Iterable[Node]:
+        if scope is None:
+            scope = self.current_scope
+        return super()._descendants(scope, breadth_first)
 
     def enclosing_scopes(
         self, scope: Optional[Scope] = None, start_at_root: bool = False
@@ -406,6 +452,13 @@ class Scoped(Scoping):
         if scope is None:
             scope = self.current_scope
         return super().enclosing_scopes(scope, start_at_root=start_at_root)
+
+    def descendants_scopes(
+        self, scope: Optional[Scope] = None, breadth_first: bool = True
+    ) -> Iterable[Scope]:
+        if scope is None:
+            scope = self.current_scope
+        return super().descendants_scopes(scope, breadth_first)
 
     def up(self, num_scope_up: int = 0) -> Scope:
         i = 0
@@ -415,26 +468,65 @@ class Scoped(Scoping):
         raise ValueError(f"{i+1} exceeds maximum tree depth")
 
     def get(self, name: Any, scope: Optional[Scope] = None) -> Any:
+        """
+        Find value of a specified name from a scope and its enclosing
+        scopes.
+
+        When `scope` is not specified, default to current scope.
+        """
         if scope is None:
             scope = self.current_scope
 
         return super().get(name, scope)
 
-    def getmagic(self, name: Any) -> Any:
-        return self[to_magic_naming(name)]
+    def getmagic(self, name: Any, scope: Optional[Scope] = None) -> Any:
+        """
+        Find value of a specified name in magic naming from a scope and
+        its enclosing scopes.
+
+        When `scope` is not specified, default to current scope.
+        """
+        if scope is None:
+            scope = self.current_scope
+
+        return super().getmagic(name, scope)
+
+    def search(self, name: Any, scope: Optional[Scope] = None) -> Any:
+        """
+        Find value of a specified name from a scope and its descendants
+        scopes.
+
+        When `scope` is not specified, default to current scope.
+        """
+        if scope is None:
+            scope = self.current_scope
+
+        return super().search(name, scope)
+
+    def searchmagic(self, name: Any, scope: Optional[Scope] = None) -> Any:
+        """
+        Find value of a specified name in magic naming from a scope and
+        its enclosing scopes.
+
+        When `scope` is not specified, default to current scope.
+        """
+        if scope is None:
+            scope = self.current_scope
+
+        return super().searchmagic(name, scope)
 
     def set(self, name: Any, value: Any, at: Union[str, int] = 0) -> None:
         if isinstance(at, int):
             scope = self.up(at)
         else:
             keyname = to_magic_naming(at + "_id")
-            scope = self.get_nearest(keyname)
+            scope = self.arg_get(keyname)
         scope[name] = value
 
     def setmagic(self, name: Any, value: Any, at: Union[str, int] = 0) -> None:
         self.set(to_magic_naming(name), value, at)
 
-    def get_nearest(self, name: Any) -> Scope:
+    def arg_get(self, name: Any) -> Scope:
         """
         Return the nearest scope containing the name.
         """
@@ -443,11 +535,11 @@ class Scoped(Scoping):
                 return scope
         raise KeyError(f"Cannot find {name} in any enclosing scope of {self.current_scope}")
 
-    def set_nearest(self, name: Any, value: Any) -> None:
+    def change(self, name: Any, value: Any) -> None:
         """
         Set a value at nearest enclosing scope containing this name.
         """
-        scope = self.get_nearest(name)
+        scope = self.arg_get(name)
         scope[name] = value
 
     def update(self, scoped: Scoping) -> None:

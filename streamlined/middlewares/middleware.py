@@ -25,7 +25,7 @@ from aiorun import run
 
 from ..common import IS_DICT, IS_ITERABLE, findvalue, format_help
 from ..execution import SimpleExecutor
-from ..services import HybridStorageOption, Scoped
+from ..services import Scoped, Scoping
 from .bound_middleware import BoundMiddleware
 from .context import Context, ScopedNext
 from .parser import Parser
@@ -116,9 +116,8 @@ class AbstractMiddleware:
     async def run(
         self,
         executor: Optional[Executor] = None,
-        storage_option: HybridStorageOption = HybridStorageOption.PERSISTENT_MEMORY,
         **kwargs: Any,
-    ) -> Scoped:
+    ) -> Scoping:
         """
         Run current middleware in an executor.
 
@@ -136,29 +135,27 @@ class AbstractMiddleware:
         if executor is None:
             executor = SimpleExecutor()
 
-        context, scoping = Context.new(executor, storage_option)
+        context, scoping = Context.new(executor)
         for name, value in kwargs.items():
             scoping.global_scope[name] = value
 
         scoped = await self.apply_onto(context)
 
         scoping.update(scoped)
-        scoping.close()
-        return scoped
+        return scoping
 
     async def __run_and_stop(
         self,
         executor: Optional[Executor] = None,
-        storage_option: HybridStorageOption = HybridStorageOption.PERSISTENT_MEMORY,
         **kwargs: Any,
     ) -> None:
-        await self.run(executor, storage_option, **kwargs)
+        scoping = await self.run(executor, **kwargs)
+        scoping.close()
         asyncio.get_running_loop().stop()
 
     def run_as_main(
         self,
         executor: Optional[Executor] = None,
-        storage_option: HybridStorageOption = HybridStorageOption.PERSISTENT_MEMORY,
         **kwargs: Any,
     ) -> None:
         """
@@ -172,7 +169,7 @@ class AbstractMiddleware:
         """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.create_task(self.__run_and_stop(executor, storage_option, **kwargs))
+        loop.create_task(self.__run_and_stop(executor, **kwargs))
 
         def handler(loop: AbstractEventLoop, context: Mapping[str, Any]) -> None:
             try:
@@ -389,7 +386,7 @@ class WithMiddlewares(Middlewares):
             self.middleware_types, self.get_middleware_names()
         ):
             if middleware_name in value:
-                yield middleware_type(value)
+                yield middleware_type(value[middleware_name])
 
     def apply(self, context: Context) -> ScopedNext:
         return super().apply(context, self.apply_methods)

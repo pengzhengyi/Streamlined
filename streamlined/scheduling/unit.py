@@ -16,7 +16,7 @@ class Unit(DependencyTracking):
     REQUIREMENTS_FACTORY: ClassVar[Type[Requirements[Unit]]] = Requirements
     _requirements: Requirements[Unit]
 
-    __slots__ = ("value",)
+    __slots__ = ("value", "__weakref__")
 
     @classmethod
     def empty(cls) -> Unit:

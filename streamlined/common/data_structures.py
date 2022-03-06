@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from collections import UserDict, defaultdict
+from collections import UserDict
 from typing import (
     Callable,
-    ClassVar,
     Dict,
     Generic,
-    Iterable,
-    Mapping,
-    Optional,
+    MutableMapping,
     Sequence,
     Set,
-    Type,
     TypeVar,
     Union,
 )
@@ -20,29 +16,36 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-class Bag(UserDict, Generic[K, V]):
+class Bag(UserDict[K, V]):
     """
     A bag is essentially a wrapper of `defaultdict(set)` with the following additional functionality:
 
     `self[key] = item` is equivalent to `self[key].add(item)`
     """
 
-    data: Dict[K, Set[V]]
+    __slots__ = ("data", "set_factory")
 
-    def __init__(self) -> None:
-        self.data = defaultdict(set)
-
-    def bag(self) -> Dict[K, Set[V]]:
-        return self.data
+    def __init__(
+        self,
+        dict_factory: Callable[[], Dict[K, Set[V]]] = dict,
+        set_factory: Callable[[], Set[V]] = set,
+    ) -> None:
+        self.data: Dict[K, Set[V]] = dict_factory()
+        self.set_factory = set_factory
 
     def __setitem__(self, key: K, item: V) -> None:
-        return self.data[key].add(item)
+        try:
+            self.data[key].add(item)
+        except KeyError:
+            _set = self.set_factory()
+            _set.add(item)
+            self.data[key] = _set
 
 
-IndexFactory = Callable[[], Mapping[K, Iterable[V]]]
+IndexFactory = Callable[[], MutableMapping[K, Sequence[V]]]
 
 
-class BidirectionalIndex(UserDict, Generic[K, V]):
+class BidirectionalIndex(Generic[K, V]):
     """
     BidirectionalIndex has two indexing system: forward index and inverted index.
 
@@ -58,32 +61,26 @@ class BidirectionalIndex(UserDict, Generic[K, V]):
     [Inverted Index](https://en.wikipedia.org/wiki/Inverted_index)
     """
 
-    DEFAULT_FORWARD_INDEX_FACTORY: ClassVar[Type[Bag[K, V]]] = Bag
-    DEFAULT_INVERTED_INDEX_FACTORY: ClassVar[Type[Bag[K, V]]] = Bag
+    __slots__ = ("data", "inverted_index")
+
+    @property
+    def forward_index(self) -> MutableMapping[K, Sequence[V]]:
+        return self.data
 
     def __init__(
         self,
-        forward_index_factory: Optional[IndexFactory[K, V]] = None,
-        inverted_index_factory: Optional[IndexFactory[V, K]] = None,
+        forward_index_factory: IndexFactory[K, V] = Bag,
+        inverted_index_factory: IndexFactory[V, K] = Bag,
     ) -> None:
         self.__init_index(forward_index_factory, inverted_index_factory)
 
     def __init_index(
         self,
-        forward_index_factory: Optional[IndexFactory[K, V]] = None,
-        inverted_index_factory: Optional[IndexFactory[V, K]] = None,
+        forward_index_factory: IndexFactory[K, V],
+        inverted_index_factory: IndexFactory[V, K],
     ) -> None:
-        if forward_index_factory is None:
-            forward_index_factory = self.DEFAULT_FORWARD_INDEX_FACTORY
-        if inverted_index_factory is None:
-            inverted_index_factory = self.DEFAULT_INVERTED_INDEX_FACTORY
-
-        self.data = forward_index_factory()
-        self.inverted_index = inverted_index_factory()
-
-    @property
-    def forward_index(self) -> Mapping[K, V]:
-        return self.data
+        self.data: MutableMapping[K, Sequence[V]] = forward_index_factory()
+        self.inverted_index: MutableMapping[V, Sequence[K]] = inverted_index_factory()
 
     def __getitem__(self, key: Union[K, V]) -> Union[Sequence[V], Sequence[K]]:
         try:
@@ -92,5 +89,5 @@ class BidirectionalIndex(UserDict, Generic[K, V]):
             return self.inverted_index[key]
 
     def __setitem__(self, key: K, item: V) -> None:
-        super().__setitem__(key, item)
+        self.forward_index[key] = item
         self.inverted_index[item] = key

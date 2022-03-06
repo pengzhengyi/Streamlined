@@ -1,6 +1,6 @@
 import pytest
 
-from streamlined.services import HybridStorageOption, Scope, Scoping
+from streamlined.services import Scope, Scoping
 
 
 def test_scoping_two_scopes():
@@ -60,21 +60,28 @@ def test_scoped_update_for_different_global_scopes():
     assert scoped1["Alice"] == "US"
 
 
-def test_set_nearest():
-    with Scoping.of(HybridStorageOption.TRANSIENT_STORAGE) as scoping:
+def test_change():
+    with Scoping() as scoping:
         scoping.global_scope["Alice"] = "US"
 
         scoped = scoping.create_scoped(scoping.global_scope, Bob="UK")
         scoped["Jerry"] = "Germany"
 
-        scoped.set_nearest("Jerry", "UK")
+        scoped.change("Jerry", "UK")
         assert scoped["Jerry"] == "UK"
 
         with pytest.raises(KeyError):
-            scoped.set_nearest("Benjamin", "France")
+            scoped.change("Benjamin", "France")
 
 
 def test_store_at_file():
-    with Scope.of(HybridStorageOption.TRANSIENT_STORAGE) as scope:
+    with Scope() as scope:
         scope["shell"] = "bash"
         assert scope["shell"] == "bash"
+
+
+def test_store_unpicklable():
+    unpickleable = lambda: None
+    with Scope() as scope:
+        scope["unpickleable"] = unpickleable
+        assert "unpickleable" in scope._memory

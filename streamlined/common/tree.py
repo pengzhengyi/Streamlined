@@ -1,5 +1,5 @@
 from collections import deque
-from operator import is_
+from operator import attrgetter, is_
 from typing import Any, Callable, Deque, List, Optional, Tuple
 
 import networkx as nx
@@ -60,7 +60,9 @@ def update(
                 transplant(source, source_node=parent, target=target, target_node=target_node)
 
 
-def to_networkx(tree: Tree) -> nx.DiGraph:
+def to_networkx(
+    tree: Tree, node_converter: Callable[[Node], Any] = attrgetter("identifier")
+) -> nx.DiGraph:
     """
     Convert a Tree to NetworkX DiGraph.
     """
@@ -71,7 +73,9 @@ def to_networkx(tree: Tree) -> nx.DiGraph:
     while frontier:
         nid = frontier.popleft()
         for child_nid in tree.is_branch(nid):
-            graph.add_edge(nid, child_nid)
+            node_data = node_converter(tree[nid])
+            child_data = node_converter(tree[child_nid])
+            graph.add_edge(node_data, child_data)
             frontier.append(child_nid)
 
     return graph
