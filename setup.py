@@ -16,6 +16,7 @@ setup(
     install_requires=[
         "ray[default]",
         "treelib",
+        "diskcache",
         "networkx[default]",
         "decorator",
         "wrapt",

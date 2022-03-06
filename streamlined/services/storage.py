@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-import os
-import shelve
-import uuid
 from collections import UserDict
 from contextlib import suppress
-from glob import iglob
 from pickle import PickleError
 from tempfile import TemporaryDirectory
-from typing import Any, Iterable, Iterator, MutableMapping, TypeVar
+from typing import Any, Iterator, MutableMapping, TypeVar
 from weakref import finalize
+
+from diskcache import Index
 
 T = TypeVar("T")
 
@@ -126,64 +124,24 @@ class Dictionary(UserDict[str, Any], AbstractDictionary):
         self.data.clear()
 
 
-class Shelf(AbstractDictionary):
+class Storage(Index, AbstractDictionary):
     """
-    Use a temporary file as a dictionary.
-
     Reference
     ------
-    [shelve]https://docs.python.org/3/library/shelve.html)
+    [Index](https://grantjenks.com/docs/diskcache/tutorial.html#index)
     """
 
-    __slots__ = ("shelf", "_tempdir", "_temppath")
+    __slots__ = ("_tempdir",)
 
     def __init__(self) -> None:
-        self._init_shelf()
-        super().__init__()
+        self._init_tempdir()
+        Index.__init__(self, self._tempdir.name)
+        AbstractDictionary.__init__(self)
 
-    def _init_shelf(self) -> None:
+    def _init_tempdir(self) -> None:
         self._tempdir = TemporaryDirectory(prefix="streamlined", suffix=self.__class__.__name__)
-        self._temppath = os.path.join(self._tempdir.name, str(uuid.uuid4()))
-        self.shelf = shelve.open(self._temppath)
-
-    def __getitem__(self, __k: str) -> Any:
-        return self.shelf.__getitem__(__k)
-
-    def __setitem__(self, __k: str, __v: Any) -> None:
-        """
-        Set a mapping from key to value.
-        Raises
-        ------
-        AttributeError
-            When a value cannot be pickled
-        """
-        self.shelf.__setitem__(__k, __v)
-        self.shelf.sync()
-
-    def __len__(self) -> int:
-        return self.shelf.__len__()
-
-    def __delitem__(self, __k: str) -> None:
-        return self.shelf.__delitem__(__k)
-
-    def __iter__(self) -> Iterator[Any]:
-        return self.shelf.__iter__()
-
-    def _get_shelf_files(self) -> Iterable[str]:
-        yield from iglob(f"{self._temppath}.*")
-
-    def _remove_shelf_files(self) -> None:
-        for savefile in self._get_shelf_files():
-            os.remove(savefile)
-
-    def _clear(self) -> None:
-        super()._clear()
-        self.shelf.clear()
-        self._remove_shelf_files()
 
     def _close(self) -> None:
-        super()._close()
-        self.shelf.close()
         self._tempdir.cleanup()
 
 
@@ -212,7 +170,7 @@ class Store(AbstractDictionary):
         self._memory = Dictionary()
 
     def _init_storage(self) -> None:
-        self._storage = Shelf()
+        self._storage = Storage()
 
     def __getitem__(self, __k: str) -> Any:
         with suppress(KeyError):
