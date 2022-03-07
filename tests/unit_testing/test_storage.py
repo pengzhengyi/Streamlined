@@ -19,9 +19,9 @@ def trace_memory(storage_provider):
 
 def test_memory_reduction_of_storage():
     with ProcessPoolExecutor() as executor:
-        used_memory = list(executor.map(trace_memory, [Dictionary, Storage]))
+        dict_memory, store_memory = list(executor.map(trace_memory, [Dictionary, Storage]))
 
-    assert used_memory[1] < used_memory[0]
+    assert store_memory < dict_memory
 
 
 def test_shelf_cleanup():

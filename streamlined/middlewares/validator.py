@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from functools import partial
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Any, Awaitable, Callable, Dict, List, Tuple
 
 from ..common import (
     ACTION,
@@ -21,6 +21,8 @@ from ..common import (
     IS_STR,
     NOOP,
     VALUE,
+    Predicate,
+    Transform,
     get_or_raise,
 )
 from ..services import Scoped
@@ -72,22 +74,24 @@ class ValidatorHandler(Middleware, WithMiddlewares):
         super()._init_middleware_apply_methods()
         self.middleware_apply_methods.extend([APPLY_INTO, APPLY_INTO, APPLY_ONTO])
 
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
 
         # `{<name>: None}` -> `{<name>: NOOP}`
-        self.simplifications.append((IS_NONE, IDENTITY_FACTORY(NOOP)))
+        simplifications.append((IS_NONE, IDENTITY_FACTORY(NOOP)))
 
         # `{<name>: <str>}` -> `{<name>: {LOG: <str>}}}`
-        self.simplifications.append((IS_STR, _TRANSFORM_WHEN_HANDLER_IS_STR))
+        simplifications.append((IS_STR, _TRANSFORM_WHEN_HANDLER_IS_STR))
 
         # `{<name>: <callable>}` -> `{<name>: {ACTION: <callable>}}}`
-        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_HANDLER_IS_CALLABLE))
+        simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_HANDLER_IS_CALLABLE))
 
         # `{<name>: {LOG: ...}}}` -> `{<name>: {LOG: ..., ACTION: NOOP}}}`
-        self.simplifications.append(
+        simplifications.append(
             (AND(IS_DICT, _MISSING_HANDLER_ACTION), _TRANSFORM_WHEN_HANDLER_MISSING_ACTION)
         )
+        return simplifications
 
     def parse(self, value: Any) -> Dict[str, List[Middleware]]:
         return AbstractParser.parse(self, value)
@@ -140,21 +144,21 @@ class ValidatorStage(Middleware):
         if _MISSING_DEFAULT_HANDLER(value):
             raise DEFAULT_KEYERROR(value[HANDLERS], DEFAULT)
 
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
 
         # `{<stage_name>: <callable>}` -> `{<stage_name>: {ACTION: <callable>}}`
-        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_IS_CALLABLE))
+        simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_IS_CALLABLE))
 
         # `{<stage_name>: {ACTION: <callable>}}` -> `{<stage_name>: {ACTION: <callable>, HANDLERS: {}}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_HANDLERS), _TRANSFORM_WHEN_MISSING_HANDLERS)
-        )
+        simplifications.append((AND(IS_DICT, _MISSING_HANDLERS), _TRANSFORM_WHEN_MISSING_HANDLERS))
 
         # `{<stage_name>: {ACTION: <callable>, HANDLERS: {}}}` -> `{<stage_name>: {ACTION: <callable>, HANDLERS: {DEFAULT: NOOP}}}`
-        self.simplifications.append(
+        simplifications.append(
             (AND(IS_DICT, _MISSING_DEFAULT_HANDLER), _TRANSFORM_WHEN_MISSING_DEFAULT_HANDLER)
         )
+        return simplifications
 
     def _do_parse(self, value: Any) -> Dict[str, Any]:
         self.verify(value)
@@ -225,11 +229,14 @@ class Validator(Middleware):
                 f"{value} should specify either {VALIDATOR_BEFORE_STAGE} stage validator or {VALIDATOR_AFTER_STAGE} stage validator"
             )
 
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
 
         # `{VALIDATOR: <callable>}` -> `{VALIDATOR: {VALIDATOR_AFTER_STAGE: <callable>}}`
-        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_VALIDATOR_IS_CALLABLE))
+        simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_VALIDATOR_IS_CALLABLE))
+
+        return simplifications
 
     def _do_parse(self, value: Any) -> Dict[str, ValidatorStage]:
         self.verify(value)

@@ -1,7 +1,19 @@
 import sys
 from functools import partial
 from subprocess import DEVNULL, PIPE
-from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Type, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 from ..common import (
     AND,
@@ -18,9 +30,11 @@ from ..common import (
     VALUE,
     ArgumentDefinition,
     ParsedArgument,
+    Predicate,
     StdinStream,
     Stream,
     SubprocessResult,
+    Transform,
     get_or_raise,
     parse_argument,
     rewrite_function_parameters,
@@ -146,38 +160,39 @@ class Shell(Variant):
             _EXPECT_CALLABLE_AT_KEY(value, key)
         return value
 
-    def _init_simplifications_for_variant(self) -> None:
-        super()._init_simplifications_for_variant()
+    @classmethod
+    def _get_simplifications_for_variant(cls) -> List[Tuple[Predicate, Transform]]:
+        variant_simplifications = super()._get_simplifications_for_variant()
 
-        self._variant_simplifications.append(
-            (_IS_ARGS_NOT_CALLABLE, _TRANSFORM_WHEN_ARGS_NOT_CALLABLE)
-        )
+        variant_simplifications.append((_IS_ARGS_NOT_CALLABLE, _TRANSFORM_WHEN_ARGS_NOT_CALLABLE))
 
-        self._variant_simplifications.append((_MISSING_STDIN, _TRANSFORM_WHEN_MISSING_STDIN))
+        variant_simplifications.append((_MISSING_STDIN, _TRANSFORM_WHEN_MISSING_STDIN))
 
-        self._variant_simplifications.append((_IS_STDIN_STR, _TRANSFORM_WHEN_STDIN_IS_STR))
+        variant_simplifications.append((_IS_STDIN_STR, _TRANSFORM_WHEN_STDIN_IS_STR))
 
-        self._variant_simplifications.append(
+        variant_simplifications.append(
             (_IS_STDIN_NOT_CALLABLE, _TRANSFORM_WHEN_STDIN_NOT_CALLABLE)
         )
 
-        self._variant_simplifications.append((_MISSING_STDOUT, _TRANSFORM_WHEN_MISSING_STDOUT))
+        variant_simplifications.append((_MISSING_STDOUT, _TRANSFORM_WHEN_MISSING_STDOUT))
 
-        self._variant_simplifications.append(
+        variant_simplifications.append(
             (_IS_STDOUT_NOT_CALLABLE, _TRANSFORM_WHEN_STDOUT_NOT_CALLABLE)
         )
 
-        self._variant_simplifications.append((_MISSING_STDERR, _TRANSFORM_WHEN_MISSING_STDERR))
+        variant_simplifications.append((_MISSING_STDERR, _TRANSFORM_WHEN_MISSING_STDERR))
 
-        self._variant_simplifications.append(
+        variant_simplifications.append(
             (_IS_STDERR_NOT_CALLABLE, _TRANSFORM_WHEN_STDERR_NOT_CALLABLE)
         )
 
-        self._variant_simplifications.append((_MISSING_KWARGS, _TRANSFORM_WHEN_MISSING_KWARGS))
+        variant_simplifications.append((_MISSING_KWARGS, _TRANSFORM_WHEN_MISSING_KWARGS))
 
-        self._variant_simplifications.append(
+        variant_simplifications.append(
             (_IS_KWARGS_NOT_CALLABLE, _TRANSFORM_WHEN_KWARGS_NOT_CALLABLE)
         )
+
+        return variant_simplifications
 
 
 SHELL = Shell.get_name()
@@ -278,6 +293,29 @@ class Argparse(Variant):
         ]
 
     @classmethod
+    def _get_simplifications_for_variant(cls) -> List[Tuple[Predicate, Transform]]:
+        variant_simplifications = super()._get_simplifications_for_variant()
+
+        variant_simplifications.append((_NAME_NOT_CALLABLE, _TRANSFORM_WHEN_NAME_NOT_CALLABLE))
+
+        for key in cls.get_keys()[1:-1]:
+            MISSING = partial(IS_DICT_MISSING_KEY, key=key)
+            TRANSFORM_WHEN_MISSING = partial(_TRANSFORM_DICTVALUE_TO_NONE, key=key)
+            variant_simplifications.append((MISSING, TRANSFORM_WHEN_MISSING))
+
+            if key == ARGTYPE:
+                NOT_CALLABLE = _ARGTYPE_NOT_CALLABLE
+            else:
+                NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=key)
+
+            TRANSFORM_WHEN_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=key)
+            variant_simplifications.append((NOT_CALLABLE, TRANSFORM_WHEN_NOT_CALLABLE))
+
+        variant_simplifications.append((_MISSING_ARGS, _TRANSFORM_WHEN_MISSING_ARGS))
+        variant_simplifications.append((_ARGS_NOT_CALLABLE, _TRANSFORM_WHEN_ARGS_NOT_CALLABLE))
+        return variant_simplifications
+
+    @classmethod
     def reduce(cls, value: Any) -> Any:
         actions = [value[key] for key in cls.get_keys()]
         actions.append(cls.parse)
@@ -289,32 +327,6 @@ class Argparse(Variant):
         for key in cls.get_keys():
             _EXPECT_CALLABLE_AT_KEY(value, key)
         return value
-
-    def _init_simplifications_for_variant(self) -> None:
-        super()._init_simplifications_for_variant()
-
-        self._variant_simplifications.append(
-            (_NAME_NOT_CALLABLE, _TRANSFORM_WHEN_NAME_NOT_CALLABLE)
-        )
-
-        for key in self.get_keys()[1:-1]:
-            MISSING = partial(IS_DICT_MISSING_KEY, key=key)
-            TRANSFORM_WHEN_MISSING = partial(_TRANSFORM_DICTVALUE_TO_NONE, key=key)
-
-            if key == ARGTYPE:
-                NOT_CALLABLE = _ARGTYPE_NOT_CALLABLE
-            else:
-                NOT_CALLABLE = partial(IS_DICTVALUE_NOT_CALLABLE, key=key)
-
-            TRANSFORM_WHEN_NOT_CALLABLE = partial(_TRANSFORM_DICTVALUE_TO_CALLABLE, key=key)
-
-            self._variant_simplifications.append((MISSING, TRANSFORM_WHEN_MISSING))
-            self._variant_simplifications.append((NOT_CALLABLE, TRANSFORM_WHEN_NOT_CALLABLE))
-
-        self._variant_simplifications.append((_MISSING_ARGS, _TRANSFORM_WHEN_MISSING_ARGS))
-        self._variant_simplifications.append(
-            (_ARGS_NOT_CALLABLE, _TRANSFORM_WHEN_ARGS_NOT_CALLABLE)
-        )
 
 
 ARGPARSE = Argparse.get_name()
@@ -334,14 +346,16 @@ class AbstractAction(Middleware):
         if IS_NOT_LIST_OF_CALLABLE(value):
             raise TypeError(f"{value} should be a callable or a list of callable")
 
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
 
-        self.simplifications.append((AND(IS_NOT_LIST, IS_NOT_CALLABLE), IDENTITY_FACTORY))
+        simplifications.append((AND(IS_NOT_LIST, IS_NOT_CALLABLE), IDENTITY_FACTORY))
 
-        self.simplifications.append((AND(IS_LIST, IS_NOT_LIST_OF_CALLABLE), IDENTITY_FACTORY))
+        simplifications.append((AND(IS_LIST, IS_NOT_LIST_OF_CALLABLE), IDENTITY_FACTORY))
 
-        self.simplifications.append((IS_NOT_LIST, _TRANSFORM_WHEN_NOT_LIST))
+        simplifications.append((IS_NOT_LIST, _TRANSFORM_WHEN_NOT_LIST))
+        return simplifications
 
     def _do_parse(self, value: List[Callable[..., Any]]) -> Dict[str, Any]:
         self.verify(value)
@@ -359,10 +373,9 @@ class AbstractAction(Middleware):
 
 
 class Action(AbstractAction, WithVariants):
-    def _init_variants(self) -> None:
-        super()._init_variants()
-
-        self.variants.extend([Shell(), Argparse()])
+    @classmethod
+    def _get_static_variants(cls) -> Sequence[Variant]:
+        return (Shell(), Argparse())
 
 
 ACTION = Action.get_name()

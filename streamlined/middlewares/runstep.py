@@ -1,6 +1,6 @@
 import uuid
 from functools import partial
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from ..common import (
     AND,
@@ -10,6 +10,8 @@ from ..common import (
     IS_DICT_MISSING_KEY,
     IS_NOT_DICT,
     VOID,
+    Predicate,
+    Transform,
 )
 from ..services import Scoped
 from .action import ACTION, Action
@@ -56,6 +58,22 @@ class Runstep(Middleware, WithMiddlewares):
         if _MISSING_RUNSTEP_ACTION(value):
             raise DEFAULT_KEYERROR(value, ACTION)
 
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
+
+        # `{RUNSTEP: <callable>}` -> `{RUNSTEP: {.., ACTION: <callable>}}`
+        simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_RUNSTEP_IS_CALLABLE))
+
+        # `{RUNSTEP: {...}}` -> `{RUNSTEP: {.., ACTION: VOID}}`
+        simplifications.append(
+            (AND(IS_DICT, _MISSING_RUNSTEP_ACTION), _TRANSFORM_WHEN_MISSING_ACTION)
+        )
+
+        # `{RUNSTEP: {...}}` -> `{RUNSTEP: {.., NAME: <uuid>}}`
+        simplifications.append((AND(IS_DICT, _MISSING_RUNSTEP_NAME), _TRANSFORM_WHEN_MISSING_NAME))
+        return simplifications
+
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend(
@@ -77,22 +95,6 @@ class Runstep(Middleware, WithMiddlewares):
                 APPLY_ONTO,
                 APPLY_ONTO,
             ]
-        )
-
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
-
-        # `{RUNSTEP: <callable>}` -> `{RUNSTEP: {.., ACTION: <callable>}}`
-        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_RUNSTEP_IS_CALLABLE))
-
-        # `{RUNSTEP: {...}}` -> `{RUNSTEP: {.., ACTION: VOID}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_RUNSTEP_ACTION), _TRANSFORM_WHEN_MISSING_ACTION)
-        )
-
-        # `{RUNSTEP: {...}}` -> `{RUNSTEP: {.., NAME: <uuid>}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_RUNSTEP_NAME), _TRANSFORM_WHEN_MISSING_NAME)
         )
 
     def _do_parse(self, value: Any) -> Dict[str, List[Middleware]]:

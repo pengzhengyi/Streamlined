@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Awaitable, Dict
+from typing import Any, Awaitable, Dict, List, Tuple
 
 from ..common import (
     ACTION,
@@ -16,6 +16,8 @@ from ..common import (
     RETURN_FALSE,
     VALUE,
     WHEN,
+    Predicate,
+    Transform,
 )
 from ..services import Scoped
 from .action import Action
@@ -65,30 +67,30 @@ class Skip(Middleware):
         if _MISSING_VALUE(value):
             raise DEFAULT_KEYERROR(value, VALUE)
 
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
 
         # `{'skip': None}` -> `{'skip': False}`
-        self.simplifications.append((IS_NONE, CONTRADICTION))
+        simplifications.append((IS_NONE, CONTRADICTION))
 
         # `{'skip': <bool>}` -> `{'skip': IDENTITY_FACTORY(<bool>)}`
-        self.simplifications.append((AND(IS_NOT_DICT, IS_NOT_CALLABLE), IDENTITY_FACTORY))
+        simplifications.append((AND(IS_NOT_DICT, IS_NOT_CALLABLE), IDENTITY_FACTORY))
 
         # `{'skip': <any>}` -> `{'skip': {VALUE: <any>}}`
-        self.simplifications.append((IS_NOT_DICT, _TRANSFORM_WHEN_NOT_DICT))
+        simplifications.append((IS_NOT_DICT, _TRANSFORM_WHEN_NOT_DICT))
 
         # `{'skip': {VALUE: ...}}` -> `{'skip': {VALUE: ..., ACTION: NOOP}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_ACTION), _TRANSFORM_WHEN_MISSING_ACTION)
-        )
+        simplifications.append((AND(IS_DICT, _MISSING_ACTION), _TRANSFORM_WHEN_MISSING_ACTION))
 
         # `{'skip': {ACTION: ...}}` -> `{'skip': {VALUE: RETURN_FALSE, ACTION: ...}}`
-        self.simplifications.append((AND(IS_DICT, _MISSING_VALUE), _TRANSFORM_WHEN_MISSING_VALUE))
+        simplifications.append((AND(IS_DICT, _MISSING_VALUE), _TRANSFORM_WHEN_MISSING_VALUE))
 
         # `{'skip': {VALUE: <non-callable>, ACTION: ...}}`
-        self.simplifications.append(
+        simplifications.append(
             (AND(IS_DICT, _VALUE_NOT_CALLABLE), _TRANSFORM_WHEN_VALUE_NOT_CALLABLE)
         )
+        return simplifications
 
     def _do_parse(self, value: Dict[str, Any]) -> Dict[str, Middleware]:
         self.verify(value)

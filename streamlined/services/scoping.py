@@ -118,6 +118,16 @@ class Scope(Store):
         self.__setitem__(to_magic_naming(name), value)
 
 
+class ScopeRef(ref):
+    @property
+    def representation(self) -> str:
+        scope: Optional[Scope] = self.__call__()
+        if scope is not None:
+            return scope.representation
+        else:
+            return "???"
+
+
 class Scoping(AbstractDictionary):
     """
     Scoping can be used as a calltree to track execution.
@@ -410,7 +420,7 @@ class Scoped(Scoping):
         for node in scoping._ancestors(self.current_scope, start_at_root=True):
             scope = self._get_scope(node)
             with suppress(TypeError):
-                scope = ref(scope)
+                scope = ScopeRef(scope)
 
             parent = self._tree.create_node(identifier=node.identifier, data=scope, parent=parent)
 
