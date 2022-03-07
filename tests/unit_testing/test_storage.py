@@ -9,7 +9,7 @@ from streamlined.services.storage import Dictionary, Storage
 def trace_memory(storage_provider):
     tracemalloc.start()
     with storage_provider() as storage:
-        for i in range(2000):
+        for i in range(1000):
             storage[f"{i}"] = uuid4()
         _, peak = tracemalloc.get_traced_memory()
     tracemalloc.reset_peak()

@@ -1,10 +1,19 @@
 import sys
 from argparse import ArgumentParser
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from rich import print
 
-from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_NOT_DICT, findvalue, format_help
+from ..common import (
+    AND,
+    DEFAULT_KEYERROR,
+    IS_DICT,
+    IS_NOT_DICT,
+    Predicate,
+    Transform,
+    findvalue,
+    format_help,
+)
 from ..services import Scoped
 from .action import Argparse
 from .argument import Arguments
@@ -39,6 +48,17 @@ class Pipeline(Middleware, WithMiddlewares):
         if _MISSING_PIPELINE_NAME(value):
             raise DEFAULT_KEYERROR(value, NAME)
 
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
+
+        # `{RUNSTAGE: {...}}` -> `{RUNSTAGE: {.., NAME: <uuid>}}`
+        simplifications.append(
+            (AND(IS_DICT, _MISSING_PIPELINE_NAME), _TRANSFORM_WHEN_MISSING_NAME)
+        )
+
+        return simplifications
+
     def parse(self, value: Any) -> Dict[str, Any]:
         """
         Accept both `{...}` and `{PIPELINE: {...}}`
@@ -68,14 +88,6 @@ class Pipeline(Middleware, WithMiddlewares):
                 APPLY_ONTO,
                 APPLY_ONTO,
             ]
-        )
-
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
-
-        # `{RUNSTAGE: {...}}` -> `{RUNSTAGE: {.., NAME: <uuid>}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_PIPELINE_NAME), _TRANSFORM_WHEN_MISSING_NAME)
         )
 
     def _do_parse(self, value: Any) -> Dict[str, List[Middleware]]:

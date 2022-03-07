@@ -1,19 +1,20 @@
 from functools import partial
 from inspect import isclass
-from typing import Any, Callable, Dict, Type
-
-from streamlined.common.predicates import IS_CALLABLE
+from typing import Any, Callable, Dict, List, Tuple, Type
 
 from ..common import (
     ACTION,
     AND,
     DEFAULT_KEYERROR,
+    IS_CALLABLE,
     IS_DICT,
     IS_DICT_MISSING_KEY,
     IS_NOT_CALLABLE,
     NOOP,
     TAUTOLOGY,
     WHEN,
+    Predicate,
+    Transform,
 )
 from ..services import Scoped
 from .action import Action
@@ -81,27 +82,28 @@ class Suppress(Middleware):
         elif IS_NOT_CALLABLE(value[ACTION]):
             raise ValueError(f"{ACTION} should be a callable, received {value[ACTION]} instead")
 
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
 
         # `{'suppress': <exception>}` -> `{'suppress': {EXCEPTION: <exception>}}`
-        self.simplifications.append((_IS_EXCEPTION_CLASS, _TRANSFORM_WHEN_IS_EXCEPTION_CLASS))
+        simplifications.append((_IS_EXCEPTION_CLASS, _TRANSFORM_WHEN_IS_EXCEPTION_CLASS))
 
         # `{'suppress': <callable>}` -> `{'suppress': {WHEN: <callable>}}`
-        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_IS_CALLABLE))
+        simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_IS_CALLABLE))
 
         # `{'suppress': {WHEN: ..., ACTION: ...}}` -> `{'suppress': {WHEN: ..., ACTION: ..., EXCEPTION: Exception}}`
-        self.simplifications.append(
+        simplifications.append(
             (AND(IS_DICT, _MISSING_EXCEPTION), _TRANSFORM_WHEN_MISSING_EXCEPTION)
         )
 
         # `{'suppress': {WHEN: ..., EXCEPTION: ...}}` -> `{'suppress': {WHEN: ..., ACTION: NOOP, EXCEPTION: ...}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_ACTION), _TRANSFORM_WHEN_MISSING_ACTION)
-        )
+        simplifications.append((AND(IS_DICT, _MISSING_ACTION), _TRANSFORM_WHEN_MISSING_ACTION))
 
         # `{'suppress': {ACTION: ..., EXCEPTION: ...}}` -> `{'suppress': {WHEN: RETURN_TRUE, ACTION: ..., EXCEPTION: ...}}`
-        self.simplifications.append((AND(IS_DICT, _MISSING_WHEN), _TRANSFORM_WHEN_MISSING_WHEN))
+        simplifications.append((AND(IS_DICT, _MISSING_WHEN), _TRANSFORM_WHEN_MISSING_WHEN))
+
+        return simplifications
 
     def _do_parse(self, value: Dict[str, Any]) -> Dict[str, Any]:
         self.verify(value)

@@ -1,4 +1,4 @@
-from functools import partial
+from functools import cache, partial
 from typing import Any, List, Tuple
 
 from ..common import Predicate, Transform
@@ -49,8 +49,32 @@ class Simplification:
 
         return simplified_value
 
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        """
+        When simplifications for this class can be statically computed (not varying
+        per instance). This method should be implemented to compute the
+        simplifications for this class.
+        """
+        return []
+
+    @classmethod
+    @property
+    @cache
+    def _static_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        return cls._get_simplifications()
+
     def _init_simplifications(self) -> None:
-        self.simplifications: List[Tuple[Predicate, Transform]] = []
+        """
+        By default, it will use static computed (cached) simplifications for this
+        class. To use the default workflow, `_get_simplifications`
+        should be implemented to statically compute the simplifications.
+
+        Otherwise, when the simplifications for this class varies per instance.
+        This method should be overridden to bind custom value for
+        `simplifications`.
+        """
+        self.simplifications: List[Tuple[Predicate, Transform]] = self._static_simplifications
 
     def simplify(self, value: Any) -> Any:
         """

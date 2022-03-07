@@ -1,7 +1,15 @@
 from functools import partial
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
-from ..common import AND, DEFAULT_KEYERROR, IS_DICT, IS_DICT_MISSING_KEY, IS_NOT_DICT
+from ..common import (
+    AND,
+    DEFAULT_KEYERROR,
+    IS_DICT,
+    IS_DICT_MISSING_KEY,
+    IS_NOT_DICT,
+    Predicate,
+    Transform,
+)
 from ..services import Scoped
 from .argument import Arguments
 from .cleanup import Cleanup
@@ -40,6 +48,17 @@ class Runstage(Middleware, WithMiddlewares):
         if _MISSING_RUNSTAGE_RUNSTEPS(value):
             raise DEFAULT_KEYERROR(value, RUNSTEPS)
 
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
+
+        # `{RUNSTAGE: {...}}` -> `{RUNSTAGE: {.., NAME: <uuid>}}`
+        simplifications.append(
+            (AND(IS_DICT, _MISSING_RUNSTAGE_NAME), _TRANSFORM_WHEN_MISSING_NAME)
+        )
+
+        return simplifications
+
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()
         self.middleware_types.extend(
@@ -60,14 +79,6 @@ class Runstage(Middleware, WithMiddlewares):
                 APPLY_ONTO,
                 APPLY_ONTO,
             ]
-        )
-
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
-
-        # `{RUNSTAGE: {...}}` -> `{RUNSTAGE: {.., NAME: <uuid>}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_RUNSTAGE_NAME), _TRANSFORM_WHEN_MISSING_NAME)
         )
 
     def _do_parse(self, value: Any) -> Dict[str, List[Middleware]]:

@@ -1,6 +1,13 @@
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Tuple
 
-from ..common import IDENTITY_FACTORY, IS_NOT_CALLABLE, IS_STR, VALUE
+from ..common import (
+    IDENTITY_FACTORY,
+    IS_NOT_CALLABLE,
+    IS_STR,
+    VALUE,
+    Predicate,
+    Transform,
+)
 from ..services import Scoped
 from .middleware import APPLY_INTO, Context, Middleware, WithMiddlewares
 
@@ -13,10 +20,12 @@ class Name(Middleware, WithMiddlewares):
         if IS_NOT_CALLABLE(value):
             raise TypeError(f"{value} should be either a callable or a string")
 
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
 
-        self.simplifications.append((IS_STR, IDENTITY_FACTORY))
+        simplifications.append((IS_STR, IDENTITY_FACTORY))
+        return simplifications
 
     def _init_middleware_types(self) -> None:
         super()._init_middleware_types()

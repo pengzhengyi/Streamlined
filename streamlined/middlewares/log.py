@@ -1,6 +1,6 @@
 import logging
 from functools import partial
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 from ..common import (
     AND,
@@ -15,6 +15,8 @@ from ..common import (
     LOGGER,
     MESSAGE,
     VALUE,
+    Predicate,
+    Transform,
 )
 from ..services import Scoped
 from .action import Action
@@ -86,37 +88,35 @@ _TRANSFORM_WHEN_IS_CALLABLE = _TRANSFORM_WHEN_IS_STR
 
 
 class Log(Middleware):
-    def _init_simplifications(self) -> None:
-        super()._init_simplifications()
+    @classmethod
+    def _get_simplifications(cls) -> List[Tuple[Predicate, Transform]]:
+        simplifications = super()._get_simplifications()
 
         # `{'log': <str>}` -> `{'log': {MESSAGE: <str>}}`
-        self.simplifications.append((IS_STR, _TRANSFORM_WHEN_IS_STR))
+        simplifications.append((IS_STR, _TRANSFORM_WHEN_IS_STR))
 
         # `{'log': <callable>}` -> `{'log': {MESSAGE: <callable>}}`
-        self.simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_IS_CALLABLE))
+        simplifications.append((IS_CALLABLE, _TRANSFORM_WHEN_IS_CALLABLE))
 
         # `{'log': {MESSAGE: ..., LOGGER: ...}}` -> `{'log': {MESSAGE: ..., LOGGER: ..., LEVEL: DEBUG}}`
-        self.simplifications.append((AND(IS_DICT, _MISSING_LEVEL), _TRANSFORM_WHEN_MISSING_LEVEL))
+        simplifications.append((AND(IS_DICT, _MISSING_LEVEL), _TRANSFORM_WHEN_MISSING_LEVEL))
 
         # `{'log': {MESSAGE: ..., LEVEL: ...}}` -> `{'log': {MESSAGE: ..., LOGGER: _GET_DEFAULT_LOGGER, LEVEL: ...}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MISSING_LOGGER), _TRANSFORM_WHEN_MISSING_LOGGER)
-        )
+        simplifications.append((AND(IS_DICT, _MISSING_LOGGER), _TRANSFORM_WHEN_MISSING_LOGGER))
 
         # `{'log': {MESSAGE: <str>, LOGGER: ..., LEVEL: ...}}` -> `{'log': {MESSAGE: IDENTITY_FACTORY(<str>), LOGGER: ..., LEVEL: ...}}`
-        self.simplifications.append(
-            (AND(IS_DICT, _MESSAGE_IS_STR), _TRANSFORM_WHEN_MESSAGE_IS_STR)
-        )
+        simplifications.append((AND(IS_DICT, _MESSAGE_IS_STR), _TRANSFORM_WHEN_MESSAGE_IS_STR))
 
         # `{'log': {MESSAGE: ..., LOGGER: ..., LEVEL: <int>}}` -> `{'log': {MESSAGE: ..., LOGGER: ..., LEVEL: IDENTITY_FACTORY(<int>)}}`
-        self.simplifications.append(
+        simplifications.append(
             (AND(IS_DICT, _LEVEL_NOT_CALLABLE), _TRANSFORM_WHEN_LEVEL_NOT_CALLABLE)
         )
 
         # `{'log': {MESSAGE: ..., LOGGER: <logger> LEVEL: ...}}` -> `{'log': {MESSAGE: ..., LOGGER: IDENTITY_FACTORY(<logger>), LEVEL: ...)}}`
-        self.simplifications.append(
+        simplifications.append(
             (AND(IS_DICT, _LOGGER_NOT_CALLABLE), _TRANSFORM_WHEN_LOGGER_NOT_CALLABLE)
         )
+        return simplifications
 
     @classmethod
     def verify(cls, value: Any) -> None:
