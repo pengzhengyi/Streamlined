@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from streamlined.services import Scope, Scoping
+from streamlined.services import Scoping, StoreScope
+from streamlined.settings import SETTINGS
 
 
 def test_scoping_two_scopes():
@@ -78,14 +79,14 @@ def test_change():
 
 
 def test_store_at_file():
-    with Scope() as scope:
+    with StoreScope() as scope:
         scope["shell"] = "bash"
         assert scope["shell"] == "bash"
 
 
 def test_store_unpicklable():
     unpickleable = lambda: None
-    with Scope() as scope:
+    with StoreScope() as scope:
         scope["unpickleable"] = unpickleable
         assert "unpickleable" in scope._memory
 
@@ -99,3 +100,14 @@ def test_to_dot(tmp_path: Path):
         scoping.write_dot(filepath)
 
     assert os.path.isfile(filepath)
+
+
+def test_scope_with_settings(tmp_path: Path):
+    SETTINGS.use_diskcache = True
+    tmpdir = str(tmp_path)
+    SETTINGS.tempdir = tmpdir
+
+    assert len(os.listdir(tmpdir)) == 0
+
+    with Scoping() as scoping:
+        assert len(os.listdir(tmpdir)) != 0
