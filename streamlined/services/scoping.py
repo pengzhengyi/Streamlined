@@ -3,8 +3,19 @@ from __future__ import annotations
 import uuid
 from collections import deque
 from contextlib import suppress
-from typing import Any, Deque, Dict, Iterable, Iterator, Optional, Tuple, TypeVar, Union
-from weakref import ReferenceType, ref
+from typing import (
+    Any,
+    Deque,
+    Dict,
+    Iterable,
+    Iterator,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
+from weakref import ref
 
 import networkx as nx
 from pqdict import maxpq
@@ -13,7 +24,8 @@ from treelib.exceptions import MultipleRootError
 
 from ..common import to_networkx, transplant
 from ..common import update as tree_update
-from .storage import AbstractDictionary, Store
+from ..settings import SETTINGS
+from .storage import AbstractDictionary, Dictionary, Store
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -29,7 +41,7 @@ def to_magic_naming(name: str) -> str:
     return f"_{name}_"
 
 
-class Scope(Store):
+class Scope(AbstractDictionary):
     """
     Scope stores mappings from name to value.
 
@@ -44,7 +56,6 @@ class Scope(Store):
     for how to change temporary directory to a custom location.
     """
 
-    __slots__ = ("id",)
     __hash__ = object.__hash__
 
     @property
@@ -118,7 +129,15 @@ class Scope(Store):
         self.__setitem__(to_magic_naming(name), value)
 
 
-class ScopeRef(ref):
+class StoreScope(Scope, Store):
+    """A variant of Scope that uses `Store` as storage provider"""
+
+
+class DictionaryScope(Scope, Dictionary):
+    """A variant of Scope that uses `Dictionary` as storage provider"""
+
+
+class ScopeRef(ref[Scope]):
     @property
     def representation(self) -> str:
         scope: Optional[Scope] = self.__call__()
@@ -143,7 +162,7 @@ class Scoping(AbstractDictionary):
     @staticmethod
     def _get_scope(node: Node) -> Scope:
         data = node.data
-        if isinstance(data, ReferenceType):
+        if isinstance(data, ScopeRef):
             return data()
         elif isinstance(data, Scope):
             return data
@@ -169,6 +188,10 @@ class Scoping(AbstractDictionary):
     def all_scopes(self) -> Iterable[Scope]:
         for node in self._tree.all_nodes_itr():
             yield self._get_scope(node)
+
+    @property
+    def _scope_factory(self) -> Type[Scope]:
+        return StoreScope if SETTINGS.use_diskcache else DictionaryScope
 
     def __init__(self, _tree: Optional[Tree] = None):
         """
@@ -332,7 +355,7 @@ class Scoping(AbstractDictionary):
         )
 
     def _create_scope(self, **kwargs: Any) -> Scope:
-        return Scope(None, **kwargs)
+        return self._scope_factory(None, **kwargs)
 
     def add_scope(self, parent_scope: Scope, scope: Scope) -> Node:
         return self._tree.create_node(identifier=scope.id, data=scope, parent=parent_scope.id)
