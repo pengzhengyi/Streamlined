@@ -25,6 +25,12 @@ from streamlined.middlewares.runstep import SUBSTEPS
 
 
 @pytest.mark.asyncio
+async def test_runstep_no_action(simple_executor):
+    runstep = Runstep({NAME: "no action"})
+    await runstep.run(simple_executor)
+
+
+@pytest.mark.asyncio
 async def test_runstep_action_requires_arguments(simple_executor):
 
     mock = Mock()

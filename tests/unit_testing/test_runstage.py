@@ -1,4 +1,4 @@
-from typing import Any, Dict, Literal, Union
+from typing import Any, Dict, List, Literal, Union
 from unittest.mock import Mock
 
 import pytest
@@ -9,10 +9,24 @@ from streamlined.middlewares import (
     ARGUMENTS,
     NAME,
     RUNSTAGE,
+    RUNSTAGES,
     RUNSTEPS,
+    SCHEDULING,
     Runstage,
+    Runstages,
 )
+from streamlined.scheduling import PARALLEL
 from streamlined.services import Scoped
+
+
+@pytest.mark.asyncio
+async def test_empty_runstages(simple_executor):
+    def _return_empty_runstages() -> List[Dict[str, Any]]:
+        return []
+
+    runstages = Runstages({RUNSTAGES: {VALUE: _return_empty_runstages, SCHEDULING: PARALLEL}})
+
+    await runstages.run(simple_executor)
 
 
 @pytest.mark.asyncio
