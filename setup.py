@@ -8,10 +8,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="streamlined",
-    version="0.4.5",
+    version="1.0.0",
     author="Zhengyi Peng",
     author_email="pengzhengyipengzhengyi@gmail.com",
-    description="Make ML or generic pipeline more streamlined",
+    description="Make task execution more streamlined",
     keywords="workflow pipeline",
     install_requires=[
         "ray[default]",
