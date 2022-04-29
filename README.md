@@ -1,8 +1,65 @@
 # Streamlined
 
-**Making running scripts more streamlined!**
+## Analogy to prepare a Christmas dinner
 
-Streamlined allows you to declare a pipeline using a declarative syntax.
+It's Christmas and your family is motivated in preparing a sumptuous dinner.
+Not interfered by your noisy brothers and sisters, you are determined to keep things organized.
+
+It will surely cause some headache: you would like to have meal ready before evening so better to be
+efficient; you have helpers but your youngest sister does not know how to operate the oven while
+as for your younger brother, better to have him away from the knife. To make things worse, there are
+dependencies and prerequisites. For example, to cook that tomato beef soup, tomato has to be sliced
+and beef has to be stewed.
+
+In similar terms, Streamlined aims at efficient execution of tasks under the available resources
+managing all the dependencies and constraints while provides an intuitive user interface.
+
+## Cook shredded pork and green pepper (青椒肉丝) imaginatively
+
+### Recipe Breakdown
+
+Tasks:
+
++ wash pepper
++ cut pepper into shreds
++ cut ginger into shreds
++ cut garlic into slices
++ cut pork into slices
++ marinate pork slices
+  + salt
+  + add soy sauce
+  + stir
+  + oil
++ add oil to the wak
++ add pork slices
++ add garlic slices
++ add pepper slices
++ add salt
++ add sugar
++ add vinegar
++ add soy sauce
+
+Ingredients:
+
++ pork
++ pepper
++ ginger
++ garlic
++ salt
++ soy sauce
++ oil
++ sugar
++ vinegar
+
+Resources:
+
++ bowl
++ cutting board
++ knife
++ kitchen sink
++ wak
+
+### How it translates to code
 
 ## Install
 
@@ -62,7 +119,7 @@ pipeline = Pipeline({
                 LEVEL: logging.INFO,
                 LOGGER: logger
             }
-        }     
+        }  
     ]
 })
 ```
@@ -103,7 +160,7 @@ pipeline = Pipeline({
         {
             NAME: "compute sum",
             ACTION: lambda x, y: x + y
-        }     
+        }  
     ]
 })
 ```
@@ -115,9 +172,9 @@ Argument definition precedence:
 
 Argument naming conventions:
 
-- Argument name are encouraged to be unique to avoid arguemnt shadowing. When multiple arguments share the same name, the the argument value in the nearest scope will be used. For example, if `x` is defined in pipeline to be `1` and in runstage `foo` to be `-1`, referencing `x` in a runstep inside `foo` will resolve to `-1` while in runstage `bar` will resolve to `1`.
-- Argument name should follow [Python variable naming convention](https://www.python.org/dev/peps/pep-0008/#function-and-variable-names) when it needs to be referenced in execution components. *Explicit retrieval is possible if a variable is named differently like `"Menu Items"`, but it will not be as straightforward as dependency injection.*
-- If an argument is only executed for the effect, its name is encouraged to be `"_"`.
++ Argument name are encouraged to be unique to avoid arguemnt shadowing. When multiple arguments share the same name, the the argument value in the nearest scope will be used. For example, if `x` is defined in pipeline to be `1` and in runstage `foo` to be `-1`, referencing `x` in a runstep inside `foo` will resolve to `-1` while in runstage `bar` will resolve to `1`.
++ Argument name should follow [Python variable naming convention](https://www.python.org/dev/peps/pep-0008/#function-and-variable-names) when it needs to be referenced in execution components. *Explicit retrieval is possible if a variable is named differently like `"Menu Items"`, but it will not be as straightforward as dependency injection.*
++ If an argument is only executed for the effect, its name is encouraged to be `"_"`.
 
 #### Syntax
 
@@ -158,7 +215,7 @@ CLEANUP: <action>
 
 ### Execution
 
-Execution component is pivotal in pipeline definition as it can produce a new value utilizing already-defined values. 
+Execution component is pivotal in pipeline definition as it can produce a new value utilizing already-defined values.
 
 The value for executed action can be any Callable -- a lambda or a function. And if this callable has any parameters, those values will be resolved at invocation time.
 
@@ -166,9 +223,9 @@ Dependency Injection will succeed if and only if parameter name match the name o
 
 Possible ways of Argument Declaration:
 
-- Through argument component (most frequent)
-- Through automatically exposed magic values.
-- Through explicitly bound argument -- calls of `bindone`, `bind`, `run`.
++ Through argument component (most frequent)
++ Through automatically exposed magic values.
++ Through explicitly bound argument -- calls of `bindone`, `bind`, `run`.
 
 An argument is in scope if and only if it is defined in current scope or any enclosing scope. For example, if `x` is referenced in a runstep execution component, applicable scopes include this runstep scope, enclosing runstage scope, enclosing pipeline scope (global scope).
 
@@ -193,7 +250,7 @@ If logger is not specified, it will use [`logging.getLogger()`](https://docs.pyt
 #### Syntax
 
 + Full Syntax
-    
+
     ```Python
     LOG: {
         VALUE: ...,
@@ -226,10 +283,10 @@ Skip is a special field present in pipeline configuration (it is also present in
 
 It can be configured in any of the following ways:
 
-- Boolean Flag: `"skip": True` or `"skip": False`
-- An execution component that evaluates to boolean flag
++ Boolean Flag: `"skip": True` or `"skip": False`
++ An execution component that evaluates to boolean flag
     `"skip": lambda: True`
-- A dictionary where value determines whether enclosing component should be skipped and action specifies an action to execute in replacement if enclosing component is skipped.
++ A dictionary where value determines whether enclosing component should be skipped and action specifies an action to execute in replacement if enclosing component is skipped.
 
     ```Python
     "skip": {
@@ -238,7 +295,7 @@ It can be configured in any of the following ways:
     }
     ```
 
-- Not specifying any, it will default to `"skip": False`
++ Not specifying any, it will default to `"skip": False`
 
 #### Syntax
 
@@ -409,7 +466,7 @@ A validator component is composed by before validation stage and (or) after vali
     ```
 
 | Field Name | Field Value |
-| --- | --- | 
+| --- | --- |
 | before | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>Callable[..., bool]</i></td><td><code>lambda: True</code></td></tr><tr><td>Dict</a></td><td><code>{"action": lambda: True, LOG: {True: "pass", False: "fail"}}</code></td></tr></tbody></table>|
 | after | <table><thead><tr><th>Type</th><th>Example</th></tr> </thead>  <tbody><tr><td><i>Callable[..., bool]</i></td><td><code>lambda: True</code></td></tr><tr><td>Dict</a></td><td><code>{"action": lambda: True, LOG: {True: "pass", False: "fail"}}</code></td></tr></tbody></table>|
 
@@ -429,7 +486,6 @@ There are several variants to validation stage configuration:
 
 + Use default log message
 
-
     ```Python
     {
         ACTION: ...
@@ -448,13 +504,13 @@ This section will cover some utilities exposed by `streamlined` library. All the
 ### Argument Parser/Loader
 
 + `streamlined.utils.ArgumentParser` is a utility built on top of [argparse](https://docs.python.org/3/library/argparse.html) to parse command line arguments iteratively. See `utils/argument_parser.py` folder for more details.
-+ `streamlined.utils.ArgumentLoader` allows specifying definition for argument parser inside the [dataclass](https://docs.python.org/3/library/dataclasses.html) definition -- through the `metadata` property of dataclass field. 
++ `streamlined.utils.ArgumentLoader` allows specifying definition for argument parser inside the [dataclass](https://docs.python.org/3/library/dataclasses.html) definition -- through the `metadata` property of dataclass field.
 
     It supports
-    
-    + creating an argument parser based on defined dataclass fields
-    + creating an instance from arguments using a provided argument parser
-    + create an instance from arguments directly (the argument parser is created based off configuration in defined dataclass fields)
+
+  + creating an argument parser based on defined dataclass fields
+  + creating an instance from arguments using a provided argument parser
+  + create an instance from arguments directly (the argument parser is created based off configuration in defined dataclass fields)
 
     ```Python
     @dataclass
@@ -480,9 +536,9 @@ This section will cover some utilities exposed by `streamlined` library. All the
 
 + `streamlined.utils.ConfigurationParser` is a derived class of [configparser.ConfigParser](https://docs.python.org/3/library/configparser.html#configparser.ConfigParser) that provides the additional functionalities:
 
-    + **CLASSMETHOD** add a section -- `append_section`
-    + **CLASSMETHOD** remove a section -- `remove_section`
-    + get an configuration option and cast to specified type -- `get_with_type`
+  + **CLASSMETHOD** add a section -- `append_section`
+  + **CLASSMETHOD** remove a section -- `remove_section`
+  + get an configuration option and cast to specified type -- `get_with_type`
 + `streamlined.utils.ConfigurationLoader` allows loading a configuration file into a [dataclass](https://docs.python.org/3/library/dataclasses.html).
 It can be seen as a trait to be derived by desired dataclass:
 
